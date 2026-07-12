@@ -81,7 +81,7 @@
 | refactor-done | YawPitchModel が yaw/pitch、符号、独立感度、Y反転、pitch上限、dt境界、resetを満たす | new / edge | unit | 9 tests green。中間 pitch 投影、raw 非依存、reset を確認 |
 | refactor-skipped | YawPitchModel が移動なしでも姿勢整合した static 1G を維持する | characterization / regression | unit | 10 tests green。既存 model の pose 維持を追加テストで固定 |
 | refactor-skipped | InputPublisher が monotonic clock で sequence/epoch 付き frame を 8ms 評価境界へ渡す | new / edge | unit | 4 tests green。時計注入、初回・epoch変更の dt=0、capture 外 neutral、sink offer を実装。実時間 sleep と Bluetooth は使わない |
-| todo | input pipeline の全 gate と package smoke が通る | characterization | package | `uv lock --check`、`uv build`、unit を含める |
+| refactor-done | input pipeline の全 gate と package smoke が通る | characterization | package | 75 unit tests、lock、format、lint、ty、build、wheel contents smoke を確認。`tests/integration` は tree 不在のため not applicable |
 
 ## 7. 設計メモ
 
@@ -128,6 +128,20 @@
 | `uv run ruff format --check src/demi/input tests/unit/input` | passed | 8 files already formatted |
 | `uv run ruff check src/demi/input tests/unit/input` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv sync --dev` | passed | 42 packages resolved、37 packages checked |
+| `uv lock --check` | passed | 42 packages |
+| `uv run ruff format --check .` | passed | 32 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 75 passed |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成。sandbox の PyPI 接続制限のため外部アクセス許可で実行 |
+| package smoke via `uv run python -c` | passed | wheel に `demi/__main__.py`、`demi/domain/controller.py`、`demi/input/publisher.py` が含まれることを確認 |
+| `uv run pytest tests/integration` | not applicable | `tests/integration` tree は未作成 |
+| `git diff --check` | passed | whitespace error なし |
+| type-boundary review | passed | `Clock` / `FrameSink` を `Protocol` で表現。`ty` 通過、production の `Any` / `type: ignore` なし |
+| docstring review | passed | publisher の public API と test fake の D 系 docstring を確認 |
+| docs-quality review | passed | TDD status、検証結果、not applicable、先送り事項、仮テキスト残りを確認 |
+| agentic self-review | passed | `spec/initial`、対象範囲、対象外、diff、gate、残リスクを照合 |
 | `uv run pytest tests/unit/input/test_yaw_pitch_model.py` | passed | 10 passed |
 | `uv run ruff check src/demi/input/yaw_pitch_model.py tests/unit/input/test_yaw_pitch_model.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
@@ -158,6 +172,6 @@
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を作成した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] package / release / public API に触れる場合の gate を記録した
 - [ ] 完了時に `spec/complete/unit_003` へ移動した
