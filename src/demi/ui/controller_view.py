@@ -231,6 +231,7 @@ class ControllerView:
             LogicalButton.DPAD_RIGHT: (body_x + body_width * 0.20, body_y + body_height * 0.55),
         }
         for button, (x, y) in button_positions.items():
+            # pyglet's writable color descriptor is not exposed as writable by ty.
             self._button_shapes[button] = cast(
                 "ColorShape",
                 shapes.Circle(

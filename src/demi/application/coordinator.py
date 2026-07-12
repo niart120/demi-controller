@@ -26,6 +26,7 @@ class CaptureCoordinator:
         self._app_state = AppState.IDLE
         self._capture_epoch = 0
         self._focused = True
+        self._last_frame: ControllerFrame | None = None
 
     @property
     def app_state(self) -> AppState:
@@ -52,6 +53,11 @@ class CaptureCoordinator:
         """Return whether controller input capture is active."""
         return self._app_state is AppState.CAPTURED
 
+    @property
+    def last_frame(self) -> ControllerFrame | None:
+        """Return the latest frame published by this coordinator."""
+        return self._last_frame
+
     def start_capture(self) -> bool:
         """Start capture and publish an initial active neutral frame.
 
@@ -72,11 +78,19 @@ class CaptureCoordinator:
             return False
 
         self._app_state = AppState.CAPTURED
-        self._publisher.publish(
-            capture_active=True,
+        self._publish_frame(capture_active=True)
+        return True
+
+    def evaluate(self) -> ControllerFrame:
+        """Publish the current capture state at one scheduled clock tick."""
+        return self._publish_frame(capture_active=self.is_captured)
+
+    def _publish_frame(self, *, capture_active: bool) -> ControllerFrame:
+        self._last_frame = self._publisher.publish(
+            capture_active=capture_active,
             capture_epoch=self._capture_epoch,
         )
-        return True
+        return self._last_frame
 
     def stop_capture(self) -> ControllerFrame | None:
         """Stop capture and publish a capture-inactive neutral frame.
@@ -118,7 +132,4 @@ class CaptureCoordinator:
         with suppress(OSError, RuntimeError):
             self._window.set_exclusive_mouse(False)
         self._publisher.state.clear()
-        return self._publisher.publish(
-            capture_active=False,
-            capture_epoch=self._capture_epoch,
-        )
+        return self._publish_frame(capture_active=False)

@@ -86,7 +86,7 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | refactor-done | ControllerView が ControllerFrame だけから pressed/control/IMU の表示モデルを更新する | new / edge | unit | 2 tests green。stick、button、gyro、accel、capture を frame だけから更新し、pyglet Batch 描画境界を追加 |
 | refactor-done | toolbar が connection/app state からラベルと enabled を決める | new / edge | unit | 2 tests green。接続中、captured、focus loss、modal 相当の無効状態を確認 |
 | refactor-done | status bar が adapter、connection、capture、8ms、preview warning を組み立てる | new / edge | unit | 2 tests green。未接続 capture の preview-only 警告を固定 |
-| todo | PygletApplication が backend、view、toolbar、status、8ms clock を接続する | new / integration | unit | FakeWindow と FakeClock で handler wiring を確認する |
+| refactor-done | PygletApplication が backend、view、toolbar、status、8ms clock を接続する | new / integration | unit | 1 test green。FakeWindow と FakeClock で handler wiring、8ms schedule、coordinator latest frame を確認 |
 | todo | UI package の全 gate と headless/package smoke が通る | characterization | package | lock、format、lint、ty、unit、build、wheel contents を含める |
 
 ## 7. 設計メモ
@@ -128,6 +128,10 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | `uv run pytest tests/unit/ui/test_window.py` | passed | 1 passed |
 | `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/ui/test_pyglet_application.py` | passed | 1 passed |
+| `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_pyglet_application.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_pyglet_application.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/ui/test_status_bar.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` | passed | 2 files already formatted |
