@@ -109,6 +109,17 @@ def test_non_positive_dt_does_not_update_pose_and_returns_current_acceleration()
     assert accel == AccelG(-sin(previous_pitch), 0.0, cos(previous_pitch))
 
 
+def test_no_motion_keeps_pose_but_returns_zero_gyro() -> None:
+    model = YawPitchModel(MouseSettings())
+    model.update(dx=0.0, dy=10.0, dt_seconds=0.01)
+    pitch = model.pitch_radians
+
+    gyro, accel = model.update(dx=0.0, dy=0.0, dt_seconds=0.01)
+
+    assert gyro == GyroRate(0.0, 0.0, 0.0)
+    assert accel == AccelG(-sin(pitch), 0.0, cos(pitch))
+
+
 def test_reset_returns_pose_to_horizontal_neutral() -> None:
     model = YawPitchModel(MouseSettings())
     model.update(dx=0.0, dy=10.0, dt_seconds=0.01)
