@@ -78,7 +78,12 @@ def _is_button_target(target: BindingTarget) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class Binding:
-    """A normalized physical input binding."""
+    """A normalized physical input binding.
+
+    Raises:
+        DomainValueError: The source, target, amount, or inversion combination
+            is not supported by the configuration schema.
+    """
 
     source: str
     target: BindingTarget
@@ -107,7 +112,12 @@ class Binding:
 
 @dataclass(frozen=True, slots=True)
 class InputProfile:
-    """Named collection of bindings available to the application."""
+    """Named collection of bindings available to the application.
+
+    Raises:
+        DomainValueError: The profile identity or binding collection is
+            invalid.
+    """
 
     id: str
     name: str
@@ -129,7 +139,11 @@ class InputProfile:
 
 
 def default_profile() -> InputProfile:
-    """Return the immutable built-in ``Default`` input profile."""
+    """Return the immutable built-in ``Default`` input profile.
+
+    Returns:
+        The 28-binding profile defined by the initial configuration.
+    """
     return InputProfile(
         id="default",
         name="Default",

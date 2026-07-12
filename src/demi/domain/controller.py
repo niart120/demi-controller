@@ -42,7 +42,12 @@ def _require_counter(value: int) -> None:
 
 @dataclass(frozen=True, slots=True)
 class StickVector:
-    """Normalized two-dimensional stick position in the `-1..1` range."""
+    """Normalized two-dimensional stick position in the `-1..1` range.
+
+    Raises:
+        DomainValueError: A coordinate is non-finite or outside the normalized
+            range.
+    """
 
     x: float
     y: float
@@ -57,7 +62,11 @@ class StickVector:
 
 @dataclass(frozen=True, slots=True)
 class GyroRate:
-    """Angular velocity expressed in radians per second."""
+    """Angular velocity expressed in radians per second.
+
+    Raises:
+        DomainValueError: A component is not finite.
+    """
 
     x_radians_per_second: float
     y_radians_per_second: float
@@ -72,7 +81,11 @@ class GyroRate:
 
 @dataclass(frozen=True, slots=True)
 class AccelG:
-    """Acceleration-sensor specific force expressed in G units."""
+    """Acceleration-sensor specific force expressed in G units.
+
+    Raises:
+        DomainValueError: A component is not finite.
+    """
 
     x_g: float
     y_g: float
@@ -87,7 +100,12 @@ class AccelG:
 
 @dataclass(frozen=True, slots=True)
 class ControllerFrame:
-    """Complete immutable controller state for one input evaluation."""
+    """Complete immutable controller state for one input evaluation.
+
+    Raises:
+        DomainValueError: Metadata or nested values violate the frame
+            invariant.
+    """
 
     sequence: int
     capture_epoch: int

@@ -25,14 +25,28 @@ class SettingsPaths:
         return self.config_dir / "settings.toml"
 
     def bond_file(self, slot: str) -> Path:
-        """Return a validated Pro Controller bond path for ``slot``."""
+        """Return a validated Pro Controller bond path for ``slot``.
+
+        Args:
+            slot: Lowercase bond slot name without path separators.
+
+        Returns:
+            The slot path under ``data_dir/bonds/pro-controller``.
+
+        Raises:
+            DomainValueError: ``slot`` does not match the safe slot pattern.
+        """
         if not isinstance(slot, str) or _BOND_SLOT_PATTERN.fullmatch(slot) is None:
             raise DomainValueError
         return self.data_dir / "bonds" / "pro-controller" / f"{slot}.json"
 
 
 def resolve_paths() -> SettingsPaths:
-    """Resolve Project_Demi directories through platformdirs."""
+    """Resolve Project_Demi directories through platformdirs.
+
+    Returns:
+        Config, data, and log directories selected for the current OS.
+    """
     directories = platformdirs.PlatformDirs(appname="Project_Demi", appauthor=False)
     return SettingsPaths(
         config_dir=Path(directories.user_config_path),

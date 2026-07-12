@@ -42,7 +42,14 @@ class SettingsRepository:
         self._paths = paths
 
     def load(self) -> SettingsLoadResult:
-        """Load settings, distinguishing first run and recovery outcomes."""
+        """Load settings, distinguishing first run and recovery outcomes.
+
+        Returns:
+            A settings snapshot with FIRST_RUN, LOADED, or RECOVERED status.
+
+        Raises:
+            SettingsPersistenceError: The settings file cannot be read.
+        """
         if not self._paths.settings_file.exists():
             return SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
         try:
@@ -58,7 +65,15 @@ class SettingsRepository:
         return SettingsLoadResult(settings, SettingsLoadStatus.LOADED)
 
     def save(self, settings: AppSettings) -> None:
-        """Atomically replace the settings file with a validated snapshot."""
+        """Atomically replace the settings file with a validated snapshot.
+
+        Args:
+            settings: Validated snapshot to persist.
+
+        Raises:
+            SettingsPersistenceError: The temporary write or atomic replace
+                fails. The previous settings file is left untouched.
+        """
         temporary_path: Path | None = None
         try:
             self._paths.config_dir.mkdir(parents=True, exist_ok=True)

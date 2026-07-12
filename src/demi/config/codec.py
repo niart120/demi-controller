@@ -315,12 +315,31 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
 
 
 def dumps_settings(settings: AppSettings) -> str:
-    """Serialize settings as UTF-8 TOML text."""
+    """Serialize settings as UTF-8 TOML text.
+
+    Args:
+        settings: Validated settings snapshot.
+
+    Returns:
+        TOML text using the current schema and complete binding arrays.
+    """
     return tomli_w.dumps(encode_settings(settings))
 
 
 def loads_settings(text: str) -> AppSettings:
-    """Parse TOML text and decode it as current-schema settings."""
+    """Parse TOML text and decode it as current-schema settings.
+
+    Args:
+        text: UTF-8 TOML document.
+
+    Returns:
+        Validated immutable settings.
+
+    Raises:
+        ConfigurationError: The text is malformed or violates a setting
+            constraint.
+        UnsupportedSchemaError: The document uses an unknown schema.
+    """
     try:
         raw = tomllib.loads(text)
     except tomllib.TOMLDecodeError:

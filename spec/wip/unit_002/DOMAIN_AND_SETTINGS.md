@@ -85,7 +85,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | refactor-done | 未知 schema、未知項目、無効 enum/range を安全に拒否する | new / edge | unit | 4 tests green。現行 v1 のみ migration registry を通過させ、fallback 保存をしない |
 | refactor-skipped | PlatformDirs と bond slot のパス境界を検証する | new / edge | unit | 2 tests green。既存責務が小さく追加 refactor は不要 |
 | refactor-done | repository が初回、正常、破損復旧、原子的保存を区別する | new / regression / edge | unit | 5 tests green。backup failure、replace failure、temporary file cleanup を確認 |
-| refactor-skipped | package dependency、lock、build、typed import の gate が通る | characterization | package | 42 unit tests、lock/build、domain boundary、wheel contents を確認。追加 refactor は不要 |
+| refactor-done | package dependency、lock、build、typed import の gate が通る | characterization | package | 42 unit tests、lock/build、domain boundary、wheel contents を確認。公開 I/O API の docstring を整理 |
 
 ## 7. 設計メモ
 
@@ -135,6 +135,8 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `uv run ruff format --check src/demi/domain tests/unit/domain/test_controller.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/domain tests/unit/domain/test_controller.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| type-boundary review | passed | `ty`、py.typed、None boundary、cast/type ignore の確認。production の `Any` / `type: ignore` なし |
+| docstring review | passed | domain value、codec、paths、repository の公開契約へ Args/Returns/Raises を反映 |
 | `uv sync --dev` | passed | 42 packages resolved、37 packages checked |
 | `uv lock --check` | passed | 42 packages |
 | `uv run ruff format --check .` | passed | 23 files already formatted |
