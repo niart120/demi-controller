@@ -85,3 +85,46 @@ def test_controller_frame_is_converted_to_one_public_input_state() -> None:
         z_rad_s=3.0,
     ).with_accel_g(x_g=0.25, y_g=-0.5, z_g=0.75)
     assert state.imu_frames == (expected_imu, expected_imu, expected_imu)
+
+
+def test_neutral_frame_uses_one_g_acceleration_in_all_three_imu_slots() -> None:
+    gamepad = RecordingGamepad()
+
+    def gamepad_factory(**kwargs: object) -> RecordingGamepad:
+        del kwargs
+        return gamepad
+
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=gamepad_factory,
+        adapter_lister=lambda: (),
+    )
+    neutral_frame = ControllerFrame(
+        sequence=2,
+        capture_epoch=1,
+        monotonic_ns=2,
+        buttons=frozenset(),
+        left_stick=StickVector(x=0.0, y=0.0),
+        right_stick=StickVector(x=0.0, y=0.0),
+        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        accel_g=AccelG(0.0, 0.0, 1.0),
+        capture_active=False,
+    )
+
+    async def exercise() -> None:
+        await adapter.connect_saved(
+            "usb:0",
+            Path("bond.json"),
+            30.0,
+            ControllerColorSettings(),
+        )
+        await adapter.apply_frame(neutral_frame)
+
+    asyncio.run(exercise())
+
+    state = gamepad.applied_states[0]
+    expected_imu = IMUFrame.gyro_rate().with_accel_g(x_g=0.0, y_g=0.0, z_g=1.0)
+    assert state.buttons == frozenset()
+    assert state.left_stick == Stick.center()
+    assert state.right_stick == Stick.center()
+    assert state.imu_frames == (expected_imu, expected_imu, expected_imu)
+    assert state.imu_frames != InputState.neutral().imu_frames
