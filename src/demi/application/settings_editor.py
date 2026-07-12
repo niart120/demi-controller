@@ -1,6 +1,6 @@
 """Immutable draft editing for Project_Demi settings modals."""
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from demi.domain.errors import DomainValueError
@@ -13,6 +13,15 @@ from demi.domain.settings import (
 )
 
 type ColorField = Literal["body", "buttons", "left_grip", "right_grip"]
+
+
+@dataclass(frozen=True, slots=True)
+class BindingConflict:
+    """One duplicate binding source or local-action collision."""
+
+    source: str
+    binding_indices: tuple[int, ...]
+    local_action: str | None = None
 
 
 class SettingsEditor:
@@ -124,6 +133,47 @@ class SettingsEditor:
             self._draft,
             active_profile="default",
             profiles=(default_profile(),),
+        )
+
+    def conflicts(self) -> tuple[BindingConflict, ...]:
+        """Return deterministic duplicate-source and local-action warnings."""
+        profile = self._active_profile()
+        indices_by_source: dict[str, list[int]] = {}
+        for index, binding in enumerate(profile.bindings):
+            indices_by_source.setdefault(binding.source, []).append(index)
+
+        conflicts: list[BindingConflict] = []
+        for source, indices in indices_by_source.items():
+            if len(indices) >= 2:
+                conflicts.append(BindingConflict(source=source, binding_indices=tuple(indices)))
+
+        local_actions = (
+            *self._draft.local_actions.toggle_capture,
+            *self._draft.local_actions.quit,
+            *self._draft.local_actions.release_capture,
+        )
+        local_action_set = set(local_actions)
+        for index, binding in enumerate(profile.bindings):
+            if not binding.source.startswith("KEY:"):
+                continue
+            action = binding.source.removeprefix("KEY:")
+            if action in local_action_set:
+                conflicts.append(
+                    BindingConflict(
+                        source=binding.source,
+                        binding_indices=(index,),
+                        local_action=action,
+                    )
+                )
+        return tuple(
+            sorted(
+                conflicts,
+                key=lambda conflict: (
+                    conflict.binding_indices[0],
+                    conflict.source,
+                    conflict.local_action or "",
+                ),
+            )
         )
 
     def validate(self) -> None:

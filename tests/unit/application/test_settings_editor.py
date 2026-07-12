@@ -40,3 +40,19 @@ def test_editor_rejects_f12_binding_and_restores_the_default_profile() -> None:
 
     assert editor.draft.profiles == (default_profile(),)
     assert editor.draft.active_profile == "default"
+
+
+def test_editor_reports_duplicate_source_and_local_action_conflicts_only() -> None:
+    editor = SettingsEditor(AppSettings.default())
+    editor.update_binding(1, source="KEY:F")
+    editor.update_binding(2, source="KEY:CTRL+C")
+
+    conflicts = editor.conflicts()
+
+    assert conflicts[0].source == "KEY:F"
+    assert conflicts[0].binding_indices == (0, 1)
+    assert conflicts[0].local_action is None
+    assert conflicts[1].source == "KEY:CTRL+C"
+    assert conflicts[1].binding_indices == (2,)
+    assert conflicts[1].local_action == "CTRL+C"
+    assert all(conflict.source != "KEY:V" for conflict in conflicts)
