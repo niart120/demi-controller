@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Merge Cleanup"
+  short_description: "PR とブランチ整理"
+  default_prompt: "現在の作業ブランチを検証し、PR 作成または merge、default branch 同期、branch cleanup まで進める。"

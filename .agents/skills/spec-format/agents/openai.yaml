@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec Format"
+  short_description: "作業仕様を作成・更新"
+  default_prompt: "依頼内容を spec/wip の作業仕様に落とし込み、対象範囲、対象外、TDD Test List、検証条件を整理する。"

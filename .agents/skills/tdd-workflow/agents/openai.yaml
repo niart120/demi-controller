@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tdd Workflow"
+  short_description: "TDD で作業単位を進める"
+  default_prompt: "対象の spec/wip を読み、TDD Test List から red / green / refactor を進めて検証結果を記録する。"
