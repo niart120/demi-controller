@@ -114,25 +114,22 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/unit/application/test_settings_editor.py` | not run | implementation 後に実行する |
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 2 passed。draft 編集、default reset、F12 予約保護を確認 |
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 3 passed。duplicate source、local action collision、同一 target の複数 source を確認 |
 | `uv run pytest tests/unit/application/test_dialogs.py -q` | passed | 2 passed。modal 排他、title、idempotent close を確認 |
 | `uv run pytest tests/unit/application/test_coordinator.py -q` | passed | 3 passed。configuration open の neutral、state transition、自動 recapture なしを確認 |
 | `uv run pytest tests/integration/ui/test_settings_modal.py -q` | passed | 4 passed。save/reconnect decision、save failure 保持、recovery notice の backup 有無を確認 |
-| `uv run pytest tests/unit/ui/test_dialogs.py -q` | passed | 2 passed。display-free view model と conflict warning を確認 |
-| `uv run ruff format --check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | 2 files already formatted |
-| `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | All checks passed |
+| `uv run pytest tests/unit/ui/test_dialog_view.py -q` | passed | 2 passed。display-free view model と conflict warning を確認 |
+| `uv sync --dev` | passed | Resolved 68 packages、Checked 66 packages |
+| `uv lock --check` | passed | Resolved 68 packages |
+| `uv run ruff format --check .` | passed | 74 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
-| `uv run pytest tests/unit/application/test_dialogs.py` | not run | implementation 後に実行する |
-| `uv run pytest tests/integration/ui/test_settings_modal.py` | not run | implementation 後に実行する |
-| `uv run ruff format --check .` | not run | implementation 後に実行する |
-| `uv run ruff check .` | not run | implementation 後に実行する |
-| `uv run ty check --no-progress` | not run | implementation 後に実行する |
-| `uv run pytest tests/unit` | not run | implementation 後に実行する |
-| `uv run pytest tests/integration` | not run | implementation 後に実行する |
-| `uv build` | not run | package gate として実行する |
-| `git diff --check` | not run | implementation 後に実行する |
+| `uv run pytest tests/unit` | passed | 117 passed。test basename collision を rename して collection を安定化 |
+| `uv run pytest tests/integration` | passed | 10 passed |
+| `uv build` | passed | `dist/demi_controller-0.1.0.tar.gz` と `dist/demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `uv run python -c "from pathlib import Path; import zipfile; wheel=next(Path('dist').glob('*.whl')); names=set(zipfile.ZipFile(wheel).namelist()); required={'demi/application/settings_editor.py','demi/application/settings_modal.py','demi/ui/dialogs.py'}; assert required <= names, sorted(required-names); print(f'{wheel.name}: settings modal files present')"` | passed | wheel に settings modal files が含まれることを確認 |
+| `git diff --check` | passed | whitespace error なし |
 
 ## 10. 先送り事項
 
@@ -144,5 +141,5 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を作成した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] package / release / public API に触れる場合の gate を記録した
