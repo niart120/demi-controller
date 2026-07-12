@@ -1,0 +1,141 @@
+"""Evaluate normalized input state and publish controller frames."""
+
+from typing import ClassVar, Protocol
+
+from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
+from demi.domain.mapping import InputProfile, default_profile
+from demi.domain.physical_input import PhysicalInputState
+from demi.domain.settings import MouseSettings
+
+from .mapper import aggregate_buttons, synthesize_stick
+from .yaw_pitch_model import YawPitchModel
+
+
+class Clock(Protocol):
+    """Monotonic clock required by the input evaluation boundary."""
+
+    def monotonic_ns(self) -> int:
+        """Return the current monotonic time in nanoseconds."""
+
+
+class FrameSink(Protocol):
+    """Destination for the latest evaluated controller frame."""
+
+    def offer_frame(self, frame: ControllerFrame) -> None:
+        """Accept one immutable controller frame."""
+
+
+class InputPublisher:
+    """Evaluate input state at an injected-clock boundary.
+
+    The publisher does not schedule itself or wait for real time. The caller
+    invokes :meth:`publish` at the configured evaluation boundary.
+    """
+
+    evaluation_interval_ms: ClassVar[int] = 8
+
+    def __init__(
+        self,
+        *,
+        clock: Clock,
+        sink: FrameSink,
+        profile: InputProfile | None = None,
+        mouse_settings: MouseSettings | None = None,
+        circular_limit: bool = False,
+    ) -> None:
+        """Initialize an input publisher.
+
+        Args:
+            clock: Monotonic clock used to derive elapsed evaluation time.
+            sink: Destination that receives each generated frame.
+            profile: Input profile to evaluate, defaulting to the built-in
+                profile.
+            mouse_settings: Mouse-to-IMU settings, defaulting to application
+                defaults.
+            circular_limit: Whether diagonal stick values are normalized.
+        """
+        self._clock = clock
+        self._sink = sink
+        self._profile = profile if profile is not None else default_profile()
+        self._model = YawPitchModel(
+            mouse_settings if mouse_settings is not None else MouseSettings()
+        )
+        self._circular_limit = circular_limit
+        self._state = PhysicalInputState()
+        self._sequence = 0
+        self._last_monotonic_ns: int | None = None
+        self._capture_epoch: int | None = None
+
+    @property
+    def state(self) -> PhysicalInputState:
+        """Return the mutable physical input state updated by event handlers."""
+        return self._state
+
+    def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
+        """Evaluate current input and offer one controller frame.
+
+        Args:
+            capture_active: Whether keyboard and mouse mappings are enabled.
+            capture_epoch: Session identifier attached to the generated frame.
+
+        Returns:
+            The same frame offered to the configured sink.
+        """
+        now_ns = self._clock.monotonic_ns()
+        epoch_changed = self._capture_epoch is not None and capture_epoch != self._capture_epoch
+        first_evaluation = self._last_monotonic_ns is None
+        if epoch_changed:
+            self._state.clear()
+            self._model.reset()
+        if not capture_active:
+            self._state.clear()
+            self._model.reset()
+
+        if first_evaluation or epoch_changed:
+            dt_seconds = 0.0
+        else:
+            dt_seconds = (now_ns - self._last_monotonic_ns) / 1_000_000_000.0
+
+        dx, dy = self._state.consume_mouse_motion()
+        if capture_active:
+            buttons = aggregate_buttons(self._profile, self._state, capture_active=True)
+            left_stick = synthesize_stick(
+                self._profile,
+                self._state,
+                "left",
+                circular_limit=self._circular_limit,
+            )
+            right_stick = synthesize_stick(
+                self._profile,
+                self._state,
+                "right",
+                circular_limit=self._circular_limit,
+            )
+            gyro_rate, accel_g = self._model.update(
+                dx=dx,
+                dy=dy,
+                dt_seconds=dt_seconds,
+            )
+        else:
+            buttons = frozenset()
+            left_stick = StickVector(x=0.0, y=0.0)
+            right_stick = StickVector(x=0.0, y=0.0)
+            gyro_rate = GyroRate(0.0, 0.0, 0.0)
+            accel_g = AccelG(0.0, 0.0, 1.0)
+
+        self._sequence += 1
+        frame = ControllerFrame(
+            sequence=self._sequence,
+            capture_epoch=capture_epoch,
+            monotonic_ns=now_ns,
+            buttons=buttons,
+            left_stick=left_stick,
+            right_stick=right_stick,
+            gyro_rate=gyro_rate,
+            accel_g=accel_g,
+            capture_active=capture_active,
+        )
+        self._last_monotonic_ns = now_ns
+        self._capture_epoch = capture_epoch
+        self._sink.offer_frame(frame)
+        return frame

@@ -72,7 +72,8 @@ def logical_button_for_target(target: BindingTarget) -> LogicalButton:
         raise DomainValueError from None
 
 
-def _is_button_target(target: BindingTarget) -> bool:
+def is_button_target(target: BindingTarget) -> bool:
+    """Return whether a binding target represents a logical button."""
     return target in _BUTTON_TARGETS
 
 
@@ -103,9 +104,9 @@ class Binding:
         if not isinstance(self.inverted, bool):
             raise DomainValueError
         amount = float(self.amount)
-        if _is_button_target(self.target) and amount != 1.0:
+        if is_button_target(self.target) and amount != 1.0:
             raise DomainValueError
-        if not _is_button_target(self.target) and (self.inverted or not 0.0 <= amount <= 1.0):
+        if not is_button_target(self.target) and (self.inverted or not 0.0 <= amount <= 1.0):
             raise DomainValueError
         object.__setattr__(self, "amount", amount)
 
