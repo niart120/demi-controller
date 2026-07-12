@@ -174,4 +174,4 @@
 - [x] TDD Test List を作成した
 - [x] 検証結果または未実行理由を実装後に更新した
 - [x] package / release / public API に触れる場合の gate を記録した
-- [ ] 完了時に `spec/complete/unit_003` へ移動した
+- [x] 完了時に `spec/complete/unit_003` へ移動した
