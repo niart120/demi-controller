@@ -79,3 +79,23 @@ def test_capture_start_failure_keeps_idle_and_does_not_publish_input() -> None:
     assert coordinator.app_state is AppState.IDLE
     assert coordinator.capture_epoch == 1
     assert sink.frames == []
+
+
+def test_configuration_transition_neutralizes_capture_without_auto_recapture() -> None:
+    window = FakeWindow()
+    coordinator, sink = make_coordinator(window)
+    assert coordinator.start_capture() is True
+    coordinator.publisher.state.press_key("F")
+
+    assert coordinator.open_configuration() is True
+    assert coordinator.app_state is AppState.CONFIGURING
+    assert coordinator.last_frame is not None
+    assert coordinator.last_frame.capture_active is False
+    assert coordinator.last_frame.buttons == frozenset()
+    assert coordinator.publisher.state.held_keys == set()
+
+    assert coordinator.close_configuration() is True
+    assert coordinator.app_state is AppState.IDLE
+    assert coordinator.is_captured is False
+    assert window.exclusive_calls == [True, False]
+    assert len(sink.frames) == 2
