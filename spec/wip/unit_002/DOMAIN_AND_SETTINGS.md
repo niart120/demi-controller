@@ -85,7 +85,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | refactor-done | 未知 schema、未知項目、無効 enum/range を安全に拒否する | new / edge | unit | 4 tests green。現行 v1 のみ migration registry を通過させ、fallback 保存をしない |
 | refactor-skipped | PlatformDirs と bond slot のパス境界を検証する | new / edge | unit | 2 tests green。既存責務が小さく追加 refactor は不要 |
 | refactor-done | repository が初回、正常、破損復旧、原子的保存を区別する | new / regression / edge | unit | 5 tests green。backup failure、replace failure、temporary file cleanup を確認 |
-| todo | package dependency、lock、build、typed import の gate が通る | characterization | package | `uv lock --check` と `uv build` を含める |
+| refactor-skipped | package dependency、lock、build、typed import の gate が通る | characterization | package | 42 unit tests、lock/build、domain boundary、wheel contents を確認。追加 refactor は不要 |
 
 ## 7. 設計メモ
 
@@ -116,7 +116,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `tests/unit/config/test_codec.py` | new | TOML 往復と schema |
 | `tests/unit/config/test_paths.py` | new | path と bond slot |
 | `tests/unit/config/test_repository.py` | new | 初回、復旧、原子的保存 |
-| `tests/fixtures/settings/` | new | current/invalid/unknown schema fixture |
+| `tests/fixtures/settings/` | not needed | raw mapping を unit test 内で構築し、旧版仕様が未確定のため fixture ファイルを推測作成しない |
 | `spec/complete/unit_002/DOMAIN_AND_SETTINGS.md` | new / modify | TDD 状態、検証、完了記録 |
 
 ## 9. 検証
@@ -135,6 +135,17 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `uv run ruff format --check src/demi/domain tests/unit/domain/test_controller.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/domain tests/unit/domain/test_controller.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv sync --dev` | passed | 42 packages resolved、37 packages checked |
+| `uv lock --check` | passed | 42 packages |
+| `uv run ruff format --check .` | passed | 23 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 42 passed |
+| `uv build` | passed | dependency 追加後の wheel/source distribution を生成 |
+| domain boundary smoke via `uv run python -c` | passed | `demi.domain.controller` import 時に `platformdirs` / `tomli_w` を import しない |
+| package smoke via `uv run python -c` | passed | metadata 版、import、`py.typed` を確認。`0.1.0` |
+| wheel contents inspection | passed | `demi/config/codec.py`、`demi/domain/controller.py`、`demi/py.typed` を確認 |
+| `git diff --check` | passed | whitespace error なし |
 | `uv run pytest tests/unit/config/test_paths.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/config/paths.py tests/unit/config/test_paths.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/config/paths.py tests/unit/config/test_paths.py` | passed | All checks passed |
@@ -170,6 +181,6 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を作成した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] package / release / public API に触れる場合の gate を記録した
 - [ ] 完了時に `spec/complete/unit_002` へ移動した
