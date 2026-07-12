@@ -40,7 +40,7 @@ class BindingTarget(StrEnum):
     RIGHT_STICK_RIGHT = "RIGHT_STICK:RIGHT"
 
 
-_SOURCE_PATTERN = re.compile(r"(?:KEY|MOUSE):[A-Z0-9_]+")
+_SOURCE_PATTERN = re.compile(r"(?:KEY:[A-Z0-9_]+(?:\+[A-Z0-9_]+)*|MOUSE:[A-Z0-9_]+)")
 _PROFILE_ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 _BUTTON_TARGETS: dict[BindingTarget, LogicalButton] = {
     BindingTarget.BUTTON_A: LogicalButton.A,

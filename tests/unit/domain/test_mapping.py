@@ -68,6 +68,12 @@ def test_stick_binding_rejects_inversion_and_out_of_range_amount() -> None:
         Binding(source="KEY:W", target=BindingTarget.LEFT_STICK_UP, amount=1.001)
 
 
+def test_binding_accepts_normalized_modifier_source() -> None:
+    binding = Binding(source="KEY:CTRL+F", target=BindingTarget.BUTTON_A)
+
+    assert binding.source == "KEY:CTRL+F"
+
+
 @pytest.mark.parametrize(
     "source",
     ["KEY", "KEY:f"],
