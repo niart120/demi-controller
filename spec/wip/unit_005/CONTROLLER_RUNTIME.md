@@ -82,7 +82,7 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | refactor-done | ControllerCommand、RuntimeEvent、error category、adapter descriptor が immutable typed value として表現される | new / edge | unit | 2 tests green。command ordering と public event payload の境界を固定 |
 | refactor-done | LatestFrameMailbox が sequence/epoch を判定し、最新 1 slot を thread-safe に保持する | new / edge | unit | 3 tests green。stale sequence、stale epoch、future epoch、同一内容の capture release、take/peek を確認 |
 | refactor-done | Watchdog が FakeClock で 200ms 未満を無視し、250ms 以上を一度だけ発火する | new / edge | unit | 2 tests green。interval 50ms、epoch reset、connected/captured 条件を確認 |
-| todo | ControllerRuntime が dedicated thread、asyncio loop、start/close、RuntimeStopped を扱う | new / regression | unit | 実 thread は短時間、join 後に alive/task 残りを確認 |
+| refactor-done | ControllerRuntime が dedicated thread、asyncio loop、start/close、RuntimeStopped を扱う | new / regression | unit | 1 test green。実 thread、worker 所有 adapter、join 後の alive/task 残りを確認 |
 | todo | command queue が Discover/Connect/Disconnect/Status を順序どおり fake adapter へ渡す | new / integration | unit | adapter factory と event sink を注入し、worker thread 所有を確認 |
 | todo | accepted frame が connected adapter へ一括 apply され、未接続では apply されない | new / integration | unit | latest frame slot、duplicate sequence、capture release を含む |
 | todo | stale capture epoch/sequence が破棄され、watchdog 後の同 epoch active frame が再開しない | new / regression / edge | unit | 新 epoch の明示 frame だけ再開を許可 |
@@ -122,6 +122,10 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | `uv run pytest tests/unit/controller/test_contracts.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/controller tests/unit/controller` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/controller tests/unit/controller` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/controller/test_runtime.py` | passed | 1 passed |
+| `uv run ruff format --check src/demi/controller/adapter.py src/demi/controller/runtime.py tests/unit/controller/test_runtime.py` | passed | 3 files already formatted |
+| `uv run ruff check src/demi/controller/adapter.py src/demi/controller/runtime.py tests/unit/controller/test_runtime.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/controller/test_watchdog.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/controller/watchdog.py tests/unit/controller/test_watchdog.py` | passed | 2 files already formatted |
