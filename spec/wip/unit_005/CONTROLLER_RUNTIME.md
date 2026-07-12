@@ -79,7 +79,7 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | ControllerCommand、RuntimeEvent、error category、adapter descriptor が immutable typed value として表現される | new / edge | unit | command ordering と public event payload の境界を固定 |
+| refactor-done | ControllerCommand、RuntimeEvent、error category、adapter descriptor が immutable typed value として表現される | new / edge | unit | 2 tests green。command ordering と public event payload の境界を固定 |
 | todo | LatestFrameMailbox が sequence/epoch を判定し、最新 1 slot を thread-safe に保持する | new / edge | unit | stale sequence、stale epoch、future epoch、同一内容の capture release を確認 |
 | todo | Watchdog が FakeClock で 200ms 未満を無視し、250ms 以上を一度だけ発火する | new / edge | unit | interval 50ms、epoch reset、connected/captured 条件を確認 |
 | todo | ControllerRuntime が dedicated thread、asyncio loop、start/close、RuntimeStopped を扱う | new / regression | unit | 実 thread は短時間、join 後に alive/task 残りを確認 |
@@ -119,6 +119,10 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit` | not run | unit_005 implementation 前の baseline は unit_004 merge 時点で 92 passed |
+| `uv run pytest tests/unit/controller/test_contracts.py` | passed | 2 passed |
+| `uv run ruff format --check src/demi/controller tests/unit/controller` | passed | 4 files already formatted |
+| `uv run ruff check src/demi/controller tests/unit/controller` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
 | `uv lock --check` | not run | package metadata は変更しない予定だが final gate で確認する |
 | `uv build` | not run | final package gate で確認する |
 | `uv run pytest tests/integration` | not run | fake runtime integration tree を作成後に実行する |
