@@ -87,11 +87,12 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | refactor-done | toolbar が connection/app state からラベルと enabled を決める | new / edge | unit | 2 tests green。接続中、captured、focus loss、modal 相当の無効状態を確認 |
 | refactor-done | status bar が adapter、connection、capture、8ms、preview warning を組み立てる | new / edge | unit | 2 tests green。未接続 capture の preview-only 警告を固定 |
 | refactor-done | PygletApplication が backend、view、toolbar、status、8ms clock を接続する | new / integration | unit | 1 test green。FakeWindow と FakeClock で handler wiring、8ms schedule、表示開始、coordinator latest frame を確認 |
-| refactor-done | UI package の全 gate と window/package smoke が通る | characterization | package | 91 unit tests、lock、format、lint、ty、非表示 window、ControllerView draw、build、wheel contents を確認。Windows headless は EGL 不在で not applicable |
+| refactor-done | UI package の全 gate と display-free import/window/package smoke が通る | characterization | package | 92 unit tests、lock、format、lint、ty、display-free import、非表示 window、ControllerView draw、build、wheel contents を確認。Windows headless は EGL 不在で not applicable |
 
 ## 7. 設計メモ
 
 - pyglet の具象 `Window` は `ui.window` に閉じ込め、入力 backend と view は Protocol / 表示モデルを介して試験する。
+- input/UI module は import 時に display-dependent な pyglet module を読み込まず、実 window/draw/event 境界で遅延 import する。backend の key/mouse constants は注入できる。
 - `CaptureCoordinator` が `AppState` と `capture_epoch` の唯一の所有者となる。toolbar や backend が直接 state を変更しない。
 - `PygletInputBackend` は callback で `PhysicalInputState` を更新するだけで、frame publish は clock callback の `InputPublisher` に任せる。
 - F12 は capture 状態に関係なく予約操作として扱い、capture 中なら解除し、mapping へ渡さない。
@@ -117,6 +118,7 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | `tests/unit/application/` | new | state transition and coordinator behavior |
 | `tests/unit/input/test_pyglet_backend.py` | new | event normalization and priority |
 | `tests/unit/ui/` | new | window/view/toolbar/status behavior |
+| `tests/unit/test_pyglet_import_boundary.py` | new | display-free import regression |
 | `spec/complete/unit_004/UI_AND_PYGLET.md` | new / modify | TDD 状態、検証、完了記録 |
 
 ## 9. 検証
@@ -135,6 +137,12 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | `uv run ruff check .` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit` | passed | 91 passed |
+| `uv run pytest tests/unit/test_pyglet_import_boundary.py` | passed | 1 passed。input/UI module import 時に display-dependent pyglet modules を読み込まない |
+| `uv run pytest tests/unit` | passed | 92 passed |
+| `uv run ruff format --check .` | passed | 49 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| display-free import smoke via `uv run python -c` | passed | `pyglet.window`、`pyglet.graphics`、`pyglet.text` を読み込まず application modules を import |
 | window factory smoke via `uv run python -c` | passed | 非表示 960x640 window を作成し、close まで完了 |
 | ControllerView draw smoke via `uv run python -c` | passed | 非表示 OpenGL context 上で Batch 描画と close を確認 |
 | headless window smoke via `uv run python -c` | not applicable | Windows の pyglet headless path は EGL library 不在で `Library "EGL" not found`。通常の非表示 window smoke は passed |
@@ -142,6 +150,7 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | package smoke via `uv run python -c` | passed | wheel に UI、PygletInputBackend、window modules が含まれることを確認 |
 | `uv run pytest tests/integration` | not applicable | `tests/integration` tree は未作成。fake/UI boundary は unit で確認 |
 | `git diff --check` | passed | whitespace error なし |
+| GitHub Actions PR #4 initial run | failed | Python 3.12 / 3.13 とも Linux display unavailable。`pyglet.window` import 時の `NoSuchDisplayException` |
 | type-boundary review | passed | pyglet window、clock、event handler を Protocol で境界化。`ty` 通過、production の `Any` / `type: ignore` なし。外部 descriptor の writable color だけ局所 `cast` |
 | docstring review | passed | application、input backend、window、view、toolbar、status の public API 契約を確認 |
 | docs-quality review | passed | scope、non-goals、TDD status、実行結果、not applicable、先送り事項、仮テキスト残りを確認 |

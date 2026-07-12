@@ -1,8 +1,6 @@
 """Normalize pyglet keyboard and mouse events at the input boundary."""
 
-from typing import Protocol
-
-from pyglet.window import key, mouse
+from typing import Protocol, cast
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.domain.physical_input import KeySource
@@ -15,26 +13,50 @@ class EventWindow(Protocol):
         """Register backend event handlers with a pyglet window."""
 
 
-_MODIFIER_NAMES: tuple[tuple[int, str], ...] = (
-    (key.MOD_CTRL, "CTRL"),
-    (key.MOD_SHIFT, "SHIFT"),
-    (key.MOD_ALT, "ALT"),
-    (key.MOD_COMMAND, "COMMAND"),
-    (key.MOD_OPTION, "OPTION"),
-)
-_MOUSE_BUTTON_NAMES = {
-    mouse.LEFT: "LEFT",
-    mouse.MIDDLE: "MIDDLE",
-    mouse.RIGHT: "RIGHT",
-}
+class PygletKeyCodes(Protocol):
+    """Pyglet key constants and symbol conversion used by the backend."""
+
+    F12: int
+    MOD_CTRL: int
+    MOD_SHIFT: int
+    MOD_ALT: int
+    MOD_COMMAND: int
+    MOD_OPTION: int
+
+    def symbol_string(self, symbol: int) -> str:
+        """Return pyglet's symbolic name for a key value."""
+
+
+class PygletMouseCodes(Protocol):
+    """Pyglet mouse button constants used by the backend."""
+
+    LEFT: int
+    MIDDLE: int
+    RIGHT: int
 
 
 class PygletInputBackend:
     """Convert pyglet events into a coordinator-owned physical input state."""
 
-    def __init__(self, coordinator: CaptureCoordinator) -> None:
-        """Initialize an event backend for one capture coordinator."""
+    def __init__(
+        self,
+        coordinator: CaptureCoordinator,
+        *,
+        key_codes: PygletKeyCodes | None = None,
+        mouse_codes: PygletMouseCodes | None = None,
+    ) -> None:
+        """Initialize an event backend for one capture coordinator.
+
+        Args:
+            coordinator: Main-thread capture lifecycle owner.
+            key_codes: Optional pyglet-compatible key constants for tests or
+                alternate event sources.
+            mouse_codes: Optional pyglet-compatible mouse constants for tests
+                or alternate event sources.
+        """
         self._coordinator = coordinator
+        self._key_codes = key_codes
+        self._mouse_codes = mouse_codes
         self._active_keys: dict[int, KeySource] = {}
 
     def install(self, window: EventWindow) -> None:
@@ -43,7 +65,8 @@ class PygletInputBackend:
 
     def on_key_press(self, symbol: int, modifiers: int) -> bool | None:
         """Handle a key press, reserving F12 for capture release."""
-        if symbol == key.F12:
+        keys = self._key_codes_or_load()
+        if symbol == keys.F12:
             self._active_keys.clear()
             self._coordinator.stop_capture()
             return True
@@ -58,7 +81,8 @@ class PygletInputBackend:
 
     def on_key_release(self, symbol: int, modifiers: int) -> bool | None:
         """Handle a key release without allowing F12 into mappings."""
-        if symbol == key.F12:
+        keys = self._key_codes_or_load()
+        if symbol == keys.F12:
             return True
         source = self._active_keys.pop(symbol, None)
         if source is None:
@@ -95,21 +119,46 @@ class PygletInputBackend:
         """Return focus to idle without automatically recapturing input."""
         self._coordinator.on_focus_gained()
 
-    @staticmethod
-    def _key_symbol(symbol: int) -> str:
-        value = key.symbol_string(symbol).upper()
+    def _key_codes_or_load(self) -> PygletKeyCodes:
+        if self._key_codes is None:
+            from pyglet.window import key  # noqa: PLC0415
+
+            self._key_codes = cast("PygletKeyCodes", key)
+        return self._key_codes
+
+    def _mouse_codes_or_load(self) -> PygletMouseCodes:
+        if self._mouse_codes is None:
+            from pyglet.window import mouse  # noqa: PLC0415
+
+            self._mouse_codes = cast("PygletMouseCodes", mouse)
+        return self._mouse_codes
+
+    def _key_symbol(self, symbol: int) -> str:
+        value = self._key_codes_or_load().symbol_string(symbol).upper()
         if value.startswith("_") and value[1:].isdigit():
             return value[1:]
         return value
 
-    @staticmethod
-    def _modifier_names(modifiers: int) -> frozenset[str]:
-        return frozenset(name for mask, name in _MODIFIER_NAMES if modifiers & mask)
+    def _modifier_names(self, modifiers: int) -> frozenset[str]:
+        keys = self._key_codes_or_load()
+        modifier_names = (
+            (keys.MOD_CTRL, "CTRL"),
+            (keys.MOD_SHIFT, "SHIFT"),
+            (keys.MOD_ALT, "ALT"),
+            (keys.MOD_COMMAND, "COMMAND"),
+            (keys.MOD_OPTION, "OPTION"),
+        )
+        return frozenset(name for mask, name in modifier_names if modifiers & mask)
 
-    @staticmethod
-    def _mouse_button(button: int) -> str:
-        if button in _MOUSE_BUTTON_NAMES:
-            return _MOUSE_BUTTON_NAMES[button]
+    def _mouse_button(self, button: int) -> str:
+        mouse = self._mouse_codes_or_load()
+        mouse_button_names = {
+            mouse.LEFT: "LEFT",
+            mouse.MIDDLE: "MIDDLE",
+            mouse.RIGHT: "RIGHT",
+        }
+        if button in mouse_button_names:
+            return mouse_button_names[button]
         if button > 0 and button & (button - 1) == 0:
             return f"BUTTON_{button.bit_length()}"
         return f"BUTTON_{button}"

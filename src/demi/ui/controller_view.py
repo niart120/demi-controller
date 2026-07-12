@@ -1,14 +1,13 @@
 """ControllerFrame display model and pyglet drawing boundary."""
 
 from dataclasses import dataclass
-from typing import Protocol, cast
-
-from pyglet import shapes
-from pyglet.graphics import Batch
-from pyglet.text import Label
+from typing import TYPE_CHECKING, Protocol, cast
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
+
+if TYPE_CHECKING:
+    from pyglet.graphics import Batch
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +46,14 @@ class ControllerViewModel:
         )
 
 
-class ColorShape(Protocol):
+class Drawable(Protocol):
+    """Subset of a pyglet drawable that can be deleted."""
+
+    def delete(self) -> None:
+        """Delete the underlying drawable."""
+
+
+class ColorShape(Drawable, Protocol):
     """Subset of a pyglet shape used for pressed-state updates."""
 
     @property
@@ -58,8 +64,22 @@ class ColorShape(Protocol):
     def color(self, value: tuple[int, ...]) -> None:
         """Set the shape color."""
 
+
+class PositionShape(ColorShape, Protocol):
+    """Subset of a pyglet shape that exposes a movable position."""
+
+    x: float
+    y: float
+
+
+class TextLabel(Protocol):
+    """Subset of a pyglet label used by the view."""
+
+    text: str
+    y: float
+
     def delete(self) -> None:
-        """Delete the underlying pyglet shape."""
+        """Delete the underlying pyglet label."""
 
 
 def _rgb(value: str) -> tuple[int, int, int]:
@@ -77,23 +97,23 @@ class ControllerView:
         self,
         *,
         colors: ControllerColorSettings | None = None,
-        batch: Batch | None = None,
+        batch: "Batch | None" = None,
     ) -> None:
         """Initialize a display model and an optional pyglet batch."""
         self._colors = colors if colors is not None else ControllerColorSettings()
         self._model = ControllerViewModel.neutral()
         self._batch = batch
         self._layout: tuple[float, float] | None = None
-        self._static_shapes: list[shapes.ShapeBase] = []
+        self._static_shapes: list[Drawable] = []
         self._button_shapes: dict[LogicalButton, ColorShape] = {}
-        self._left_knob: shapes.Circle | None = None
-        self._right_knob: shapes.Circle | None = None
+        self._left_knob: PositionShape | None = None
+        self._right_knob: PositionShape | None = None
         self._left_center = (0.0, 0.0)
         self._right_center = (0.0, 0.0)
         self._stick_radius = 1.0
-        self._gyro_label: Label | None = None
-        self._accel_label: Label | None = None
-        self._capture_label: Label | None = None
+        self._gyro_label: TextLabel | None = None
+        self._accel_label: TextLabel | None = None
+        self._capture_label: TextLabel | None = None
 
     @property
     def model(self) -> ControllerViewModel:
@@ -114,6 +134,8 @@ class ControllerView:
         if width <= 0 or height <= 0:
             return
         if self._batch is None:
+            from pyglet.graphics import Batch  # noqa: PLC0415
+
             self._batch = Batch()
         if self._layout != (width, height):
             self._clear_renderables()
@@ -142,6 +164,9 @@ class ControllerView:
         self._capture_label = None
 
     def _build_renderables(self, width: float, height: float) -> None:
+        from pyglet import shapes  # noqa: PLC0415
+        from pyglet.text import Label  # noqa: PLC0415
+
         batch = self._batch
         if batch is None:
             return
@@ -195,19 +220,25 @@ class ControllerView:
                     batch=batch,
                 )
             )
-        self._left_knob = shapes.Circle(
-            self._left_center[0],
-            self._left_center[1],
-            self._stick_radius * 0.65,
-            color=button_color,
-            batch=batch,
+        self._left_knob = cast(
+            "PositionShape",
+            shapes.Circle(
+                self._left_center[0],
+                self._left_center[1],
+                self._stick_radius * 0.65,
+                color=button_color,
+                batch=batch,
+            ),
         )
-        self._right_knob = shapes.Circle(
-            self._right_center[0],
-            self._right_center[1],
-            self._stick_radius * 0.65,
-            color=button_color,
-            batch=batch,
+        self._right_knob = cast(
+            "PositionShape",
+            shapes.Circle(
+                self._right_center[0],
+                self._right_center[1],
+                self._stick_radius * 0.65,
+                color=button_color,
+                batch=batch,
+            ),
         )
 
         button_positions = {
@@ -244,26 +275,35 @@ class ControllerView:
             )
 
         label_color = (*button_color, 255)
-        self._capture_label = Label(
-            "IDLE",
-            x=body_x,
-            y=body_y + body_height + 24,
-            color=label_color,
-            batch=batch,
+        self._capture_label = cast(
+            "TextLabel",
+            Label(
+                "IDLE",
+                x=body_x,
+                y=body_y + body_height + 24,
+                color=label_color,
+                batch=batch,
+            ),
         )
-        self._gyro_label = Label(
-            "Gyro 0.00, 0.00, 0.00 rad/s",
-            x=body_x,
-            y=body_y - 28,
-            color=label_color,
-            batch=batch,
+        self._gyro_label = cast(
+            "TextLabel",
+            Label(
+                "Gyro 0.00, 0.00, 0.00 rad/s",
+                x=body_x,
+                y=body_y - 28,
+                color=label_color,
+                batch=batch,
+            ),
         )
-        self._accel_label = Label(
-            "Accel 0.00, 0.00, 1.00 G",
-            x=body_x,
-            y=body_y - 48,
-            color=label_color,
-            batch=batch,
+        self._accel_label = cast(
+            "TextLabel",
+            Label(
+                "Accel 0.00, 0.00, 1.00 G",
+                x=body_x,
+                y=body_y - 48,
+                color=label_color,
+                batch=batch,
+            ),
         )
 
     def _update_renderables(self) -> None:

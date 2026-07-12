@@ -1,13 +1,35 @@
 from dataclasses import dataclass, field
 
-from pyglet.window import key, mouse
-
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.state import AppState
 from demi.domain.controller import ControllerFrame
 from demi.domain.physical_input import KeySource, MouseButtonSource
 from demi.input.publisher import InputPublisher
 from demi.input.pyglet_backend import PygletInputBackend
+
+
+class FakeKeyCodes:
+    """Pyglet-compatible key constants for display-free tests."""
+
+    F = 70
+    F12 = 123
+    MOD_CTRL = 2
+    MOD_SHIFT = 1
+    MOD_ALT = 4
+    MOD_COMMAND = 64
+    MOD_OPTION = 128
+
+    def symbol_string(self, symbol: int) -> str:
+        """Return the fake key name for a symbol."""
+        return {self.F: "F", self.F12: "F12"}[symbol]
+
+
+class FakeMouseCodes:
+    """Pyglet-compatible mouse constants for display-free tests."""
+
+    LEFT = 1
+    MIDDLE = 2
+    RIGHT = 4
 
 
 @dataclass
@@ -48,24 +70,31 @@ def make_backend() -> tuple[PygletInputBackend, CaptureCoordinator]:
     publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
     coordinator = CaptureCoordinator(publisher=publisher, window=FakeWindow())
     coordinator.start_capture()
-    return PygletInputBackend(coordinator), coordinator
+    return (
+        PygletInputBackend(
+            coordinator,
+            key_codes=FakeKeyCodes(),
+            mouse_codes=FakeMouseCodes(),
+        ),
+        coordinator,
+    )
 
 
 def test_key_events_normalize_symbol_and_modifiers() -> None:
     backend, coordinator = make_backend()
 
-    backend.on_key_press(key.F, key.MOD_CTRL | key.MOD_SHIFT)
+    backend.on_key_press(FakeKeyCodes.F, FakeKeyCodes.MOD_CTRL | FakeKeyCodes.MOD_SHIFT)
 
     assert coordinator.publisher.state.held_keys == {KeySource("F", frozenset({"CTRL", "SHIFT"}))}
 
-    backend.on_key_release(key.F, key.MOD_CTRL | key.MOD_SHIFT)
+    backend.on_key_release(FakeKeyCodes.F, FakeKeyCodes.MOD_CTRL | FakeKeyCodes.MOD_SHIFT)
     assert coordinator.publisher.state.held_keys == set()
 
 
 def test_mouse_events_and_relative_motion_update_physical_state() -> None:
     backend, coordinator = make_backend()
 
-    backend.on_mouse_press(0, 0, mouse.LEFT, 0)
+    backend.on_mouse_press(0, 0, FakeMouseCodes.LEFT, 0)
     backend.on_mouse_press(0, 0, 8, 0)
     backend.on_mouse_motion(0, 0, 3, -2)
 
@@ -79,10 +108,14 @@ def test_mouse_events_and_relative_motion_update_physical_state() -> None:
 def test_events_outside_capture_are_ignored() -> None:
     publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
     coordinator = CaptureCoordinator(publisher=publisher, window=FakeWindow())
-    backend = PygletInputBackend(coordinator)
+    backend = PygletInputBackend(
+        coordinator,
+        key_codes=FakeKeyCodes(),
+        mouse_codes=FakeMouseCodes(),
+    )
 
-    backend.on_key_press(key.F, 0)
-    backend.on_mouse_press(0, 0, mouse.LEFT, 0)
+    backend.on_key_press(FakeKeyCodes.F, 0)
+    backend.on_mouse_press(0, 0, FakeMouseCodes.LEFT, 0)
     backend.on_mouse_motion(0, 0, 3, 2)
 
     assert publisher.state.held_keys == set()
@@ -92,17 +125,17 @@ def test_events_outside_capture_are_ignored() -> None:
 
 def test_f12_releases_capture_and_never_enters_the_mapping_state() -> None:
     backend, coordinator = make_backend()
-    backend.on_key_press(key.F, 0)
+    backend.on_key_press(FakeKeyCodes.F, 0)
 
-    assert backend.on_key_press(key.F12, 0) is True
+    assert backend.on_key_press(FakeKeyCodes.F12, 0) is True
     assert coordinator.is_captured is False
     assert coordinator.publisher.state.held_keys == set()
-    assert backend.on_key_release(key.F12, 0) is True
+    assert backend.on_key_release(FakeKeyCodes.F12, 0) is True
 
 
 def test_deactivate_suspends_and_activate_returns_to_idle_without_recapture() -> None:
     backend, coordinator = make_backend()
-    backend.on_key_press(key.F, 0)
+    backend.on_key_press(FakeKeyCodes.F, 0)
 
     backend.on_deactivate()
     assert coordinator.app_state is AppState.SUSPENDED

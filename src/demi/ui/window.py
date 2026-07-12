@@ -2,13 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
-
-from pyglet import app as pyglet_app
-from pyglet import clock as pyglet_clock
-from pyglet.graphics import Batch
-from pyglet.text import Label
-from pyglet.window import Window
+from typing import TYPE_CHECKING, Protocol, cast
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.state import ConnectionState
@@ -19,6 +13,9 @@ from demi.input.pyglet_backend import PygletInputBackend
 from .controller_view import ControllerView
 from .status_bar import StatusBar
 from .toolbar import Toolbar
+
+if TYPE_CHECKING:
+    from pyglet.window import Window
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +78,21 @@ class ClockScheduler(Protocol):
         """Remove a previously scheduled callback."""
 
 
-def create_window(spec: WindowSpec | None = None) -> Window:
+class BatchPort(Protocol):
+    """Subset of a pyglet batch used by the application chrome."""
+
+    def draw(self) -> None:
+        """Draw all labels in the batch."""
+
+
+class TextLabel(Protocol):
+    """Subset of a pyglet label used by the application chrome."""
+
+    text: str
+    y: float
+
+
+def create_window(spec: WindowSpec | None = None) -> "Window":
     """Create a pyglet window from a validated window specification.
 
     Args:
@@ -97,6 +108,8 @@ def create_window(spec: WindowSpec | None = None) -> Window:
     """
     if spec is None:
         spec = WindowSpec()
+
+    from pyglet.window import Window  # noqa: PLC0415
 
     window = Window(
         width=spec.width,
@@ -133,13 +146,18 @@ class PygletApplication:
         self._view = view
         self._toolbar = toolbar
         self._status_bar = status_bar
-        self._clock = clock if clock is not None else pyglet_clock
+        if clock is None:
+            from pyglet import clock as pyglet_clock  # noqa: PLC0415
+
+            self._clock = cast("ClockScheduler", pyglet_clock)
+        else:
+            self._clock = clock
         self._connection_state = connection_state
         self._adapter_label = adapter_label
         self._started = False
-        self._chrome_batch: Batch | None = None
-        self._toolbar_label: Label | None = None
-        self._status_label: Label | None = None
+        self._chrome_batch: BatchPort | None = None
+        self._toolbar_label: TextLabel | None = None
+        self._status_label: TextLabel | None = None
 
     @property
     def started(self) -> bool:
@@ -169,6 +187,8 @@ class PygletApplication:
 
     def run(self) -> None:
         """Start the application and enter pyglet's default event loop."""
+        from pyglet import app as pyglet_app  # noqa: PLC0415
+
         self.start()
         pyglet_app.run()
 
@@ -211,14 +231,21 @@ class PygletApplication:
 
     def _draw_chrome(self) -> None:
         if self._chrome_batch is None:
-            self._chrome_batch = Batch()
-            self._toolbar_label = Label(
-                "",
-                x=16,
-                y=self._window.height - 32,
-                batch=self._chrome_batch,
+            from pyglet.graphics import Batch  # noqa: PLC0415
+            from pyglet.text import Label  # noqa: PLC0415
+
+            batch = Batch()
+            self._chrome_batch = cast("BatchPort", batch)
+            self._toolbar_label = cast(
+                "TextLabel",
+                Label(
+                    "",
+                    x=16,
+                    y=self._window.height - 32,
+                    batch=batch,
+                ),
             )
-            self._status_label = Label("", x=16, y=12, batch=self._chrome_batch)
+            self._status_label = cast("TextLabel", Label("", x=16, y=12, batch=batch))
         if self._toolbar_label is not None:
             self._toolbar_label.text = (
                 f"{self._toolbar.model.connection_label}  "
