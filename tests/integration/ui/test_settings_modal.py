@@ -137,3 +137,11 @@ def test_recovered_settings_notice_contains_only_the_backup_name() -> None:
         )
         is None
     )
+
+
+def test_recovered_settings_notice_reports_when_backup_could_not_be_created() -> None:
+    notice = settings_recovery_notice(
+        SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.RECOVERED)
+    )
+
+    assert notice == "設定を復旧しました。破損ファイルの退避はできませんでした。"

@@ -84,7 +84,7 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 | refactor-done | DialogKind / DialogManager が modal を1つだけ開き、タイトルと状態を返す | new / regression | unit | 2 tests green。mapping、connection、colors、pairing confirmation を確認 |
 | refactor-done | modal open / cancel が capture を neutralize し、configuration state と IDLE を遷移する | new / integration | integration | 1 test green。FakeWindow、FakePublisher、CaptureCoordinator で確認 |
 | refactor-done | SettingsModalController が save / cancel / reset と color reconnect decision を束ねる | new / integration | integration | 2 tests green。repository save failure 時の modal / draft 保持を含む |
-| refactor-done | RECOVERED / backup path が安全な復旧通知へ変換される | new / edge | integration | 1 test green。corrupt file 内容や秘密値を通知へ入れない |
+| refactor-done | RECOVERED / backup path が安全な復旧通知へ変換される | new / edge | integration | 2 tests green。backup 有無、corrupt file 内容や秘密値を通知へ入れない |
 | todo | settings modal の display-free model、全 gate、package smoke が通る | characterization | package | unit、integration、build、wheel contents を記録 |
 
 ## 7. 設計メモ
@@ -119,7 +119,7 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 3 passed。duplicate source、local action collision、同一 target の複数 source を確認 |
 | `uv run pytest tests/unit/application/test_dialogs.py -q` | passed | 2 passed。modal 排他、title、idempotent close を確認 |
 | `uv run pytest tests/unit/application/test_coordinator.py -q` | passed | 3 passed。configuration open の neutral、state transition、自動 recapture なしを確認 |
-| `uv run pytest tests/integration/ui/test_settings_modal.py -q` | passed | 3 passed。save/reconnect decision、save failure 保持、recovery notice を確認 |
+| `uv run pytest tests/integration/ui/test_settings_modal.py -q` | passed | 4 passed。save/reconnect decision、save failure 保持、recovery notice の backup 有無を確認 |
 | `uv run ruff format --check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
