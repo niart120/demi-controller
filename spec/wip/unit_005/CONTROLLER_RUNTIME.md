@@ -85,7 +85,7 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | refactor-done | ControllerRuntime が dedicated thread、asyncio loop、start/close、RuntimeStopped を扱う | new / regression | unit | 1 test green。実 thread、worker 所有 adapter、join 後の alive/task 残りを確認 |
 | refactor-done | command queue が Discover/Connect/Disconnect/Status を順序どおり fake adapter へ渡す | new / integration | unit | 1 test green。adapter factory と event sink を注入し、worker thread 所有と RuntimeEvent を確認 |
 | refactor-done | accepted frame が connected adapter へ一括 apply され、未接続では apply されない | new / integration | integration | 接続前の latest 保持、接続中の latest-only apply を fake adapter で確認 |
-| todo | stale capture epoch/sequence が破棄され、watchdog 後の同 epoch active frame が再開しない | new / regression / edge | unit | 新 epoch の明示 frame だけ再開を許可 |
+| refactor-done | stale capture epoch/sequence が破棄され、watchdog 後の同 epoch active frame が再開しない | new / regression / edge | integration | 250ms watchdog 後の neutral、同 epoch reject、新 epoch apply を runtime で確認 |
 | todo | runtime の全 gate、thread cleanup、package smoke が通る | characterization | package | lock、format、lint、ty、unit、build、wheel contents を含める |
 
 ## 7. 設計メモ
@@ -127,6 +127,7 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | `uv run ruff format --check src/demi/controller tests/integration/controller/test_runtime_commands.py` | passed | 8 files already formatted |
 | `uv run ruff check src/demi/controller tests/integration/controller/test_runtime_commands.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/integration/controller/test_runtime_commands.py -q` | passed | 3 passed。stale sequence/epoch、watchdog neutral、同 epoch 停止、新 epoch 再開を確認 |
 | `uv run pytest tests/unit/controller/test_runtime.py` | passed | 1 passed |
 | `uv run ruff format --check src/demi/controller/adapter.py src/demi/controller/runtime.py tests/unit/controller/test_runtime.py` | passed | 3 files already formatted |
 | `uv run ruff check src/demi/controller/adapter.py src/demi/controller/runtime.py tests/unit/controller/test_runtime.py` | passed | All checks passed |

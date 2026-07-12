@@ -10,6 +10,7 @@ from demi.controller.events import (
     ConnectionChanged,
     RuntimeEvent,
     StatusSnapshot,
+    WatchdogNeutralized,
 )
 from demi.controller.runtime import ControllerRuntime
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
@@ -36,6 +37,7 @@ class RecordingEvents:
     connected: Event = field(default_factory=Event)
     status: Event = field(default_factory=Event)
     ready_after_disconnect: Event = field(default_factory=Event)
+    watchdog_neutralized: Event = field(default_factory=Event)
 
     def emit(self, event: RuntimeEvent) -> None:
         """Record events and signal expected milestones."""
@@ -49,6 +51,8 @@ class RecordingEvents:
                 self.ready_after_disconnect.set()
         elif isinstance(event, StatusSnapshot):
             self.status.set()
+        elif isinstance(event, WatchdogNeutralized):
+            self.watchdog_neutralized.set()
 
 
 @dataclass
@@ -209,4 +213,52 @@ def test_unconnected_frames_are_retained_and_connected_worker_applies_latest_onl
 
     assert adapter.applied_frames[-1] == newest
     assert second not in adapter.applied_frames
+    runtime.close()
+
+
+def test_stale_frames_and_watchdog_epoch_restart_are_filtered() -> None:
+    clock = FakeClock()
+    adapter = RecordingAdapter()
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=clock,
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bonds/default.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    first = make_frame(sequence=1, epoch=1)
+    assert runtime.offer_frame(first) is True
+    assert adapter.applied_active.wait(timeout=1.0)
+    assert runtime.offer_frame(make_frame(sequence=0, epoch=1)) is False
+    assert runtime.offer_frame(make_frame(sequence=2, epoch=0)) is False
+
+    clock.now_ns += 250_000_000
+    assert events.watchdog_neutralized.wait(timeout=1.0)
+    assert runtime.watchdog_tripped is True
+
+    adapter.applied_active.clear()
+    same_epoch = make_frame(sequence=2, epoch=1)
+    assert runtime.offer_frame(same_epoch) is True
+    for _ in range(2):
+        events.status.clear()
+        runtime.post(RequestStatus())
+        assert events.status.wait(timeout=1.0)
+    assert runtime.latest_frame == same_epoch
+    assert adapter.applied_active.wait(timeout=0.1) is False
+
+    new_epoch = make_frame(sequence=3, epoch=2)
+    assert runtime.offer_frame(new_epoch) is True
+    assert adapter.applied_active.wait(timeout=1.0)
+    assert adapter.applied_frames[-1] == new_epoch
+    assert same_epoch not in adapter.applied_frames
     runtime.close()
