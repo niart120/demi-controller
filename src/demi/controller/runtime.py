@@ -243,7 +243,12 @@ class ControllerRuntime:
             return
         self._set_connection_state(ConnectionState.CONNECTING, command.adapter_id)
         try:
-            await adapter.start_pairing(command.adapter_id, command.timeout_seconds, command.colors)
+            await adapter.start_pairing(
+                command.adapter_id,
+                command.bond_path,
+                command.timeout_seconds,
+                command.colors,
+            )
             self._connected = True
             self._watchdog.set_connected(True)
             await self._apply_rest_state()

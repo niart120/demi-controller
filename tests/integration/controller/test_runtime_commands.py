@@ -3,7 +3,13 @@ from pathlib import Path
 from threading import Event, get_ident
 
 from demi.application.state import ConnectionState
-from demi.controller.commands import ConnectSaved, Disconnect, DiscoverAdapters, RequestStatus
+from demi.controller.commands import (
+    ConnectSaved,
+    Disconnect,
+    DiscoverAdapters,
+    RequestStatus,
+    StartPairing,
+)
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -64,6 +70,7 @@ class RecordingAdapter:
     applied_frames: list[ControllerFrame] = field(default_factory=list)
     applied: Event = field(default_factory=Event)
     applied_active: Event = field(default_factory=Event)
+    pairing_bond_paths: list[Path] = field(default_factory=list)
     connect_started: Event | None = None
     connect_release: Event | None = None
 
@@ -94,11 +101,13 @@ class RecordingAdapter:
     async def start_pairing(
         self,
         adapter_id: str,
+        bond_path: Path,
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:
         """Record a pairing request."""
         del adapter_id, timeout_seconds, colors
+        self.pairing_bond_paths.append(bond_path)
         self._record("pairing")
 
     async def disconnect(self) -> None:
@@ -262,3 +271,27 @@ def test_stale_frames_and_watchdog_epoch_restart_are_filtered() -> None:
     assert adapter.applied_frames[-1] == new_epoch
     assert same_epoch not in adapter.applied_frames
     runtime.close()
+
+
+def test_start_pairing_passes_the_bond_path_through_the_runtime_boundary() -> None:
+    adapter = RecordingAdapter()
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    bond_path = Path("bonds/pairing.json")
+    runtime.post(
+        StartPairing(
+            adapter_id="usb:0",
+            bond_path=bond_path,
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+    runtime.close()
+
+    assert adapter.pairing_bond_paths == [bond_path]

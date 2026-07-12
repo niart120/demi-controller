@@ -26,6 +26,7 @@ class StartPairing:
     """Request an explicitly user-approved new pairing attempt."""
 
     adapter_id: str
+    bond_path: Path
     timeout_seconds: float
     colors: ControllerColorSettings
 

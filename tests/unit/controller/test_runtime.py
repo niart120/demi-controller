@@ -66,11 +66,12 @@ class FakeAdapter:
     async def start_pairing(
         self,
         adapter_id: str,
+        bond_path: Path,
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:
         """Complete a fake pairing operation."""
-        del adapter_id, timeout_seconds, colors
+        del adapter_id, bond_path, timeout_seconds, colors
 
     async def disconnect(self) -> None:
         """Complete a fake disconnect."""

@@ -27,6 +27,7 @@ class ControllerAdapter(Protocol):
     async def start_pairing(
         self,
         adapter_id: str,
+        bond_path: Path,
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:
