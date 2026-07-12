@@ -2,21 +2,29 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import NoReturn, Protocol
 
 from swbt import (
+    AdapterDiscoveryError,
     AdapterInfo,
     Button,
+    ClosedError,
+    ConnectionFailedError,
+    ConnectionTimeoutError,
     ControllerColors,
     IMUFrame,
     InputState,
+    InvalidInputError,
+    InvalidKeyStoreError,
     ProController,
     Stick,
+    SwbtError,
+    TransportOpenError,
     list_adapters,
 )
 
-from demi.controller.adapter import ControllerAdapter
-from demi.controller.events import AdapterDescriptor
+from demi.controller.adapter import ControllerAdapter, ControllerAdapterError
+from demi.controller.events import AdapterDescriptor, ControllerErrorCategory
 from demi.domain.controller import ControllerFrame, LogicalButton
 from demi.domain.settings import ControllerColorSettings
 
@@ -91,7 +99,10 @@ class SwbtControllerAdapter(ControllerAdapter):
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """List USB Bluetooth candidates without opening a controller."""
-        return tuple(self._descriptor(info) for info in self._adapter_lister())
+        try:
+            return tuple(self._descriptor(info) for info in self._adapter_lister())
+        except Exception as error:  # noqa: BLE001
+            _raise_adapter_failure(error, ControllerErrorCategory.ADAPTER_OPEN_FAILED)
 
     async def connect_saved(
         self,
@@ -101,14 +112,14 @@ class SwbtControllerAdapter(ControllerAdapter):
         colors: ControllerColorSettings,
     ) -> None:
         """Open a controller and reconnect without pairing."""
-        await self._connect_controller(adapter_id, bond_path, colors)
-        self._timeout_seconds = timeout_seconds
-        gamepad = self._require_gamepad()
         try:
+            await self._connect_controller(adapter_id, bond_path, colors)
+            self._timeout_seconds = timeout_seconds
+            gamepad = self._require_gamepad()
             await gamepad.reconnect(timeout=timeout_seconds)
-        except Exception:
+        except Exception as error:  # noqa: BLE001
             await self._discard_failed_gamepad()
-            raise
+            _raise_adapter_failure(error, ControllerErrorCategory.RECONNECT_FAILED)
 
     async def start_pairing(
         self,
@@ -118,14 +129,14 @@ class SwbtControllerAdapter(ControllerAdapter):
         colors: ControllerColorSettings,
     ) -> None:
         """Open a controller and allow explicit pairing."""
-        await self._connect_controller(adapter_id, bond_path, colors)
-        self._timeout_seconds = timeout_seconds
-        gamepad = self._require_gamepad()
         try:
+            await self._connect_controller(adapter_id, bond_path, colors)
+            self._timeout_seconds = timeout_seconds
+            gamepad = self._require_gamepad()
             await gamepad.connect(timeout=timeout_seconds, allow_pairing=True)
-        except Exception:
+        except Exception as error:  # noqa: BLE001
             await self._discard_failed_gamepad()
-            raise
+            _raise_adapter_failure(error, ControllerErrorCategory.PAIRING_TIMEOUT)
 
     async def disconnect(self) -> None:
         """Close the current gamepad with a final neutral attempt."""
@@ -134,6 +145,8 @@ class SwbtControllerAdapter(ControllerAdapter):
             return
         try:
             await gamepad.close(neutral=True)
+        except Exception as error:  # noqa: BLE001
+            _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
         finally:
             self._clear_gamepad()
 
@@ -149,7 +162,10 @@ class SwbtControllerAdapter(ControllerAdapter):
 
     async def apply_frame(self, frame: ControllerFrame) -> None:
         """Convert and apply one complete Project_Demi frame."""
-        await self._require_gamepad().apply(frame_to_input_state(frame))
+        try:
+            await self._require_gamepad().apply(frame_to_input_state(frame))
+        except Exception as error:  # noqa: BLE001
+            _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
 
     async def close(self) -> None:
         """Release the current gamepad idempotently."""
@@ -251,3 +267,21 @@ def to_swbt_colors(colors: ControllerColorSettings) -> ControllerColors:
 
 def _hex_color(value: str) -> int:
     return int(value.removeprefix("#"), 16)
+
+
+def _raise_adapter_failure(
+    error: Exception,
+    fallback: ControllerErrorCategory,
+) -> NoReturn:
+    """Raise a safe adapter failure classified from a swbt exception."""
+    if isinstance(error, (AdapterDiscoveryError, TransportOpenError)):
+        category = ControllerErrorCategory.ADAPTER_OPEN_FAILED
+    elif isinstance(error, InvalidKeyStoreError):
+        category = ControllerErrorCategory.BOND_NOT_FOUND
+    elif isinstance(error, InvalidInputError):
+        category = ControllerErrorCategory.INVALID_INPUT
+    elif isinstance(error, (ClosedError, ConnectionFailedError, ConnectionTimeoutError, SwbtError)):
+        category = fallback
+    else:
+        category = fallback
+    raise ControllerAdapterError(category) from error

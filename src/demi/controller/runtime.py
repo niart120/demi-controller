@@ -5,6 +5,7 @@ from threading import Event, Thread
 from typing import TYPE_CHECKING
 
 from demi.application.state import ConnectionState
+from demi.controller.adapter import ControllerAdapterError
 from demi.controller.commands import (
     ConnectSaved,
     ControllerCommand,
@@ -177,7 +178,9 @@ class ControllerRuntime:
                 if watchdog_task in done:
                     watchdog_task = asyncio.create_task(self._watchdog_loop())
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.UNEXPECTED, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.UNEXPECTED), error
+            )
         finally:
             for task in (command_task, frame_task, watchdog_task):
                 if task is not None:
@@ -214,7 +217,10 @@ class ControllerRuntime:
             self._event_sink.emit(AdaptersDiscovered(adapters=descriptors))
             self._set_connection_state(ConnectionState.READY)
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.ADAPTER_OPEN_FAILED, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.ADAPTER_OPEN_FAILED),
+                error,
+            )
 
     async def _connect_saved(self, command: ConnectSaved) -> None:
         adapter = self._adapter
@@ -235,7 +241,10 @@ class ControllerRuntime:
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
-            self._emit_error(ControllerErrorCategory.RECONNECT_FAILED, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.RECONNECT_FAILED),
+                error,
+            )
 
     async def _start_pairing(self, command: StartPairing) -> None:
         adapter = self._adapter
@@ -256,7 +265,10 @@ class ControllerRuntime:
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
-            self._emit_error(ControllerErrorCategory.PAIRING_TIMEOUT, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.PAIRING_TIMEOUT),
+                error,
+            )
 
     async def _disconnect(self) -> None:
         adapter = self._adapter
@@ -268,7 +280,10 @@ class ControllerRuntime:
                 await self._apply_rest_state()
                 await adapter.disconnect()
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.SHUTDOWN_FAILED, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
+                error,
+            )
         finally:
             self._connected = False
             self._watchdog.set_connected(False)
@@ -282,7 +297,10 @@ class ControllerRuntime:
             await adapter.recreate_with_colors(command.colors)
             await self._apply_rest_state()
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.CONNECTION_LOST, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+                error,
+            )
 
     async def _consume_latest_frame(self) -> None:
         frame = self._mailbox.take()
@@ -297,7 +315,10 @@ class ControllerRuntime:
         try:
             await self._adapter.apply_frame(frame)
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.CONNECTION_LOST, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+                error,
+            )
 
     async def _neutralize_for_watchdog(self) -> None:
         if not self._connected or self._adapter is None:
@@ -308,7 +329,10 @@ class ControllerRuntime:
                 WatchdogNeutralized(capture_epoch=self._watchdog.capture_epoch or 0)
             )
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.CONNECTION_LOST, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+                error,
+            )
 
     async def _apply_rest_state(self) -> None:
         if self._adapter is not None:
@@ -338,7 +362,10 @@ class ControllerRuntime:
                     await adapter.disconnect()
                 await adapter.close()
         except Exception as error:  # noqa: BLE001
-            self._emit_error(ControllerErrorCategory.SHUTDOWN_FAILED, error)
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
+                error,
+            )
         finally:
             self._connected = False
             self._watchdog.set_connected(False)
@@ -366,6 +393,15 @@ class ControllerRuntime:
                 watchdog_tripped=self._watchdog.watchdog_tripped,
             )
         )
+
+    @staticmethod
+    def _category_for_error(
+        error: Exception,
+        fallback: ControllerErrorCategory,
+    ) -> ControllerErrorCategory:
+        if isinstance(error, ControllerAdapterError):
+            return error.category
+        return fallback
 
     def _emit_error(self, category: ControllerErrorCategory, error: Exception) -> None:
         self._diagnostic_counter += 1
