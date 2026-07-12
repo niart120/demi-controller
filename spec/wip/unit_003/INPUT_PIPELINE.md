@@ -80,7 +80,7 @@
 | refactor-done | InputMapper が左右 stick の反対方向、斜め、amount、circular limit を合成する | new / edge | unit | 7 tests green。StickVector、invalid selector、capture 外を確認 |
 | refactor-done | YawPitchModel が yaw/pitch、符号、独立感度、Y反転、pitch上限、dt境界、resetを満たす | new / edge | unit | 9 tests green。中間 pitch 投影、raw 非依存、reset を確認 |
 | refactor-skipped | YawPitchModel が移動なしでも姿勢整合した static 1G を維持する | characterization / regression | unit | 10 tests green。既存 model の pose 維持を追加テストで固定 |
-| todo | InputPublisher が monotonic clock で sequence/epoch 付き frame を 8ms 評価境界へ渡す | new / edge | unit | 実時間 sleep と Bluetooth は使わない |
+| refactor-skipped | InputPublisher が monotonic clock で sequence/epoch 付き frame を 8ms 評価境界へ渡す | new / edge | unit | 4 tests green。時計注入、初回・epoch変更の dt=0、capture 外 neutral、sink offer を実装。実時間 sleep と Bluetooth は使わない |
 | todo | input pipeline の全 gate と package smoke が通る | characterization | package | `uv lock --check`、`uv build`、unit を含める |
 
 ## 7. 設計メモ
@@ -123,6 +123,10 @@
 | `uv run pytest tests/unit/input/test_physical_input.py` | passed | 7 passed |
 | `uv run ruff format --check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/input/test_publisher.py` | passed | 4 passed |
+| `uv run ruff format --check src/demi/input tests/unit/input` | passed | 8 files already formatted |
+| `uv run ruff check src/demi/input tests/unit/input` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/input/test_yaw_pitch_model.py` | passed | 10 passed |
 | `uv run ruff check src/demi/input/yaw_pitch_model.py tests/unit/input/test_yaw_pitch_model.py` | passed | All checks passed |
