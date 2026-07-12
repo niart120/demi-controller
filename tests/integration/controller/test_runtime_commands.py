@@ -12,7 +12,7 @@ from demi.controller.events import (
     StatusSnapshot,
 )
 from demi.controller.runtime import ControllerRuntime
-from demi.domain.controller import ControllerFrame
+from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
 from demi.domain.settings import ControllerColorSettings
 
 
@@ -57,6 +57,11 @@ class RecordingAdapter:
 
     operations: list[str] = field(default_factory=list)
     thread_ids: list[int] = field(default_factory=list)
+    applied_frames: list[ControllerFrame] = field(default_factory=list)
+    applied: Event = field(default_factory=Event)
+    applied_active: Event = field(default_factory=Event)
+    connect_started: Event | None = None
+    connect_release: Event | None = None
 
     def _record(self, name: str) -> None:
         self.operations.append(name)
@@ -77,6 +82,10 @@ class RecordingAdapter:
         """Record a saved connection."""
         del adapter_id, bond_path, timeout_seconds, colors
         self._record("connect_saved")
+        if self.connect_started is not None:
+            self.connect_started.set()
+        if self.connect_release is not None and not self.connect_release.wait(timeout=1.0):
+            raise TimeoutError
 
     async def start_pairing(
         self,
@@ -99,8 +108,11 @@ class RecordingAdapter:
 
     async def apply_frame(self, frame: ControllerFrame) -> None:
         """Record a complete frame application."""
-        del frame
         self._record("apply_frame")
+        self.applied_frames.append(frame)
+        self.applied.set()
+        if frame.capture_active:
+            self.applied_active.set()
 
     async def close(self) -> None:
         """Record adapter close."""
@@ -139,3 +151,62 @@ def test_commands_are_ordered_on_worker_and_events_return_to_the_sink() -> None:
     assert "disconnect" in adapter.operations
     assert adapter.operations[-1] == "close"
     assert len(set(adapter.thread_ids)) == 1
+
+
+def make_frame(*, sequence: int, epoch: int, active: bool = True) -> ControllerFrame:
+    """Build a valid frame for runtime mailbox integration tests."""
+    return ControllerFrame(
+        sequence=sequence,
+        capture_epoch=epoch,
+        monotonic_ns=sequence,
+        buttons=frozenset(),
+        left_stick=StickVector(x=0.0, y=0.0),
+        right_stick=StickVector(x=0.0, y=0.0),
+        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        accel_g=AccelG(0.0, 0.0, 1.0),
+        capture_active=active,
+    )
+
+
+def test_unconnected_frames_are_retained_and_connected_worker_applies_latest_only() -> None:
+    connect_started = Event()
+    connect_release = Event()
+    adapter = RecordingAdapter(
+        connect_started=connect_started,
+        connect_release=connect_release,
+    )
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+
+    pending = make_frame(sequence=1, epoch=1)
+    assert runtime.offer_frame(pending) is True
+    runtime.post(RequestStatus())
+    assert events.status.wait(timeout=1.0)
+    assert runtime.latest_frame == pending
+    assert adapter.applied_frames == []
+
+    second = make_frame(sequence=2, epoch=1)
+    newest = make_frame(sequence=3, epoch=1)
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bonds/default.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert connect_started.wait(timeout=1.0)
+    assert runtime.offer_frame(second) is True
+    assert runtime.offer_frame(newest) is True
+    connect_release.set()
+    assert events.connected.wait(timeout=1.0)
+    assert adapter.applied_active.wait(timeout=1.0)
+
+    assert adapter.applied_frames[-1] == newest
+    assert second not in adapter.applied_frames
+    runtime.close()
