@@ -191,3 +191,4 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 - [x] TDD Test List を作成した
 - [x] 検証結果または未実行理由を実装後に更新した
 - [x] package / release / public API に触れる場合の gate を記録した
+- [x] 完了時に `spec/complete/unit_004` へ移動した
