@@ -81,7 +81,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | refactor-done | domain の列挙型と値オブジェクトが不変で、finite/range 契約を守る | new / edge | unit | 8 tests green。例外型、docstring、型検査を green 後に整理 |
 | refactor-done | Binding、Profile、Default preset が全既定入力と反転属性を保持する | new | unit | 5 tests green。target 型を enum に固定し、raw string の変換は codec 境界へ分離 |
 | refactor-done | AppSettings の既定値と nested settings が schema v1 の制約を満たす | new / edge | unit | 13 tests green。color normalization と nested invariant を確認 |
-| todo | 現行 AppSettings が TOML encode/decode で同値往復する | new | unit | `tomli-w` は config 層だけで使う |
+| refactor-done | 現行 AppSettings が TOML encode/decode で同値往復する | new | unit | 2 tests green。`tomllib` 読み込みと `tomli-w` 書き込みを config 層へ閉じ込めた |
 | todo | 未知 schema、未知項目、無効 enum/range を安全に拒否する | new / edge | unit | 未知の新版を既定値で保存しない |
 | todo | PlatformDirs と bond slot のパス境界を検証する | new / edge | unit | パストラバーサル、OS 固定パスを禁止 |
 | todo | repository が初回、正常、破損復旧、原子的保存を区別する | new / regression / edge | unit | backup と replace failure の fixture を使う |
@@ -135,6 +135,12 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `uv run ruff format --check src/demi/domain tests/unit/domain/test_controller.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/domain tests/unit/domain/test_controller.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/config/test_codec.py` | passed | 2 passed |
+| `uv run ruff format --check src/demi/config tests/unit/config/test_codec.py` | passed | 4 files already formatted |
+| `uv run ruff check src/demi/config tests/unit/config/test_codec.py` | passed | All checks passed |
+| `uv add platformdirs tomli-w` | passed | `platformdirs==4.10.0`、`tomli-w==1.2.0` を runtime dependency へ追加 |
+| `uv lock --check` | passed | 42 packages |
+| `uv build` | passed | dependency 追加後の wheel/source distribution を生成 |
 | `uv run pytest tests/unit/domain/test_mapping.py` | passed | 5 passed |
 | `uv run ruff format --check src/demi/domain tests/unit/domain/test_mapping.py` | passed | 5 files already formatted |
 | `uv run ruff check src/demi/domain tests/unit/domain/test_mapping.py` | passed | All checks passed |
