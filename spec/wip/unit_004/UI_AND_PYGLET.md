@@ -79,7 +79,7 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | pyglet dependency と window spec が 960x640、最小 800x520、resize 可を表現する | new / edge | unit | 実 display を要求しない factory/spec test |
+| refactor-done | pyglet dependency と window spec が 960x640、最小 800x520、resize 可を表現する | new / edge | unit | 1 test green。実 display を要求しない spec test と pyglet window factory 境界を追加 |
 | todo | AppState と CaptureCoordinator が capture start/stop、epoch、neutral、exclusive mouse 失敗を扱う | new / edge | unit | FakeWindowPort と InputPublisher sink を使う |
 | todo | PygletInputBackend が key、modifier、mouse、relative motion を domain state へ変換する | new / edge | unit | pyglet event handler を直接呼び、display を要求しない |
 | todo | F12 と deactivate が capture を解除し、activate が自動再捕捉しない | new / regression | unit | capture 外 event の無視も確認する |
@@ -124,6 +124,11 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit` | not run | unit_004 implementation 前の baseline は unit_003 merge 時点で 75 passed |
+| `uv add pyglet>=2.1,<2.2` | passed | `pyglet==2.1.15` を追加し `uv.lock` を更新 |
+| `uv run pytest tests/unit/ui/test_window.py` | passed | 1 passed |
+| `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
 | `uv lock --check` | not run | dependency 変更後に実行する |
 | `uv build` | not run | dependency 変更後に実行する |
 | `uv run pytest tests/integration` | not applicable | `tests/integration` tree は未作成。headless/fake UI は unit で扱う |

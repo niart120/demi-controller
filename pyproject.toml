@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "platformdirs>=4.10.0",
+    "pyglet>=2.1,<2.2",
     "tomli-w>=1.2.0",
 ]
 
