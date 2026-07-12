@@ -23,6 +23,7 @@ dependencies = []
 
 [project.scripts]
 demi = "demi.cli:main"
+project-demi = "demi.cli:main"
 
 [dependency-groups]
 dev = [
