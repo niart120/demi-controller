@@ -79,7 +79,7 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | SettingsEditor が immutable draft の binding / connection / color 編集と F12 保護を扱う | new / edge | unit | default reset、inverted、domain validation を含む |
+| refactor-done | SettingsEditor が immutable draft の binding / connection / color 編集と F12 保護を扱う | new / edge | unit | 2 tests green。default reset、inverted、domain validation を確認 |
 | todo | duplicate source と local action conflict を警告し、同一 target の複数 source を許可する | new / edge | unit | conflict order を固定 |
 | todo | DialogKind / DialogManager が modal を1つだけ開き、タイトルと状態を返す | new / regression | unit | mapping、connection、colors、pairing confirmation を含む |
 | todo | modal open / cancel が capture を neutralize し、configuration state と IDLE を遷移する | new / integration | integration | FakeWindow、FakePublisher、CaptureCoordinator で確認 |
@@ -115,6 +115,10 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit/application/test_settings_editor.py` | not run | implementation 後に実行する |
+| `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 2 passed。draft 編集、default reset、F12 予約保護を確認 |
+| `uv run ruff format --check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/application/test_dialogs.py` | not run | implementation 後に実行する |
 | `uv run pytest tests/integration/ui/test_settings_modal.py` | not run | implementation 後に実行する |
 | `uv run ruff format --check .` | not run | implementation 後に実行する |
