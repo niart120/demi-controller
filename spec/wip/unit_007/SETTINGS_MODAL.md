@@ -81,7 +81,7 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 |---|---|---|---|---|
 | refactor-done | SettingsEditor が immutable draft の binding / connection / color 編集と F12 保護を扱う | new / edge | unit | 2 tests green。default reset、inverted、domain validation を確認 |
 | refactor-done | duplicate source と local action conflict を警告し、同一 target の複数 source を許可する | new / edge | unit | 1 test green。conflict order を固定 |
-| todo | DialogKind / DialogManager が modal を1つだけ開き、タイトルと状態を返す | new / regression | unit | mapping、connection、colors、pairing confirmation を含む |
+| refactor-done | DialogKind / DialogManager が modal を1つだけ開き、タイトルと状態を返す | new / regression | unit | 2 tests green。mapping、connection、colors、pairing confirmation を確認 |
 | todo | modal open / cancel が capture を neutralize し、configuration state と IDLE を遷移する | new / integration | integration | FakeWindow、FakePublisher、CaptureCoordinator で確認 |
 | todo | SettingsModalController が save / cancel / reset と color reconnect decision を束ねる | new / integration | integration | repository save failure 時は modal を保持 |
 | todo | RECOVERED / backup path が安全な復旧通知へ変換される | new / edge | unit | corrupt file 内容や秘密値を通知へ入れない |
@@ -117,6 +117,7 @@ Unit 002 の immutable settings / TOML repository と Unit 003 の binding model
 | `uv run pytest tests/unit/application/test_settings_editor.py` | not run | implementation 後に実行する |
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 2 passed。draft 編集、default reset、F12 予約保護を確認 |
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | 3 passed。duplicate source、local action collision、同一 target の複数 source を確認 |
+| `uv run pytest tests/unit/application/test_dialogs.py -q` | passed | 2 passed。modal 排他、title、idempotent close を確認 |
 | `uv run ruff format --check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
