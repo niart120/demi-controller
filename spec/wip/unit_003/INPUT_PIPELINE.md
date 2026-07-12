@@ -75,7 +75,7 @@
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-done | KeySource/MouseButtonSource と PhysicalInputState が press/release/duplicate/clear を扱う | new / edge | unit | 7 tests green。source normalization、revision、例外型を static gate 後に整理 |
-| todo | PhysicalInputState が mouse dx/dy を加算し、一度だけ消費する | new / edge | unit | revision と差分 reset を確認 |
+| refactor-skipped | PhysicalInputState が mouse dx/dy を加算し、一度だけ消費する | characterization / edge | unit | 12 tests green。item 1 の状態実装に含まれた差分契約を固定 |
 | todo | InputMapper が button を複数 source/inverted の OR で集約し capture 外を neutral にする | new / edge | unit | 任意 target、Default binding 境界 |
 | todo | InputMapper が左右 stick の反対方向、斜め、amount、circular limit を合成する | new / edge | unit | `-1..1` の domain 値へ渡す |
 | todo | YawPitchModel が yaw/pitch、符号、独立感度、Y反転、pitch上限、dt境界、resetを満たす | new / edge | unit | `GyroRate` と `AccelG` のみを返す |
@@ -122,6 +122,9 @@
 | `uv run pytest tests/integration` | not applicable | `tests/integration` tree は未作成 |
 | `uv run pytest tests/unit/input/test_physical_input.py` | passed | 7 passed |
 | `uv run ruff format --check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/input/test_physical_input.py` | passed | 12 passed |
 | `uv run ruff check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 

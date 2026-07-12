@@ -51,3 +51,28 @@ def test_clear_removes_all_held_sources() -> None:
 
     assert state.held_keys == set()
     assert state.held_mouse_buttons == set()
+
+
+def test_mouse_motion_is_accumulated_and_consumed_once() -> None:
+    state = PhysicalInputState()
+    state.add_mouse_motion(2.0, 1.0)
+    state.add_mouse_motion(3.0, -2.0)
+    state.add_mouse_motion(-1.0, 4.0)
+
+    assert state.consume_mouse_motion() == (4.0, 3.0)
+    assert state.consume_mouse_motion() == (0.0, 0.0)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_mouse_motion_rejects_non_finite_values(value: float) -> None:
+    with pytest.raises(DomainValueError):
+        PhysicalInputState().add_mouse_motion(value, 0.0)
+
+
+def test_clear_discards_pending_mouse_motion() -> None:
+    state = PhysicalInputState()
+    state.add_mouse_motion(4.0, -2.0)
+
+    state.clear()
+
+    assert state.consume_mouse_motion() == (0.0, 0.0)
