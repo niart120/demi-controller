@@ -5,6 +5,7 @@ from pathlib import Path
 from swbt import InputState
 
 from demi.controller.swbt_adapter import SwbtControllerAdapter
+from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
 
 
@@ -82,3 +83,47 @@ def test_saved_reconnect_and_pairing_use_distinct_public_lifecycle_routes() -> N
         "saved.json",
         "new.json",
     ]
+
+
+def test_frame_apply_and_color_recreate_preserve_saved_connection_context() -> None:
+    gamepads: list[RecordingGamepad] = []
+    factory_kwargs: list[dict[str, object]] = []
+
+    def gamepad_factory(**kwargs: object) -> RecordingGamepad:
+        factory_kwargs.append(kwargs)
+        gamepad = RecordingGamepad()
+        gamepads.append(gamepad)
+        return gamepad
+
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=gamepad_factory,
+        adapter_lister=lambda: (),
+    )
+    initial_colors = ControllerColorSettings()
+    updated_colors = ControllerColorSettings(body="#ABCDEF")
+    frame = ControllerFrame(
+        sequence=1,
+        capture_epoch=1,
+        monotonic_ns=1,
+        buttons=frozenset({LogicalButton.A}),
+        left_stick=StickVector(x=0.5, y=0.0),
+        right_stick=StickVector(x=0.0, y=-0.5),
+        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        accel_g=AccelG(0.0, 0.0, 1.0),
+        capture_active=True,
+    )
+
+    async def exercise() -> None:
+        await adapter.connect_saved("usb:0", Path("saved.json"), 12.5, initial_colors)
+        await adapter.apply_frame(frame)
+        await adapter.recreate_with_colors(updated_colors)
+        await adapter.close()
+
+    asyncio.run(exercise())
+
+    assert gamepads[0].calls == ["open", "reconnect", "apply", "close"]
+    assert gamepads[1].calls == ["open", "reconnect", "close"]
+    assert gamepads[0].reconnect_timeouts == [12.5]
+    assert gamepads[1].reconnect_timeouts == [12.5]
+    assert factory_kwargs[0]["key_store_path"] == "saved.json"
+    assert factory_kwargs[1]["key_store_path"] == "saved.json"

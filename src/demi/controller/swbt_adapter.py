@@ -87,6 +87,7 @@ class SwbtControllerAdapter(ControllerAdapter):
         self._adapter_id: str | None = None
         self._bond_path: Path | None = None
         self._colors: ControllerColorSettings | None = None
+        self._timeout_seconds: float | None = None
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """List USB Bluetooth candidates without opening a controller."""
@@ -101,6 +102,7 @@ class SwbtControllerAdapter(ControllerAdapter):
     ) -> None:
         """Open a controller and reconnect without pairing."""
         await self._connect_controller(adapter_id, bond_path, colors)
+        self._timeout_seconds = timeout_seconds
         gamepad = self._require_gamepad()
         try:
             await gamepad.reconnect(timeout=timeout_seconds)
@@ -117,6 +119,7 @@ class SwbtControllerAdapter(ControllerAdapter):
     ) -> None:
         """Open a controller and allow explicit pairing."""
         await self._connect_controller(adapter_id, bond_path, colors)
+        self._timeout_seconds = timeout_seconds
         gamepad = self._require_gamepad()
         try:
             await gamepad.connect(timeout=timeout_seconds, allow_pairing=True)
@@ -138,10 +141,11 @@ class SwbtControllerAdapter(ControllerAdapter):
         """Recreate and reconnect the current saved controller with new colors."""
         adapter_id = self._adapter_id
         bond_path = self._bond_path
+        timeout_seconds = self._timeout_seconds
         if adapter_id is None or bond_path is None:
             return
         await self.disconnect()
-        await self.connect_saved(adapter_id, bond_path, 30.0, colors)
+        await self.connect_saved(adapter_id, bond_path, timeout_seconds or 30.0, colors)
 
     async def apply_frame(self, frame: ControllerFrame) -> None:
         """Convert and apply one complete Project_Demi frame."""
@@ -193,6 +197,7 @@ class SwbtControllerAdapter(ControllerAdapter):
         self._adapter_id = None
         self._bond_path = None
         self._colors = None
+        self._timeout_seconds = None
 
     @staticmethod
     def _descriptor(info: AdapterInfo) -> AdapterDescriptor:
