@@ -86,8 +86,8 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | refactor-done | ControllerView が ControllerFrame だけから pressed/control/IMU の表示モデルを更新する | new / edge | unit | 2 tests green。stick、button、gyro、accel、capture を frame だけから更新し、pyglet Batch 描画境界を追加 |
 | refactor-done | toolbar が connection/app state からラベルと enabled を決める | new / edge | unit | 2 tests green。接続中、captured、focus loss、modal 相当の無効状態を確認 |
 | refactor-done | status bar が adapter、connection、capture、8ms、preview warning を組み立てる | new / edge | unit | 2 tests green。未接続 capture の preview-only 警告を固定 |
-| refactor-done | PygletApplication が backend、view、toolbar、status、8ms clock を接続する | new / integration | unit | 1 test green。FakeWindow と FakeClock で handler wiring、8ms schedule、coordinator latest frame を確認 |
-| todo | UI package の全 gate と headless/package smoke が通る | characterization | package | lock、format、lint、ty、unit、build、wheel contents を含める |
+| refactor-done | PygletApplication が backend、view、toolbar、status、8ms clock を接続する | new / integration | unit | 1 test green。FakeWindow と FakeClock で handler wiring、8ms schedule、表示開始、coordinator latest frame を確認 |
+| refactor-done | UI package の全 gate と window/package smoke が通る | characterization | package | 91 unit tests、lock、format、lint、ty、非表示 window、ControllerView draw、build、wheel contents を確認。Windows headless は EGL 不在で not applicable |
 
 ## 7. 設計メモ
 
@@ -129,6 +129,23 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv sync --dev` | passed | 43 packages resolved、38 packages checked |
+| `uv lock --check` | passed | 43 packages |
+| `uv run ruff format --check .` | passed | 48 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 91 passed |
+| window factory smoke via `uv run python -c` | passed | 非表示 960x640 window を作成し、close まで完了 |
+| ControllerView draw smoke via `uv run python -c` | passed | 非表示 OpenGL context 上で Batch 描画と close を確認 |
+| headless window smoke via `uv run python -c` | not applicable | Windows の pyglet headless path は EGL library 不在で `Library "EGL" not found`。通常の非表示 window smoke は passed |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成。sandbox の PyPI 接続制限のため外部アクセス許可で実行 |
+| package smoke via `uv run python -c` | passed | wheel に UI、PygletInputBackend、window modules が含まれることを確認 |
+| `uv run pytest tests/integration` | not applicable | `tests/integration` tree は未作成。fake/UI boundary は unit で確認 |
+| `git diff --check` | passed | whitespace error なし |
+| type-boundary review | passed | pyglet window、clock、event handler を Protocol で境界化。`ty` 通過、production の `Any` / `type: ignore` なし。外部 descriptor の writable color だけ局所 `cast` |
+| docstring review | passed | application、input backend、window、view、toolbar、status の public API 契約を確認 |
+| docs-quality review | passed | scope、non-goals、TDD status、実行結果、not applicable、先送り事項、仮テキスト残りを確認 |
+| agentic-self-review | passed | `spec/initial`、diff、TDD commit、static/package gate、残リスクを照合 |
 | `uv run pytest tests/unit/ui/test_pyglet_application.py` | passed | 1 passed |
 | `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_pyglet_application.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_pyglet_application.py` | passed | All checks passed |
@@ -172,5 +189,5 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を作成した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] package / release / public API に触れる場合の gate を記録した
