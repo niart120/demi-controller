@@ -103,6 +103,24 @@ class CaptureCoordinator:
             return None
         return self._leave_capture(AppState.IDLE)
 
+    def open_configuration(self) -> bool:
+        """Enter configuration state after publishing a neutral frame."""
+        if self._app_state is AppState.CAPTURED:
+            self._leave_capture(AppState.CONFIGURING)
+            return True
+        if self._app_state is not AppState.IDLE:
+            return False
+        self._app_state = AppState.CONFIGURING
+        self._publish_frame(capture_active=False)
+        return True
+
+    def close_configuration(self) -> bool:
+        """Leave configuration state without automatically recapturing input."""
+        if self._app_state is not AppState.CONFIGURING:
+            return False
+        self._app_state = AppState.IDLE
+        return True
+
     def toggle_capture(self) -> bool:
         """Start capture from idle or stop it when already captured.
 
