@@ -2,8 +2,9 @@ import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from swbt import Button, IMUFrame, InputState, Stick
+from swbt import AdapterInfo, Button, ControllerColors, IMUFrame, InputState, Stick
 
+from demi.controller.events import AdapterDescriptor
 from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
@@ -128,3 +129,60 @@ def test_neutral_frame_uses_one_g_acceleration_in_all_three_imu_slots() -> None:
     assert state.right_stick == Stick.center()
     assert state.imu_frames == (expected_imu, expected_imu, expected_imu)
     assert state.imu_frames != InputState.neutral().imu_frames
+
+
+def test_adapter_info_and_project_colors_cross_the_public_boundary() -> None:
+    gamepad = RecordingGamepad()
+    constructor_kwargs: dict[str, object] = {}
+
+    def gamepad_factory(**kwargs: object) -> RecordingGamepad:
+        constructor_kwargs.update(kwargs)
+        return gamepad
+
+    info = AdapterInfo(
+        name="usb:0",
+        manufacturer="Acme",
+        product="Blue Dongle",
+        vendor_id=0x1234,
+        product_id=0x5678,
+        serial_number="private-serial",
+    )
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=gamepad_factory,
+        adapter_lister=lambda: (info,),
+    )
+    colors = ControllerColorSettings(
+        body="#ABCDEF",
+        buttons="#102030",
+        left_grip="#405060",
+        right_grip="#708090",
+    )
+
+    async def exercise() -> tuple[AdapterDescriptor, ...]:
+        descriptors = await adapter.discover_adapters()
+        await adapter.connect_saved("usb:0", Path("bond.json"), 30.0, colors)
+        return descriptors
+
+    descriptors = asyncio.run(exercise())
+
+    assert descriptors == (
+        AdapterDescriptor(
+            id="usb:0",
+            display_name="Blue Dongle",
+            transport="usb",
+            metadata=(
+                ("manufacturer", "Acme"),
+                ("product", "Blue Dongle"),
+                ("vendor_id", "1234"),
+                ("product_id", "5678"),
+            ),
+        ),
+    )
+    assert constructor_kwargs["adapter"] == "usb:0"
+    assert constructor_kwargs["key_store_path"] == "bond.json"
+    swbt_colors = constructor_kwargs["controller_colors"]
+    assert isinstance(swbt_colors, ControllerColors)
+    assert swbt_colors.body == 0xABCDEF
+    assert swbt_colors.buttons == 0x102030
+    assert swbt_colors.left_grip == 0x405060
+    assert swbt_colors.right_grip == 0x708090
