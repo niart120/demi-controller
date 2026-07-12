@@ -82,7 +82,7 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | refactor-done | pyglet dependency と window spec が 960x640、最小 800x520、resize 可を表現する | new / edge | unit | 1 test green。実 display を要求しない spec test と pyglet window factory 境界を追加 |
 | refactor-done | AppState と CaptureCoordinator が capture start/stop、epoch、neutral、exclusive mouse 失敗を扱う | new / edge | unit | 2 tests green。FakeWindowPort と InputPublisher sink で開始・停止・失敗を確認 |
 | refactor-done | PygletInputBackend が key、modifier、mouse、relative motion を domain state へ変換する | new / edge | unit | 3 tests green。pyglet event handler を直接呼び、display を要求しない。modifier source の Binding も許可 |
-| todo | F12 と deactivate が capture を解除し、activate が自動再捕捉しない | new / regression | unit | capture 外 event の無視も確認する |
+| refactor-skipped | F12 と deactivate が capture を解除し、activate が自動再捕捉しない | new / regression | unit | 2 tests green。capture 外 event の無視を含め、item 3 の backend/coordinator 実装で固定 |
 | todo | ControllerView が ControllerFrame だけから pressed/control/IMU の表示モデルを更新する | new / edge | unit | stick 座標の範囲と静的要素の再利用を確認する |
 | todo | toolbar が connection/app state からラベルと enabled を決める | new / edge | unit | 接続中、captured、modal 相当の無効状態を確認する |
 | todo | status bar が adapter、connection、capture、8ms、preview warning を組み立てる | new / edge | unit | 未接続 capture の警告を固定する |
@@ -128,6 +128,10 @@ unit_003 の純粋な入力評価境界を pyglet の主スレッドへ接続す
 | `uv run pytest tests/unit/ui/test_window.py` | passed | 1 passed |
 | `uv run ruff format --check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/window.py tests/unit/ui/test_window.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/input/test_pyglet_backend.py` | passed | 5 passed |
+| `uv run ruff format --check src/demi/input/pyglet_backend.py tests/unit/input/test_pyglet_backend.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/input/pyglet_backend.py tests/unit/input/test_pyglet_backend.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/input/test_pyglet_backend.py` | passed | 3 passed |
 | `uv run pytest tests/unit/domain/test_mapping.py` | passed | 6 passed |

@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pyglet.window import key, mouse
 
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.state import AppState
 from demi.domain.controller import ControllerFrame
 from demi.domain.physical_input import KeySource, MouseButtonSource
 from demi.input.publisher import InputPublisher
@@ -87,3 +88,26 @@ def test_events_outside_capture_are_ignored() -> None:
     assert publisher.state.held_keys == set()
     assert publisher.state.held_mouse_buttons == set()
     assert publisher.state.consume_mouse_motion() == (0.0, 0.0)
+
+
+def test_f12_releases_capture_and_never_enters_the_mapping_state() -> None:
+    backend, coordinator = make_backend()
+    backend.on_key_press(key.F, 0)
+
+    assert backend.on_key_press(key.F12, 0) is True
+    assert coordinator.is_captured is False
+    assert coordinator.publisher.state.held_keys == set()
+    assert backend.on_key_release(key.F12, 0) is True
+
+
+def test_deactivate_suspends_and_activate_returns_to_idle_without_recapture() -> None:
+    backend, coordinator = make_backend()
+    backend.on_key_press(key.F, 0)
+
+    backend.on_deactivate()
+    assert coordinator.app_state is AppState.SUSPENDED
+    assert coordinator.publisher.state.held_keys == set()
+
+    backend.on_activate()
+    assert coordinator.app_state is AppState.IDLE
+    assert coordinator.is_captured is False
