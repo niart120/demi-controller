@@ -21,6 +21,7 @@ from demi.domain.settings import (
 )
 
 from .errors import ConfigurationError, UnsupportedSchemaError
+from .migrations import migrate_settings
 
 
 def _require_table(value: object) -> Mapping[str, object]:
@@ -200,6 +201,7 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             constraint.
         UnsupportedSchemaError: If the schema is not the current schema.
     """
+    raw = migrate_settings(raw)
     _check_keys(
         raw,
         frozenset(
