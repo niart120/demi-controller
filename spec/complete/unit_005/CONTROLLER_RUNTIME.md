@@ -86,7 +86,7 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | refactor-done | command queue が Discover/Connect/Disconnect/Status を順序どおり fake adapter へ渡す | new / integration | unit | 1 test green。adapter factory と event sink を注入し、worker thread 所有と RuntimeEvent を確認 |
 | refactor-done | accepted frame が connected adapter へ一括 apply され、未接続では apply されない | new / integration | integration | 接続前の latest 保持、接続中の latest-only apply を fake adapter で確認 |
 | refactor-done | stale capture epoch/sequence が破棄され、watchdog 後の同 epoch active frame が再開しない | new / regression / edge | integration | 250ms watchdog 後の neutral、同 epoch reject、新 epoch apply を runtime で確認 |
-| todo | runtime の全 gate、thread cleanup、package smoke が通る | characterization | package | lock、format、lint、ty、unit、build、wheel contents を含める |
+| refactor-done | runtime の全 gate、thread cleanup、package smoke が通る | characterization | package | lock、format、lint、ty、unit、integration、build、wheel contents を確認 |
 
 ## 7. 設計メモ
 
@@ -118,7 +118,13 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/unit` | not run | unit_005 implementation 前の baseline は unit_004 merge 時点で 92 passed |
+| `uv sync --dev` | passed | Resolved 43 packages、Checked 38 packages |
+| `uv lock --check` | passed | lock file is up to date |
+| `uv run ruff format --check .` | passed | 61 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 100 passed |
+| `uv run pytest tests/integration` | passed | 3 passed |
 | `uv run pytest tests/unit/controller/test_contracts.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/controller tests/unit/controller` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/controller tests/unit/controller` | passed | All checks passed |
@@ -140,9 +146,9 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 | `uv run ruff format --check src/demi/controller/mailbox.py tests/unit/controller/test_mailbox.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/controller/mailbox.py tests/unit/controller/test_mailbox.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
-| `uv lock --check` | not run | package metadata は変更しない予定だが final gate で確認する |
-| `uv build` | not run | final package gate で確認する |
-| `uv run pytest tests/integration` | not run | fake runtime integration tree を作成後に実行する |
+| `uv build` | passed | `dist/demi_controller-0.1.0.tar.gz` と `dist/demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `uv run python -c "from pathlib import Path; import zipfile; wheel=next(Path('dist').glob('*.whl')); names=set(zipfile.ZipFile(wheel).namelist()); required={'demi/__init__.py','demi/cli.py','demi/controller/runtime.py'}; assert required <= names, sorted(required-names); print(f'{wheel.name}: required package files present')"` | passed | wheel に `demi/__init__.py`、`demi/cli.py`、`demi/controller/runtime.py` が含まれることを確認 |
+| `git diff --check` | passed | whitespace error なし |
 
 ## 10. 先送り事項
 
@@ -154,5 +160,5 @@ pyglet 主スレッドから接続処理を分離し、専用 thread 上の asyn
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を作成した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] package / release / public API に触れる場合の gate を記録した
