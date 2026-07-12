@@ -77,7 +77,7 @@
 | refactor-done | KeySource/MouseButtonSource と PhysicalInputState が press/release/duplicate/clear を扱う | new / edge | unit | 7 tests green。source normalization、revision、例外型を static gate 後に整理 |
 | refactor-skipped | PhysicalInputState が mouse dx/dy を加算し、一度だけ消費する | characterization / edge | unit | 12 tests green。item 1 の状態実装に含まれた差分契約を固定 |
 | refactor-done | InputMapper が button を複数 source/inverted の OR で集約し capture 外を neutral にする | new / edge | unit | 3 tests green。任意 button target と capture 外の empty set を確認 |
-| todo | InputMapper が左右 stick の反対方向、斜め、amount、circular limit を合成する | new / edge | unit | `-1..1` の domain 値へ渡す |
+| refactor-done | InputMapper が左右 stick の反対方向、斜め、amount、circular limit を合成する | new / edge | unit | 7 tests green。StickVector、invalid selector、capture 外を確認 |
 | todo | YawPitchModel が yaw/pitch、符号、独立感度、Y反転、pitch上限、dt境界、resetを満たす | new / edge | unit | `GyroRate` と `AccelG` のみを返す |
 | todo | YawPitchModel が移動なしでも姿勢整合した static 1G を維持する | new / regression | unit | accel norm 1、yaw非依存 |
 | todo | InputPublisher が monotonic clock で sequence/epoch 付き frame を 8ms 評価境界へ渡す | new / edge | unit | 実時間 sleep と Bluetooth は使わない |
@@ -123,6 +123,10 @@
 | `uv run pytest tests/unit/input/test_physical_input.py` | passed | 7 passed |
 | `uv run ruff format --check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/domain/physical_input.py tests/unit/input/test_physical_input.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/input/test_mapper.py` | passed | 7 passed |
+| `uv run ruff format --check src/demi/input/mapper.py tests/unit/input/test_mapper.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/input/mapper.py tests/unit/input/test_mapper.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/input/test_mapper.py` | passed | 3 passed |
 | `uv run ruff format --check src/demi/input src/demi/domain/mapping.py tests/unit/input/test_mapper.py` | passed | 4 files already formatted |
