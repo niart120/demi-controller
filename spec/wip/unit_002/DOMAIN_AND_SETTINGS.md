@@ -79,7 +79,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-done | domain の列挙型と値オブジェクトが不変で、finite/range 契約を守る | new / edge | unit | 8 tests green。例外型、docstring、型検査を green 後に整理 |
-| todo | Binding、Profile、Default preset が全既定入力と反転属性を保持する | new | unit | Unit 003 の入力変換が使う設定境界 |
+| refactor-done | Binding、Profile、Default preset が全既定入力と反転属性を保持する | new | unit | 5 tests green。target 型を enum に固定し、raw string の変換は codec 境界へ分離 |
 | todo | AppSettings の既定値と nested settings が schema v1 の制約を満たす | new / edge | unit | 色、timeout、感度、pitch limit、local action |
 | todo | 現行 AppSettings が TOML encode/decode で同値往復する | new | unit | `tomli-w` は config 層だけで使う |
 | todo | 未知 schema、未知項目、無効 enum/range を安全に拒否する | new / edge | unit | 未知の新版を既定値で保存しない |
@@ -135,6 +135,9 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `uv run ruff format --check src/demi/domain tests/unit/domain/test_controller.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/domain tests/unit/domain/test_controller.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/domain/test_mapping.py` | passed | 5 passed |
+| `uv run ruff format --check src/demi/domain tests/unit/domain/test_mapping.py` | passed | 5 files already formatted |
+| `uv run ruff check src/demi/domain tests/unit/domain/test_mapping.py` | passed | All checks passed |
 
 ## 10. 先送り事項
 
