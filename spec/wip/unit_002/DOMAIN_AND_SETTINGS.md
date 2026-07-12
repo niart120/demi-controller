@@ -84,7 +84,7 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | refactor-done | 現行 AppSettings が TOML encode/decode で同値往復する | new | unit | 2 tests green。`tomllib` 読み込みと `tomli-w` 書き込みを config 層へ閉じ込めた |
 | refactor-done | 未知 schema、未知項目、無効 enum/range を安全に拒否する | new / edge | unit | 4 tests green。現行 v1 のみ migration registry を通過させ、fallback 保存をしない |
 | refactor-skipped | PlatformDirs と bond slot のパス境界を検証する | new / edge | unit | 2 tests green。既存責務が小さく追加 refactor は不要 |
-| todo | repository が初回、正常、破損復旧、原子的保存を区別する | new / regression / edge | unit | backup と replace failure の fixture を使う |
+| refactor-done | repository が初回、正常、破損復旧、原子的保存を区別する | new / regression / edge | unit | 5 tests green。backup failure、replace failure、temporary file cleanup を確認 |
 | todo | package dependency、lock、build、typed import の gate が通る | characterization | package | `uv lock --check` と `uv build` を含める |
 
 ## 7. 設計メモ
@@ -138,6 +138,10 @@ ControllerFrame とその物理量、入力 binding、Default profile、AppSetti
 | `uv run pytest tests/unit/config/test_paths.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/config/paths.py tests/unit/config/test_paths.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/config/paths.py tests/unit/config/test_paths.py` | passed | All checks passed |
+| `uv run pytest tests/unit/config/test_repository.py` | passed | 5 passed |
+| `uv run ruff format --check src/demi/config tests/unit/config/test_repository.py` | passed | 7 files already formatted |
+| `uv run ruff check src/demi/config tests/unit/config/test_repository.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/config/test_codec.py` | passed | 2 passed |
 | `uv run ruff format --check src/demi/config tests/unit/config/test_codec.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/config tests/unit/config/test_codec.py` | passed | All checks passed |
