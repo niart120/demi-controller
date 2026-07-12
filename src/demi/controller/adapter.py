@@ -4,9 +4,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from demi.controller.events import AdapterDescriptor, RuntimeEvent
+from demi.controller.events import AdapterDescriptor, ControllerErrorCategory, RuntimeEvent
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import ControllerColorSettings
+
+
+class ControllerAdapterError(Exception):
+    """Safe failure raised by a concrete adapter at the runtime boundary."""
+
+    def __init__(self, category: ControllerErrorCategory) -> None:
+        """Create a failure without exposing a lower-layer exception type."""
+        self.category = category
+        super().__init__(category.value)
 
 
 class ControllerAdapter(Protocol):
@@ -27,6 +36,7 @@ class ControllerAdapter(Protocol):
     async def start_pairing(
         self,
         adapter_id: str,
+        bond_path: Path,
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:

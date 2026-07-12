@@ -2,9 +2,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event, get_ident
 
+from demi.controller.adapter import ControllerAdapterError
+from demi.controller.commands import ConnectSaved
 from demi.controller.events import (
     AdapterDescriptor,
     ConnectionChanged,
+    ControllerError,
+    ControllerErrorCategory,
     RuntimeEvent,
     RuntimeStopped,
 )
@@ -31,6 +35,7 @@ class EventRecorder:
     events: list[RuntimeEvent] = field(default_factory=list)
     ready: Event = field(default_factory=Event)
     stopped: Event = field(default_factory=Event)
+    error: Event = field(default_factory=Event)
     thread_ids: list[int] = field(default_factory=list)
 
     def emit(self, event: RuntimeEvent) -> None:
@@ -41,6 +46,8 @@ class EventRecorder:
             self.ready.set()
         if isinstance(event, RuntimeStopped):
             self.stopped.set()
+        if isinstance(event, ControllerError):
+            self.error.set()
 
 
 @dataclass
@@ -48,6 +55,7 @@ class FakeAdapter:
     """Minimal async adapter owned by the runtime worker."""
 
     close_thread_id: int | None = None
+    connect_error: Exception | None = None
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """Return no adapters for the lifecycle test."""
@@ -62,15 +70,18 @@ class FakeAdapter:
     ) -> None:
         """Complete a fake saved connection."""
         del adapter_id, bond_path, timeout_seconds, colors
+        if self.connect_error is not None:
+            raise self.connect_error
 
     async def start_pairing(
         self,
         adapter_id: str,
+        bond_path: Path,
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:
         """Complete a fake pairing operation."""
-        del adapter_id, timeout_seconds, colors
+        del adapter_id, bond_path, timeout_seconds, colors
 
     async def disconnect(self) -> None:
         """Complete a fake disconnect."""
@@ -110,3 +121,29 @@ def test_runtime_starts_worker_and_closes_without_leaking_the_thread() -> None:
     assert runtime.is_alive is False
     assert adapter.close_thread_id is not None
     assert adapter.close_thread_id != main_thread_id
+
+
+def test_runtime_preserves_adapter_error_category_in_runtime_event() -> None:
+    adapter = FakeAdapter(
+        connect_error=ControllerAdapterError(ControllerErrorCategory.BOND_NOT_FOUND),
+    )
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+
+    assert events.error.wait(timeout=1.0)
+    errors = [event for event in events.events if isinstance(event, ControllerError)]
+    assert errors[-1].category is ControllerErrorCategory.BOND_NOT_FOUND
+    runtime.close()
