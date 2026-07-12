@@ -1,0 +1,55 @@
+"""Adapter and event-sink protocols owned by the runtime boundary."""
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import Protocol
+
+from demi.controller.events import AdapterDescriptor, RuntimeEvent
+from demi.domain.controller import ControllerFrame
+from demi.domain.settings import ControllerColorSettings
+
+
+class ControllerAdapter(Protocol):
+    """Async controller operations executed only on the worker thread."""
+
+    async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
+        """Discover available adapters."""
+
+    async def connect_saved(
+        self,
+        adapter_id: str,
+        bond_path: Path,
+        timeout_seconds: float,
+        colors: ControllerColorSettings,
+    ) -> None:
+        """Connect to a saved bond without pairing."""
+
+    async def start_pairing(
+        self,
+        adapter_id: str,
+        timeout_seconds: float,
+        colors: ControllerColorSettings,
+    ) -> None:
+        """Start an explicitly requested pairing operation."""
+
+    async def disconnect(self) -> None:
+        """Disconnect the active controller."""
+
+    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+        """Recreate the controller using new colors."""
+
+    async def apply_frame(self, frame: ControllerFrame) -> None:
+        """Apply one complete Project_Demi controller frame."""
+
+    async def close(self) -> None:
+        """Release all adapter resources."""
+
+
+class RuntimeEventSink(Protocol):
+    """Destination for worker-thread runtime events."""
+
+    def emit(self, event: RuntimeEvent) -> None:
+        """Receive one immutable runtime event."""
+
+
+type ControllerAdapterFactory = Callable[[], ControllerAdapter]
