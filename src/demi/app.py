@@ -38,7 +38,7 @@ from demi.controller.events import (
 from demi.controller.runtime import ControllerRuntime
 from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.errors import DomainValueError
-from demi.domain.settings import DiagnosticLevel, WindowSettings
+from demi.domain.settings import DiagnosticLevel
 from demi.input.publisher import InputPublisher
 
 if TYPE_CHECKING:
@@ -54,7 +54,8 @@ if TYPE_CHECKING:
     from demi.controller.watchdog import WatchdogClock
     from demi.domain.controller import ControllerFrame
     from demi.domain.mapping import InputProfile
-    from demi.domain.settings import AppSettings
+    from demi.domain.settings import AppSettings, WindowSettings
+    from demi.ui.application import QtApplicationRunner
 
 
 class Clock(Protocol):
@@ -102,26 +103,21 @@ class WindowSpec:
 class WindowPort(Protocol):
     """Window operations required by capture coordination."""
 
-    @property
-    def width(self) -> int:
-        """Return the current logical window width."""
-
-    @property
-    def height(self) -> int:
-        """Return the current logical window height."""
+    def window_state(self) -> WindowSettings | None:
+        """Return a valid state captured before native window destruction."""
 
     def set_exclusive_mouse(self, exclusive: bool = True) -> None:
         """Enable or disable relative mouse capture."""
 
-    def close(self) -> None:
+    def close(self) -> bool | None:
         """Request native window closure."""
 
 
 class GuiPort(Protocol):
     """GUI loop started after application assembly succeeds."""
 
-    def run(self) -> None:
-        """Enter the GUI event loop."""
+    def run(self) -> int:
+        """Enter the GUI event loop and return its exit status."""
 
 
 class GuiUnavailableError(RuntimeError):
@@ -473,12 +469,39 @@ class ApplicationDependencies:
     @classmethod
     def default(cls) -> ApplicationDependencies:
         """Return production factories without creating a display on import."""
+        runner: QtApplicationRunner | None = None
+
+        def create_window(spec: WindowSpec) -> WindowPort:
+            """Create the Qt application and its main window only for GUI startup."""
+            nonlocal runner
+
+            from demi.ui.application import QtApplicationRunner  # noqa: I001, PLC0415 - GUI起動時だけQtをimportする。
+
+            runner = QtApplicationRunner()
+            return runner.create_main_window(spec)
+
+        def create_gui(
+            *,
+            window: WindowPort,
+            on_shutdown_requested: Callable[[WindowSettings | None], bool],
+            **_kwargs: object,
+        ) -> GuiPort:
+            """Return the runner created with the application main window."""
+            active_runner = runner
+            if active_runner is None:
+                raise GuiUnavailableError
+            active_runner.configure(
+                window=window,
+                on_shutdown_requested=on_shutdown_requested,
+            )
+            return active_runner
+
         return cls(
             paths_resolver=resolve_paths,
             repository_factory=SettingsRepository,
             runtime_factory=_create_runtime,
-            window_factory=_create_window,
-            gui_factory=_create_gui,
+            window_factory=create_window,
+            gui_factory=create_gui,
             clock=SystemClock(),
             logger_configurer=configure_logging,
         )
@@ -585,12 +608,15 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             runtime=runtime,
             repository=repository,
             settings_provider=lambda: session.settings,
-            window_state_provider=lambda: _window_state_for(
-                window,
-                settings.window.maximized,
-            ),
+            window_state_provider=lambda: _window_state_for(window),
             report_error=lambda stage, error: _log_shutdown_error(logger, stage, error),
         )
+
+        def request_shutdown(window_state: WindowSettings | None) -> bool:
+            """Run ordered shutdown and allow native close only after success."""
+            shutdown.request(window_state)
+            return not shutdown.failed
+
         gui = selected_dependencies.gui_factory(
             window=window,
             coordinator=coordinator,
@@ -605,13 +631,10 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             dialogs=session.dialogs,
             editor_provider=lambda: session.settings_modal.editor,
             settings=settings,
-            on_shutdown_requested=shutdown.request,
+            on_shutdown_requested=request_shutdown,
             window_maximized=settings.window.maximized,
         )
-        runtime.start()
-        session.begin()
-        gui.run()
-        exit_status = 0
+        exit_status = gui.run()
     except Exception as error:  # noqa: BLE001 - CLI boundary converts startup failures.
         if logger is not None:
             logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
@@ -644,18 +667,11 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
     return exit_status
 
 
-def _window_state_for(window: WindowPort | None, maximized: bool) -> WindowSettings | None:
-    """Build a validated state snapshot without reading pyglet private APIs."""
+def _window_state_for(window: WindowPort | None) -> WindowSettings | None:
+    """Capture a framework-independent state without native private APIs."""
     if window is None:
         return None
-    try:
-        return WindowSettings(
-            width=window.width,
-            height=window.height,
-            maximized=maximized,
-        )
-    except DomainValueError:
-        return None
+    return window.window_state()
 
 
 def _close_window(window: WindowPort | None, logger: logging.Logger | None) -> None:
@@ -689,14 +705,6 @@ def _create_runtime(
         event_sink=event_sink,
         clock=clock,
     )
-
-
-def _create_window(_spec: WindowSpec) -> WindowPort:
-    raise GuiUnavailableError
-
-
-def _create_gui(**_kwargs: object) -> GuiPort:
-    raise GuiUnavailableError
 
 
 def _window_spec_for(settings: AppSettings) -> WindowSpec:

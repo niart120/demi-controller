@@ -10,6 +10,8 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +38,12 @@ jobs:
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
+
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libegl1
 
       - name: Install dependencies
         run: uv sync --locked --dev

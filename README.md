@@ -11,13 +11,7 @@ uv sync --dev
 uv run demi
 ```
 
-`uv run python -m demi` と `uv run project-demi` も同じ GUI を起動する。初回起動や USB Bluetooth アダプターが未接続の状態でも、コントローラー入力のプレビューと設定画面は開ける。接続や新規ペアリングには専用の USB Bluetooth アダプターと対象機器が必要になる。
-
-Windows 用 standalone artifact の entry point は次である。
-
-```powershell
-.\dist\standalone\demi.exe
-```
+`uv run python -m demi` と `uv run project-demi` も同じ GUI を起動する。この版の GUI はウィンドウ状態の復元と安全な終了を提供する最小構成の画面であり、コントローラー入力のプレビュー、キーボード / マウス操作、設定画面、接続 / ペアリング操作は未実装である。Windows 用の単体配布物は提供していない。
 
 表示を開かずに配布バージョンだけ確認するには、次を実行する。
 
@@ -34,7 +28,9 @@ uv run ruff format --check .
 uv run ruff check .
 uv run ty check --no-progress
 uv run pytest tests/unit
+uv run pytest tests/integration
 uv build
+git diff --check
 ```
 
 依存やパッケージメタデータを変更したら `uv lock` を実行し、`uv.lock` を commit する。
@@ -44,12 +40,3 @@ uv build
 ```powershell
 uv run twine check --strict dist\*
 ```
-
-standalone artifact の build と version smoke:
-
-```powershell
-uv run python packaging\build.py
-uv run python packaging\smoke.py
-```
-
-生成先は `dist\standalone` です。Windows、macOS、Linux の artifact は対象 OS 上で個別に build します。

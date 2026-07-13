@@ -6,8 +6,6 @@ from typing import Protocol
 
 from demi.domain.settings import AppSettings, WindowSettings
 
-from .coordinator import CaptureCoordinator
-
 
 class RuntimeCloser(Protocol):
     """Runtime operation needed during application shutdown."""
@@ -23,6 +21,16 @@ class SettingsSaver(Protocol):
         """Persist one validated settings snapshot."""
 
 
+class CaptureShutdownPort(Protocol):
+    """Capture operations required during ordered application shutdown."""
+
+    def begin_shutdown(self) -> object | None:
+        """Neutralize capture before runtime shutdown."""
+
+    def finish_shutdown(self) -> None:
+        """Mark capture shutdown complete after persistence."""
+
+
 type ErrorReporter = Callable[[str, Exception], None]
 type SettingsProvider = Callable[[], AppSettings]
 type WindowStateProvider = Callable[[], WindowSettings | None]
@@ -34,7 +42,7 @@ class ApplicationShutdownCoordinator:
     def __init__(
         self,
         *,
-        capture: CaptureCoordinator,
+        capture: CaptureShutdownPort,
         runtime: RuntimeCloser,
         repository: SettingsSaver,
         settings_provider: SettingsProvider,

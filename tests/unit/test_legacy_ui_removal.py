@@ -1,11 +1,10 @@
-"""Regression tests for removal of the legacy pyglet UI boundary."""
+"""Regression tests for removal of legacy pyglet UI boundaries."""
 
 import ast
 from pathlib import Path
 
 LEGACY_MODULE_PREFIXES = (
     "pyglet",
-    "demi.ui",
     "demi.input.pyglet_backend",
 )
 LEGACY_TYPE_NAMES = frozenset(
@@ -17,10 +16,9 @@ LEGACY_TYPE_NAMES = frozenset(
 )
 
 
-def test_current_source_and_tests_have_no_legacy_ui_boundary() -> None:
+def test_current_source_and_tests_have_no_pyglet_legacy_boundary() -> None:
     root = Path(__file__).parents[2]
 
-    assert not (root / "src" / "demi" / "ui").exists()
     assert not (root / "src" / "demi" / "input" / "pyglet_backend.py").exists()
 
     references: dict[Path, set[str]] = {}

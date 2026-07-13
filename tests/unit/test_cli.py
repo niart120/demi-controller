@@ -2,6 +2,7 @@ import builtins
 import importlib
 import importlib.metadata
 import runpy
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from types import ModuleType
@@ -45,11 +46,63 @@ def test_package_import_and_version_output_do_not_import_pyglet(
     assert capsys.readouterr().out == f"{package.__version__}\n"
 
 
-def test_cli_without_arguments_reports_legacy_ui_unavailable(
-    capsys: pytest.CaptureFixture[str],
+@pytest.mark.parametrize(
+    ("script", "expected_output"),
+    [
+        ("import demi", ""),
+        ("from demi.cli import main\nassert main(['--version']) == 0", "0.1.0\n"),
+        ("from demi.cli import main\nassert main(['--unknown']) == 2", ""),
+    ],
+)
+def test_display_free_operations_do_not_import_pyside6_in_a_subprocess(
+    script: str,
+    expected_output: str,
 ) -> None:
-    assert main([]) == 1
-    assert capsys.readouterr().err == "GUI は UI 更新中のため現在は起動できません。\n"
+    result = subprocess.run(  # noqa: S603 - test-owned interpreter and script only.
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                [
+                    "import builtins",
+                    "import sys",
+                    "original_import = builtins.__import__",
+                    "def reject_qt(name, *args, **kwargs):",
+                    "    if name == 'PySide6' or name.startswith('PySide6.'):",
+                    "        raise AssertionError(name)",
+                    "    return original_import(name, *args, **kwargs)",
+                    "builtins.__import__ = reject_qt",
+                    script,
+                    "assert not any("
+                    "name == 'PySide6' or name.startswith('PySide6.') "
+                    "for name in sys.modules"
+                    ")",
+                ]
+            ),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected_output
+
+
+def test_cli_without_arguments_returns_the_application_runner_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def run_application() -> int:
+        nonlocal calls
+        calls += 1
+        return 23
+
+    monkeypatch.setattr("demi.app.run_application", run_application)
+
+    assert main([]) == 23
+    assert calls == 1
 
 
 def test_cli_does_not_create_the_application_for_unknown_arguments(
@@ -71,10 +124,15 @@ def test_module_entry_point_uses_the_same_version_output(
     assert capsys.readouterr().out == f"{importlib.metadata.version('demi-controller')}\n"
 
 
-def test_module_and_packaging_launcher_report_legacy_ui_unavailable(
-    capsys: pytest.CaptureFixture[str],
+def test_module_and_packaging_launcher_return_the_application_runner_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    statuses = iter((41, 42))
+
+    def run_application() -> int:
+        return next(statuses)
+
+    monkeypatch.setattr("demi.app.run_application", run_application)
     monkeypatch.setattr(sys, "argv", ["demi"])
 
     with pytest.raises(SystemExit) as module_exit:
@@ -82,9 +140,8 @@ def test_module_and_packaging_launcher_report_legacy_ui_unavailable(
     with pytest.raises(SystemExit) as launcher_exit:
         runpy.run_path("packaging/launcher.py", run_name="__main__")
 
-    assert module_exit.value.code == 1
-    assert launcher_exit.value.code == 1
-    assert capsys.readouterr().err == "GUI は UI 更新中のため現在は起動できません。\n" * 2
+    assert module_exit.value.code == 41
+    assert launcher_exit.value.code == 42
 
 
 def test_project_demi_compatibility_script_points_to_the_canonical_cli() -> None:
