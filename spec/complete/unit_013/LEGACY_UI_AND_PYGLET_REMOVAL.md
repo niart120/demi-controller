@@ -196,7 +196,7 @@ full unit / integration gateはgreenである。引数なしGUI起動、Qt depen
 
 | 観測 | 先送り理由 | 後続の置き場 |
 |---|---|---|
-| 引数なし GUI 起動は撤去直後に利用不能 | application shell は pyglet 撤去と別のTDD境界 | `spec/wip/unit_014/PYSIDE6_APPLICATION_SHELL.md` |
+| 引数なし GUI 起動は撤去直後に利用不能 | application shell は pyglet 撤去と別のTDD境界 | `spec/complete/unit_014/PYSIDE6_APPLICATION_SHELL.md` |
 | PySide6 / Qt の license inventory は未確定 | dependency版と配布範囲が未決定 | unit_014 で dependencyを固定し、unit_018 で source / wheel noticeを受入 |
 | PySide6 standalone artifact は未検証 | Qt plugin、署名、clean environmentを別に検証する必要がある | milestone 7 の後続 unit |
 
