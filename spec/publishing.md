@@ -21,6 +21,8 @@ uv run ruff check .
 uv run ty check --no-progress
 uv run pytest tests/unit
 uv build
+uv run python packaging/build.py
+uv run python packaging/smoke.py
 uv run twine check --strict dist/*
 git diff --check
 ```
