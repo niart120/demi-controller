@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMainWindow, QWidget
 
+from demi.domain.errors import DomainValueError
+from demi.domain.settings import WindowSettings
+
 if TYPE_CHECKING:
     from demi.app import WindowSpec
 
@@ -24,3 +27,17 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 520)
         self.resize(max(spec.width, self.minimumWidth()), max(spec.height, self.minimumHeight()))
         self.setCentralWidget(QWidget(self))
+        if spec.maximized:
+            self.showMaximized()
+
+    def window_state(self) -> WindowSettings | None:
+        """Return a valid saved state without losing a maximized normal size."""
+        size = self.normalGeometry().size() if self.isMaximized() else self.size()
+        try:
+            return WindowSettings(
+                width=size.width(),
+                height=size.height(),
+                maximized=self.isMaximized(),
+            )
+        except DomainValueError:
+            return None
