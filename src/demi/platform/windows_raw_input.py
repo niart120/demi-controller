@@ -16,7 +16,7 @@ WM_INPUT = 0x00FF
 RIM_TYPEMOUSE = 0
 RID_INPUT = 0x10000003
 _UINT_ERROR = 0xFFFFFFFF
-_MOUSE_MOVE_ABSOLUTE = 0x0001
+MOUSE_MOVE_ABSOLUTE = 0x0001
 _WINDOWS_GENERIC_MSG = b"windows_generic_MSG"
 
 type NativeEventType = QByteArray | bytes | bytearray | memoryview
@@ -44,6 +44,7 @@ class NativeWindowsMessage:
 
     message: int
     l_param: int
+    window_handle: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +244,7 @@ class CtypesNativeMessageReader:
         return NativeWindowsMessage(
             message=int(native_message.message),
             l_param=int(native_message.lParam),
+            window_handle=(int(native_message.hwnd) if native_message.hwnd is not None else None),
         )
 
 
@@ -388,6 +390,7 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
             raw_input_reader if raw_input_reader is not None else CtypesRawInputReader()
         )
         self._target_window_handle: int | None = None
+        self._capture_epoch: int | None = None
 
     def nativeEventFilter(  # noqa: N802 - Qt override name.
         self,
@@ -403,25 +406,57 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         Returns:
             False so Qt continues normal event conversion and delivery.
         """
+        return self.handle_native_event(
+            event_type,
+            message,
+            capture_epoch=self._capture_epoch,
+        )
+
+    def handle_native_event(
+        self,
+        event_type: NativeEventType,
+        message: int,
+        *,
+        capture_epoch: int | None,
+    ) -> bool:
+        """Accumulate one current, relative event without consuming Qt handling.
+
+        Args:
+            event_type: Runtime-specific native event category supplied by Qt.
+            message: Address of the platform-native event structure.
+            capture_epoch: Capture token assigned when the event entered this
+                backend, or ``None`` outside capture.
+
+        Returns:
+            False so Qt continues normal event conversion and delivery.
+        """
+        target_window_handle = self._target_window_handle
         if (
-            self._target_window_handle is None
+            target_window_handle is None
+            or self._capture_epoch is None
+            or capture_epoch != self._capture_epoch
             or self._on_relative_motion is None
             or not _is_windows_generic_message(event_type)
         ):
             return False
         native_message = self._message_reader.read(message)
-        if native_message.message != WM_INPUT:
+        if (
+            native_message.message != WM_INPUT
+            or native_message.window_handle != target_window_handle
+        ):
             return False
         packet = self._raw_input_reader.read_mouse(native_message.l_param)
-        if packet is not None:
-            self._on_relative_motion(float(packet.dx), float(packet.dy))
+        if packet is None or packet.flags & MOUSE_MOVE_ABSOLUTE:
+            return False
+        self._on_relative_motion(float(packet.dx), float(packet.dy))
         return False
 
-    def start_capture(self, target_window_handle: int) -> None:
+    def start_capture(self, target_window_handle: int, *, capture_epoch: int = 0) -> None:
         """Register the one focused main window as the mouse input receiver.
 
         Args:
             target_window_handle: Native main-window handle supplied by Qt.
+            capture_epoch: Capture token for events accepted by this registration.
 
         Raises:
             OSError: If Win32 rejects the foreground registration.
@@ -432,6 +467,9 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
             isinstance(target_window_handle, bool)
             or not isinstance(target_window_handle, int)
             or target_window_handle <= 0
+            or isinstance(capture_epoch, bool)
+            or not isinstance(capture_epoch, int)
+            or capture_epoch < 0
         ):
             raise RawInputConfigurationError
         registered_handle = self._target_window_handle
@@ -448,6 +486,7 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
             )
         )
         self._target_window_handle = target_window_handle
+        self._capture_epoch = capture_epoch
 
     def stop_capture(self) -> None:
         """Remove the foreground mouse registration after capture ends."""
@@ -462,3 +501,4 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
             )
         )
         self._target_window_handle = None
+        self._capture_epoch = None

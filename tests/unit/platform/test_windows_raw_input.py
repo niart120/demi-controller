@@ -95,11 +95,11 @@ class FixtureRawInputReader:
         return decode_raw_mouse_payload(self.payloads[raw_input_handle])
 
 
-def _raw_mouse_payload(*, dx: int, dy: int) -> bytes:
+def _raw_mouse_payload(*, dx: int, dy: int, flags: int = 0) -> bytes:
     header_size = ctypes.sizeof(_NativeRawInputHeader)
     mouse_size = ctypes.sizeof(_NativeRawMouse)
     header = _NativeRawInputHeader(RIM_TYPEMOUSE, header_size + mouse_size, None, 0)
-    mouse = _NativeRawMouse(0, 0, 0, 0, dx, dy, 0)
+    mouse = _NativeRawMouse(flags, 0, 0, 0, dx, dy, 0)
     return bytes(header) + bytes(mouse)
 
 
@@ -144,9 +144,9 @@ def test_relative_wm_input_deltas_accumulate_then_one_evaluation_consumes_them()
         on_relative_motion=publisher.state.add_mouse_motion,
         message_reader=FakeNativeMessageReader(
             {
-                1: NativeWindowsMessage(message=WM_INPUT, l_param=101),
-                2: NativeWindowsMessage(message=WM_INPUT, l_param=102),
-                3: NativeWindowsMessage(message=WM_INPUT, l_param=103),
+                1: NativeWindowsMessage(message=WM_INPUT, l_param=101, window_handle=0x1234),
+                2: NativeWindowsMessage(message=WM_INPUT, l_param=102, window_handle=0x1234),
+                3: NativeWindowsMessage(message=WM_INPUT, l_param=103, window_handle=0x1234),
             }
         ),
         raw_input_reader=FixtureRawInputReader(
