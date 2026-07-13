@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.dialogs import DialogKind, DialogManager
@@ -18,6 +18,7 @@ from demi.application.state import ConnectionState
 from demi.config.errors import SettingsPersistenceError
 from demi.config.paths import resolve_paths
 from demi.config.repository import SettingsRepository
+from demi.controller.adapter import RuntimeEventSink
 from demi.controller.commands import (
     ConnectSaved,
     Disconnect,
@@ -39,21 +40,13 @@ from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.errors import DomainValueError
 from demi.domain.settings import DiagnosticLevel, WindowSettings
 from demi.input.publisher import InputPublisher
-from demi.input.pyglet_backend import PygletInputBackend
-from demi.ui.controller_view import ControllerView
-from demi.ui.dialogs import ModalRenderer
-from demi.ui.event_bridge import MainThreadEventBridge
-from demi.ui.status_bar import StatusBar
-from demi.ui.toolbar import Toolbar
-from demi.ui.window import PygletApplication, WindowSpec, create_window
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from demi.application.settings_editor import SettingsEditor
     from demi.config.paths import SettingsPaths
     from demi.config.repository import SettingsLoadResult
-    from demi.controller.adapter import ControllerAdapterFactory, RuntimeEventSink
+    from demi.controller.adapter import ControllerAdapterFactory
     from demi.controller.commands import ControllerCommand
     from demi.controller.events import (
         RuntimeEvent,
@@ -62,7 +55,6 @@ if TYPE_CHECKING:
     from demi.domain.controller import ControllerFrame
     from demi.domain.mapping import InputProfile
     from demi.domain.settings import AppSettings
-    from demi.ui.window import PygletWindowPort
 
 
 class Clock(Protocol):
@@ -98,6 +90,15 @@ class RuntimePort(Protocol):
         """Close the controller worker and join its thread."""
 
 
+@dataclass(frozen=True, slots=True)
+class WindowSpec:
+    """Saved window dimensions supplied to a desktop UI implementation."""
+
+    width: int
+    height: int
+    maximized: bool
+
+
 class WindowPort(Protocol):
     """Window operations required by capture coordination."""
 
@@ -121,6 +122,18 @@ class GuiPort(Protocol):
 
     def run(self) -> None:
         """Enter the GUI event loop."""
+
+
+class GuiUnavailableError(RuntimeError):
+    """Signal that no desktop UI implementation is available yet."""
+
+
+class DiscardRuntimeEventSink(RuntimeEventSink):
+    """Discard worker events until a replacement GUI owns their delivery."""
+
+    def emit(self, event: RuntimeEvent) -> None:
+        """Discard one runtime event without invoking a GUI boundary."""
+        del event
 
 
 class RuntimeFactory(Protocol):
@@ -157,8 +170,6 @@ class ApplicationSession:
         coordinator: CaptureCoordinator,
         loaded: SettingsLoadResult | None = None,
         publisher: InputPublisher | None = None,
-        view: ControllerView | None = None,
-        status_bar: StatusBar | None = None,
         reconfigure_diagnostic_logging: Callable[[DiagnosticLevel], None] | None = None,
         log_controller_error: Callable[[ControllerErrorCategory], None] | None = None,
     ) -> None:
@@ -172,8 +183,6 @@ class ApplicationSession:
             coordinator: Main-thread capture lifecycle owner.
             loaded: Optional load result used for a safe recovery notice.
             publisher: Live input publisher updated after settings saves.
-            view: Live controller preview updated after color saves.
-            status_bar: Status display updated after interval saves.
             reconfigure_diagnostic_logging: Optional callback that applies a
                 saved diagnostic logging threshold.
             log_controller_error: Optional safe category-only error logger.
@@ -184,8 +193,6 @@ class ApplicationSession:
         self._runtime = runtime
         self._coordinator = coordinator
         self._publisher = publisher if publisher is not None else coordinator.publisher
-        self._view = view
-        self._status_bar = status_bar
         self._reconfigure_diagnostic_logging = reconfigure_diagnostic_logging
         self._log_controller_error = log_controller_error
         self._dialogs = DialogManager()
@@ -419,10 +426,6 @@ class ApplicationSession:
             circular_limit=settings.input.circular_stick_limit,
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
-        if self._view is not None:
-            self._view.set_colors(settings.controller_colors)
-        if self._status_bar is not None:
-            self._status_bar.set_evaluation_interval_ms(settings.input.evaluation_interval_ms)
 
     def _start_saved_reconnect_once(self) -> None:
         if not self._startup_reconnect_pending:
@@ -550,10 +553,9 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging(settings.connection.diagnostic_level)
         logger.info("Starting Project_Demi")
 
-        bridge: MainThreadEventBridge[RuntimeEvent] = MainThreadEventBridge()
         runtime = selected_dependencies.runtime_factory(
             adapter_factory=SwbtControllerAdapter,
-            event_sink=bridge,
+            event_sink=DiscardRuntimeEventSink(),
             clock=selected_dependencies.clock,
         )
         spec = _window_spec_for(settings)
@@ -567,9 +569,6 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
         coordinator = CaptureCoordinator(publisher=publisher, window=window)
-        backend = PygletInputBackend(coordinator)
-        view = ControllerView(colors=settings.controller_colors)
-        status_bar = StatusBar(evaluation_interval_ms=settings.input.evaluation_interval_ms)
         session = ApplicationSession(
             settings=settings,
             paths=paths,
@@ -578,8 +577,6 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             coordinator=coordinator,
             loaded=loaded,
             publisher=publisher,
-            view=view,
-            status_bar=status_bar,
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )
@@ -597,10 +594,6 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         gui = selected_dependencies.gui_factory(
             window=window,
             coordinator=coordinator,
-            backend=backend,
-            view=view,
-            status_bar=status_bar,
-            bridge=bridge,
             loaded=loaded,
             paths=paths,
             repository=repository,
@@ -608,7 +601,6 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             session=session,
             actions=session,
             presentation=session.presentation,
-            event_pump=lambda: bridge.drain(session.handle_runtime_event),
             settings_provider=lambda: session.settings,
             dialogs=session.dialogs,
             editor_provider=lambda: session.settings_modal.editor,
@@ -699,45 +691,12 @@ def _create_runtime(
     )
 
 
-def _create_window(spec: WindowSpec) -> WindowPort:
-    return cast("WindowPort", create_window(spec))
+def _create_window(_spec: WindowSpec) -> WindowPort:
+    raise GuiUnavailableError
 
 
-def _create_gui(**kwargs: object) -> GuiPort:
-    window = cast("PygletWindowPort", kwargs["window"])
-    coordinator = cast("CaptureCoordinator", kwargs["coordinator"])
-    backend = cast("PygletInputBackend", kwargs["backend"])
-    view = cast("ControllerView", kwargs["view"])
-    status_bar = cast("StatusBar", kwargs["status_bar"])
-    presentation = cast("PresentationStore", kwargs["presentation"])
-    event_pump = cast("Callable[[], int]", kwargs["event_pump"])
-    settings_provider = cast("Callable[[], AppSettings]", kwargs["settings_provider"])
-    dialogs = cast("DialogManager", kwargs["dialogs"])
-    editor_provider = cast("Callable[[], SettingsEditor | None]", kwargs["editor_provider"])
-    settings = cast("AppSettings", kwargs["settings"])
-    on_shutdown_requested = cast(
-        "Callable[[WindowSettings | None], None]",
-        kwargs["on_shutdown_requested"],
-    )
-    window_maximized = cast("bool", kwargs["window_maximized"])
-    return PygletApplication(
-        window=window,
-        coordinator=coordinator,
-        backend=backend,
-        view=view,
-        toolbar=Toolbar(),
-        status_bar=status_bar,
-        presentation=presentation,
-        event_pump=event_pump,
-        actions=cast("ApplicationSession", kwargs["actions"]),
-        settings_provider=settings_provider,
-        dialogs=dialogs,
-        editor_provider=editor_provider,
-        modal_renderer=ModalRenderer(),
-        evaluation_interval_ms=settings.input.evaluation_interval_ms,
-        on_shutdown_requested=on_shutdown_requested,
-        window_maximized=window_maximized,
-    )
+def _create_gui(**_kwargs: object) -> GuiPort:
+    raise GuiUnavailableError
 
 
 def _window_spec_for(settings: AppSettings) -> WindowSpec:

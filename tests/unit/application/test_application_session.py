@@ -11,7 +11,6 @@ from demi.controller.events import AdapterDescriptor, AdaptersDiscovered, Connec
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
-from demi.ui.event_bridge import MainThreadEventBridge
 
 
 @dataclass
@@ -92,23 +91,6 @@ def make_session() -> ApplicationSession:
         paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
         settings=AppSettings.default(),
     )
-
-
-def test_worker_event_changes_presentation_only_when_the_main_thread_drains() -> None:
-    session = make_session()
-    bridge: MainThreadEventBridge[ConnectionChanged] = MainThreadEventBridge()
-    event = ConnectionChanged(
-        state=ConnectionState.CONNECTED,
-        adapter_id="usb:0",
-        summary="connected",
-    )
-
-    bridge.emit(event)
-
-    assert session.presentation.model.connection_state is ConnectionState.STOPPED
-    assert bridge.drain(session.handle_runtime_event) == 1
-    assert session.presentation.model.connection_state is ConnectionState.CONNECTED
-    assert session.presentation.model.adapter_label == "なし"
 
 
 def test_adapter_events_are_reduced_to_safe_display_choices() -> None:
