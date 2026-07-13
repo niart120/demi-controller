@@ -420,7 +420,7 @@ def test_application_displays_a_recovery_notice_once_in_the_status_bar() -> None
         window=FakeWindow(),
         coordinator=coordinator,
         backend=PygletInputBackend(coordinator),
-        view=ControllerView(),
+        view=RecordingControllerView(),
         toolbar=Toolbar(),
         status_bar=status_bar,
         presentation=presentation,
