@@ -36,6 +36,7 @@ class EventRecorder:
     ready: Event = field(default_factory=Event)
     stopped: Event = field(default_factory=Event)
     error: Event = field(default_factory=Event)
+    connected: Event = field(default_factory=Event)
     thread_ids: list[int] = field(default_factory=list)
 
     def emit(self, event: RuntimeEvent) -> None:
@@ -44,6 +45,8 @@ class EventRecorder:
         self.thread_ids.append(get_ident())
         if isinstance(event, ConnectionChanged) and event.state.value == "ready":
             self.ready.set()
+        if isinstance(event, ConnectionChanged) and event.state.value == "connected":
+            self.connected.set()
         if isinstance(event, RuntimeStopped):
             self.stopped.set()
         if isinstance(event, ControllerError):
@@ -56,6 +59,8 @@ class FakeAdapter:
 
     close_thread_id: int | None = None
     connect_error: Exception | None = None
+    apply_calls: int = 0
+    fail_on_apply_call: int | None = None
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """Return no adapters for the lifecycle test."""
@@ -93,6 +98,9 @@ class FakeAdapter:
     async def apply_frame(self, frame: ControllerFrame) -> None:
         """Accept a frame without hardware."""
         del frame
+        self.apply_calls += 1
+        if self.apply_calls == self.fail_on_apply_call:
+            raise RuntimeError("rest apply failed")
 
     async def close(self) -> None:
         """Record the worker thread that closed the adapter."""
@@ -147,3 +155,30 @@ def test_runtime_preserves_adapter_error_category_in_runtime_event() -> None:
     errors = [event for event in events.events if isinstance(event, ControllerError)]
     assert errors[-1].category is ControllerErrorCategory.BOND_NOT_FOUND
     runtime.close()
+
+
+def test_runtime_continues_shutdown_cleanup_after_neutral_failure() -> None:
+    adapter = FakeAdapter(fail_on_apply_call=2)
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    assert events.ready.wait(timeout=1.0)
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    runtime.close()
+
+    assert events.stopped.wait(timeout=1.0)
+    assert runtime.is_alive is False
+    assert adapter.close_thread_id is not None

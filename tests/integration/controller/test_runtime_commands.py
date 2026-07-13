@@ -10,10 +10,13 @@ from demi.controller.commands import (
     RequestStatus,
     StartPairing,
 )
+from demi.controller.adapter import ControllerAdapterError
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
     ConnectionChanged,
+    ControllerError,
+    ControllerErrorCategory,
     RuntimeEvent,
     StatusSnapshot,
     WatchdogNeutralized,
@@ -44,6 +47,8 @@ class RecordingEvents:
     status: Event = field(default_factory=Event)
     ready_after_disconnect: Event = field(default_factory=Event)
     watchdog_neutralized: Event = field(default_factory=Event)
+    error: Event = field(default_factory=Event)
+    ready_after_error: Event = field(default_factory=Event)
 
     def emit(self, event: RuntimeEvent) -> None:
         """Record events and signal expected milestones."""
@@ -59,6 +64,14 @@ class RecordingEvents:
             self.status.set()
         elif isinstance(event, WatchdogNeutralized):
             self.watchdog_neutralized.set()
+        elif isinstance(event, ControllerError):
+            self.error.set()
+        if (
+            isinstance(event, ConnectionChanged)
+            and event.state is ConnectionState.READY
+            and self.error.is_set()
+        ):
+            self.ready_after_error.set()
 
 
 @dataclass
@@ -71,8 +84,10 @@ class RecordingAdapter:
     applied: Event = field(default_factory=Event)
     applied_active: Event = field(default_factory=Event)
     pairing_bond_paths: list[Path] = field(default_factory=list)
+    active_frame_attempts: list[ControllerFrame] = field(default_factory=list)
     connect_started: Event | None = None
     connect_release: Event | None = None
+    active_frame_error: Exception | None = None
 
     def _record(self, name: str) -> None:
         self.operations.append(name)
@@ -122,6 +137,10 @@ class RecordingAdapter:
     async def apply_frame(self, frame: ControllerFrame) -> None:
         """Record a complete frame application."""
         self._record("apply_frame")
+        if frame.capture_active:
+            self.active_frame_attempts.append(frame)
+            if self.active_frame_error is not None:
+                raise self.active_frame_error
         self.applied_frames.append(frame)
         self.applied.set()
         if frame.capture_active:
@@ -295,3 +314,47 @@ def test_start_pairing_passes_the_bond_path_through_the_runtime_boundary() -> No
     runtime.close()
 
     assert adapter.pairing_bond_paths == [bond_path]
+
+
+def test_connection_loss_returns_to_ready_and_stops_active_frame_delivery() -> None:
+    adapter = RecordingAdapter(
+        active_frame_error=ControllerAdapterError(ControllerErrorCategory.CONNECTION_LOST)
+    )
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bonds/default.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    first = make_frame(sequence=1, epoch=1)
+    assert runtime.offer_frame(first) is True
+    assert events.error.wait(timeout=1.0)
+    assert events.ready_after_error.wait(timeout=1.0)
+
+    second = make_frame(sequence=2, epoch=1)
+    assert runtime.offer_frame(second) is True
+    events.status.clear()
+    runtime.post(RequestStatus())
+    assert events.status.wait(timeout=1.0)
+
+    assert adapter.active_frame_attempts == [first]
+    assert adapter.operations[-1] == "close"
+    states = [event.state for event in events.events if isinstance(event, ConnectionChanged)]
+    assert states[-2:] == [ConnectionState.ERROR, ConnectionState.READY]
+    assert any(
+        isinstance(event, ControllerError)
+        and event.category is ControllerErrorCategory.CONNECTION_LOST
+        for event in events.events
+    )
+    runtime.close()
