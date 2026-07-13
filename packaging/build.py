@@ -14,7 +14,6 @@ WORK_DIR = ROOT / "build" / "pyinstaller"
 RUNTIME_PACKAGES = (
     "demi-controller",
     "platformdirs",
-    "pyglet",
     "swbt-python",
     "tomli-w",
     "bumble",
@@ -62,8 +61,6 @@ def _run_pyinstaller() -> None:
         str(WORK_DIR),
         "--collect-submodules",
         "demi",
-        "--collect-all",
-        "pyglet",
         "--collect-all",
         "swbt",
         "--collect-all",

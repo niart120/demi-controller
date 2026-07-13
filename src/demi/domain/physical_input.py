@@ -1,4 +1,4 @@
-"""Normalized keyboard and mouse state independent from pyglet."""
+"""Normalized keyboard and mouse state independent from a GUI library."""
 
 import re
 from dataclasses import dataclass, field

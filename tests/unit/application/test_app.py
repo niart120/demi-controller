@@ -5,7 +5,6 @@ from pathlib import Path
 from demi.app import ApplicationDependencies, ApplicationSession, _window_spec_for, run_application
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.dialogs import DialogKind
-from demi.application.presentation import PresentationStore
 from demi.application.state import ConnectionState
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
@@ -27,9 +26,6 @@ from demi.controller.events import (
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings, DiagnosticLevel, InputSettings
 from demi.input.publisher import InputPublisher
-from demi.ui.controller_view import ControllerView
-from demi.ui.event_bridge import MainThreadEventBridge
-from demi.ui.status_bar import StatusBar
 
 
 @dataclass
@@ -112,7 +108,7 @@ def test_application_runner_assembles_runtime_and_requests_discovery() -> None:
     gui_kwargs: dict[str, object] = {}
 
     def create_gui(**kwargs: object) -> FakeGui:
-        """Capture composition-root dependencies without entering pyglet."""
+        """Capture composition-root dependencies without entering a GUI loop."""
         gui_kwargs.update(kwargs)
         return gui
 
@@ -134,41 +130,11 @@ def test_application_runner_assembles_runtime_and_requests_discovery() -> None:
     assert gui.runs == 1
     assert runtime.closed == 1
     assert isinstance(gui_kwargs["session"], ApplicationSession)
-    assert callable(gui_kwargs["event_pump"])
     assert gui_kwargs["actions"] is gui_kwargs["session"]
     assert callable(gui_kwargs["settings_provider"])
     assert gui_kwargs["dialogs"] is gui_kwargs["session"].dialogs
     assert callable(gui_kwargs["editor_provider"])
-
-
-def test_application_runner_passes_a_main_thread_event_pump_to_the_gui() -> None:
-    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
-    repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
-    runtime = FakeRuntime()
-    window = FakeWindow()
-    gui = FakeGui()
-    captured: dict[str, object] = {}
-    logger = logging.getLogger("demi-test-event-pump")
-
-    def create_gui(**kwargs: object) -> FakeGui:
-        captured.update(kwargs)
-        return gui
-
-    dependencies = ApplicationDependencies(
-        paths_resolver=lambda: paths,
-        repository_factory=lambda _paths: FakeRepository(repository_result),
-        runtime_factory=lambda **_kwargs: runtime,
-        window_factory=lambda _spec: window,
-        gui_factory=create_gui,
-        clock=FakeClock(),
-        logger_configurer=lambda _paths, _level: logger,
-    )
-
-    assert run_application(dependencies) == 0
-
-    assert isinstance(captured["bridge"], MainThreadEventBridge)
-    assert callable(captured["event_pump"])
-    assert isinstance(captured["presentation"], PresentationStore)
+    assert {"backend", "bridge", "event_pump", "status_bar", "view"}.isdisjoint(gui_kwargs)
 
 
 def test_application_runner_returns_nonzero_when_ordered_shutdown_fails() -> None:
@@ -406,15 +372,13 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
     assert isinstance(runtime.commands[-1], Disconnect)
 
 
-def test_session_applies_saved_settings_to_live_input_and_view_consumers() -> None:
+def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
     settings = replace(
         AppSettings.default(),
         input=InputSettings(evaluation_interval_ms=16),
     )
     runtime = FakeRuntime()
     coordinator = make_coordinator(runtime)
-    view = ControllerView()
-    status_bar = StatusBar()
     session = ApplicationSession(
         settings=settings,
         paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
@@ -422,8 +386,6 @@ def test_session_applies_saved_settings_to_live_input_and_view_consumers() -> No
         runtime=runtime,
         coordinator=coordinator,
         publisher=coordinator.publisher,
-        view=view,
-        status_bar=status_bar,
     )
 
     assert session.open_settings(DialogKind.MAPPING) is True
@@ -433,14 +395,6 @@ def test_session_applies_saved_settings_to_live_input_and_view_consumers() -> No
     assert session.settings.input.mouse.horizontal_sensitivity == 2.5
     assert session.settings.input.mouse.invert_y is True
     assert coordinator.publisher.evaluation_interval_ms == 16
-    assert status_bar.model.evaluation_interval_ms == 16
-
-    assert session.open_settings(DialogKind.COLORS) is True
-    assert session.settings_modal.editor is not None
-    session.settings_modal.editor.update_color("body", "#ABCDEF")
-    assert session.save_settings() is True
-
-    assert view.colors.body == "#ABCDEF"
 
 
 def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect() -> None:
