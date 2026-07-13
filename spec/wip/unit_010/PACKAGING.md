@@ -78,11 +78,11 @@ PyInstaller を standalone builder として固定し、canonical CLI を Window
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | PyInstaller を採用し、launcher が canonical CLI へ委譲する | new | package | manifest / launcher の契約を確認する |
-| todo | build script が one-file artifact、version、build info、license inventory を生成する | new | package | installed metadata の license file を使う |
-| todo | standalone binary の `--version` smoke が Windows runner で pass する | new | package | local current OS で実行する |
-| todo | OS 別 package workflow が Windows / macOS / Linux artifact を定義する | new | package | workflow 構造を repository test で固定する |
-| todo | unit / integration / static / lock / build / package gate が通る | characterization | package | sdist / wheel と standalone smoke を含める |
+| green | PyInstaller を採用し、launcher が canonical CLI へ委譲する | new | package | packaging contract test と launcher を確認した |
+| green | build script が one-file artifact、version、build info、license inventory を生成する | new | package | Windows artifact と installed metadata の license file を確認した |
+| green | standalone binary の `--version` smoke が Windows runner で pass する | new | package | `demi.exe` が `0.1.0` を返した |
+| green | OS 別 package workflow が Windows / macOS / Linux artifact を定義する | new | package | workflow 構造を repository test で固定した |
+| green | unit / integration / static / lock / build / package gate が通る | characterization | package | sdist / wheel、twine、standalone smoke を含めた |
 
 ## 7. 設計メモ
 
@@ -104,36 +104,43 @@ PyInstaller を standalone builder として固定し、canonical CLI を Window
 | `packaging/LICENSES.md` | new | direct dependency license inventory policy |
 | `.github/workflows/package.yml` | new | OS 別 standalone artifact workflow |
 | `tests/unit/test_packaging.py` | new | packaging manifest / workflow contract |
+| `README.md` | modify | standalone build と smoke の入口 |
+| `spec/publishing.md` | modify | release preflight に standalone build を追加 |
 | `spec/complete/unit_010/PACKAGING.md` | new | 完了記録 |
 
 ## 9. 検証
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/unit/test_packaging.py -q` | not run | TDD 実装前 |
-| `uv sync --dev` | not run | PyInstaller dependency 追加後に実行する |
-| `uv lock --check` | not run | dependency / package workflow 変更後に実行する |
-| `uv run ruff format --check .` | not run | 実装後に実行する |
-| `uv run ruff check .` | not run | 実装後に実行する |
-| `uv run ty check --no-progress` | not run | 実装後に実行する |
-| `uv run pytest tests/unit` | not run | 実装後に実行する |
-| `uv run pytest tests/integration` | not run | 実装後に実行する |
-| `uv run python packaging/build.py` | not run | current Windows runner で実行する |
-| `uv run python packaging/smoke.py` | not run | standalone version smoke |
-| `uv build` | not run | package gate として実行する |
-| `git diff --check` | not run | 実装後に実行する |
+| `uv run pytest tests/unit/test_packaging.py -q` | passed | 2 passed。launcher、build script、OS artifact workflow の contract を確認 |
+| `uv sync --dev` | passed | 74 packages resolved、71 packages checked。PyInstaller 6.21.0 を含む |
+| `uv lock --check` | passed | lockfile は最新 |
+| `uv run ruff format --check .` | passed | 79 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 122 passed。Windows local runner |
+| `uv run pytest tests/integration` | passed | 11 passed。Windows local runner |
+| `uv run pytest -m "not hardware and not bumble"` | passed | 133 passed、1 deselected |
+| `uv run python packaging/build.py` | passed | Windows 11、PyInstaller 6.21.0、`dist/standalone/demi.exe` 30.6 MB、libusb DLL、VERSION / BUILD_INFO / LICENSES を生成 |
+| `uv run python packaging/smoke.py` | passed | `demi.exe --version` が `0.1.0`、終了コード 0 |
+| standalone metadata smoke | passed | project / runtime license inventory と build info を確認 |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `uv run twine check --strict dist/*.whl dist/*.tar.gz` | passed | wheel / sdist metadata valid |
+| wheel / sdist smoke | passed | wheel package metadata、sdist packaging sources を確認 |
+| `git diff --check` | passed | whitespace error なし |
 | GitHub Actions package matrix | not run | workflow dispatch / tag 実行で確認する |
 
 ## 10. 先送り事項
 
 - standalone artifact の実ウィンドウ、display、exclusive mouse、Bluetooth 接続は未検証。
+- Windows build では PyInstaller が optional な pyglet X11、Bumble pandora、wintab32 module を収集できない warning を出した。Windows の version smoke は通ったが、各 OS の実機能に必要な resource 完備は OS 別 artifact で確認する。
 - PyPI / TestPyPI publish は明示承認と trusted publishing 設定確認が必要。
 - assets は現行 inventory が空。新規 assets 追加時に license と収集テストを追加する。
 
 ## 11. チェックリスト
 
-- [ ] 対象範囲と対象外を確認した
-- [ ] TDD Test List を更新した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] standalone artifact の version / license / build info を確認した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 対象範囲と対象外を確認した
+- [x] TDD Test List を更新した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] standalone artifact の version / license / build info を確認した
+- [x] package / release / public API に触れる場合の gate を記録した

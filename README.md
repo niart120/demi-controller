@@ -22,6 +22,15 @@ uv build
 uv run twine check --strict dist\*
 ```
 
+standalone artifact の build と version smoke:
+
+```powershell
+uv run python packaging\build.py
+uv run python packaging\smoke.py
+```
+
+生成先は `dist\standalone` です。Windows、macOS、Linux の artifact は対象 OS 上で個別に build します。
+
 ## エージェント作業
 
 このリポジトリは次を使う。
