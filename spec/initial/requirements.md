@@ -70,7 +70,7 @@ Project_Demiは `uv run project-demi` および `python -m demi` で同じアプ
 
 ### FR-007 相対マウス・IMU入力
 
-入力捕捉中はpygletの排他マウスモードと `YawPitchModel` を使い、`dx` と `dy` からジャイロ角速度と静的加速度を生成しなければならない。
+入力捕捉中はQtの入力イベントとOS固有の相対ポインター入力アダプターを使い、`dx` と `dy` からジャイロ角速度と静的加速度を生成しなければならない。WindowsではRaw Inputによる未加速の相対移動量を優先する。
 
 受入条件:
 
@@ -179,7 +179,7 @@ Project_Demiは `uv run project-demi` および `python -m demi` で同じアプ
 
 受入条件:
 
-- タイムスタンプ、OS、Python、Project_Demi、swbt-python、pygletの版を記録する。
+- タイムスタンプ、OS、Python、Project_Demi、PySide6、Qt、swbt-pythonの版を記録する。
 - アダプターIDとドライバー情報は必要範囲に限定する。
 - ボンドファイルの内容と秘密値は記録しない。
 - 通常ログはローテーションし、無制限に増加させない。
@@ -190,7 +190,7 @@ Project_Demiは `uv run project-demi` および `python -m demi` で同じアプ
 
 - 描画目標は60Hzとする。
 - 入力状態の評価間隔は8ミリ秒とする。
-- 接続、列挙、切断でpyglet主スレッドを100ミリ秒以上連続して塞がない。
+- 接続、列挙、切断でQtのGUIスレッドを100ミリ秒以上連続して塞がない。
 - 設定ファイルI/Oを除く通常UI操作は1フレーム以内に表示へ反映する。
 
 ### NFR-002 安全停止
@@ -208,8 +208,8 @@ Project_Demiは `uv run project-demi` および `python -m demi` で同じアプ
 
 ### NFR-004 軽量性
 
-- Qt、Electron、WebViewを0.1系へ導入しない。
-- GUIのための実行時依存はpygletを中心とする。
+- GUIはPySide6のQt Widgetsを使用し、ElectronとWebViewを0.1系へ導入しない。
+- GUIの実行時依存はPySide6を中心とし、QtのGUI型をdomain、application、controller、configへ持ち込まない。
 - コントローラー画像は必要な解像度へ限定し、動画や大規模UI素材を含めない。
 - 常駐中に毎フレーム新しい大量オブジェクトを作らない。
 

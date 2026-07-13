@@ -54,12 +54,12 @@ ERROR -> STOPPING -> STOPPED
 4. create domain services
 5. create ControllerRuntime
 6. start worker thread
-7. create pyglet window and UI
+7. create Qt application, main window, and UI
 8. schedule 8ms input evaluation
 9. render IDLE state
 10. optionally request adapter discovery
 11. optionally reconnect saved bond
-12. pyglet.app.run()
+12. `QApplication.exec()`
 ```
 
 `reconnect_on_start=true` でも新規ペアリングは行わない。アダプター未検出や再接続失敗は起動失敗にせず、UIを操作可能にする。
@@ -119,12 +119,12 @@ virtual pitch: 0 rad
 ```text
 1. AppState leaves CAPTURED
 2. increment capture_epoch
-3. window.set_exclusive_mouse(False), best effort
+3. PointerCapturePort.release(), best effort
 4. PhysicalInputState.clear()
 5. YawPitchModel.reset()
 6. create neutral ControllerFrame(capture_active=False)
 7. ControllerPort.offer_frame(neutral)
-8. update ControllerView immediately
+8. update ControllerPreviewWidget immediately
 9. show reason when not user initiated
 ```
 
@@ -284,7 +284,7 @@ show warning
 12. emit RuntimeStopped and stop asyncio loop
 13. join non-daemon worker thread
 14. save window/settings if valid
-15. close pyglet window
+15. close Qt main window
 16. AppState = STOPPED
 ```
 

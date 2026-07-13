@@ -2,19 +2,18 @@
 
 ## 1. 入力取得方式
 
-0.1.0ではpygletのウィンドウイベントを使用する。
+0.1.0ではQt Widgetsの入力イベントを使用し、OS固有の入力はアダプターへ隔離する。
 
-| 入力 | pygletイベント |
+| 入力 | Qt / OS入力境界 |
 |---|---|
-| キー押下 | `on_key_press(symbol, modifiers)` |
-| キー解放 | `on_key_release(symbol, modifiers)` |
-| マウス押下 | `on_mouse_press(x, y, button, modifiers)` |
-| マウス解放 | `on_mouse_release(x, y, button, modifiers)` |
-| マウス移動 | `on_mouse_motion(x, y, dx, dy)` |
-| フォーカス変化 | `on_activate` / `on_deactivate` |
-| ウィンドウ終了 | `on_close` |
+| キー押下・解放 | `QKeyEvent` |
+| マウス押下・解放 | `QMouseEvent` |
+| マウス移動 | `QMouseEvent` またはOS固有の相対入力イベント |
+| フォーカス変化 | `QEvent.FocusIn` / `QEvent.FocusOut` |
+| ウィンドウ終了 | `QCloseEvent` |
 
-マウス捕捉には `window.set_exclusive_mouse(True)` を使う。キーボードの排他モードは使わない。
+
+マウス捕捉はframework非依存の `PointerCapturePort` を介して実装する。WindowsではQt native event filterとWin32 Raw Inputを使い、キーボードのグローバルフックは導入しない。
 
 グローバルフックは導入しない。入力が対象機器へ送られる条件は、Project_Demiウィンドウがフォーカスを持ち、ユーザーが入力捕捉を開始していることとする。
 
@@ -86,7 +85,7 @@ class MouseButtonSource:
 PhysicalSource = KeySource | MouseButtonSource
 ```
 
-保存するキー名はpygletの定数値そのものではなく、正規化した文字列とする。
+保存するキー名はQtの定数値そのものではなく、正規化した文字列とする。
 
 例:
 
@@ -343,7 +342,7 @@ accel_g = AccelG(0.0, 0.0, 1.0)
 
 | 項目 | 規則 |
 |---|---|
-| マウス入力 | pyglet排他マウスの相対差分 |
+| マウス入力 | PointerCapturePortが提供する相対差分 |
 | 評価目標 | 8ms |
 | 時間 | 単調増加時計で測定した実経過時間 |
 | ドメイン座標 | +Xトリガー、+Y左、+Zボタン面外向き、右手系 |

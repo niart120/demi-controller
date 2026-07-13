@@ -66,6 +66,8 @@ uv run python -m demi --version
 
 ## Unit 004: pygletウィンドウと可視化
 
+> 履歴注記: このunitは完了時のpyglet実装を示す。現行UIの採用判断と後続計画は `spec/ui-redesign/` およびunit_013以降を正本とする。
+
 成果:
 
 - メインウィンドウ

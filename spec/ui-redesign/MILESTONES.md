@@ -14,7 +14,7 @@
 
 ### 目的
 
-pyglet を採用する現行 `spec/initial` と PySide6 採用判断の矛盾を解消する。
+pyglet を採用していた `spec/initial` と PySide6 採用判断の矛盾を解消する。
 
 ### 作業
 
@@ -30,6 +30,14 @@ pyglet を採用する現行 `spec/initial` と PySide6 採用判断の矛盾を
 - 現行仕様の採用 UI が一意に PySide6 / Qt Widgets となる。
 - 完了済み work unit の履歴を改変していない。
 - 撤去と置換の対象外が作業仕様に記録されている。
+
+### milestone 0 の更新記録
+
+- 現行仕様の UI、入力、ライフサイクル、試験、リスク、診断項目を PySide6 / Qt Widgets 前提へ更新した。
+- 完了済みの `spec/complete/unit_001`〜`unit_012` は変更していない。
+- 旧 UI 撤去の対象範囲と維持する境界は `CURRENT_UI_REMOVAL.md` に記録済みである。
+- 最初の実装 work unit として `spec/wip/unit_013/LEGACY_UI_AND_PYGLET_REMOVAL.md` を作成済みである。
+- milestone 0 は設計文書だけを対象とし、Python実装・依存関係・lockは変更しない。
 
 ## 3. milestone 1: 旧 UI と pyglet の一括撤去
 
@@ -223,11 +231,11 @@ PySide6 UI を通常の source 配布として完了可能な状態にする。
 
 | command | result | notes |
 |---|---|---|
-| `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec\ui-redesign` | passed | 該当なし |
-| `rg -n "[ \t]+$" spec\ui-redesign` | passed | 行末空白なし |
-| `git diff --no-index --check -- NUL <file>` | passed | 新規 Markdown 5ファイルを個別に確認。LF / CRLF変換予告のみ |
-| `git diff --check` | passed | 既存追跡ファイルの差分なし。新規ファイルは上記の個別検査で確認 |
-| Python標準 gate | not run | 設計文書だけを追加し、production codeとdependencyを変更していない |
+| `rg -n "pyglet|Pyglet|ControllerView" spec\initial` | passed | `roadmap.md` の完了済みunit履歴だけに残り、現行採用指示ではないことを注記済み |
+| `rg -n "T[O]DO|T[B]D|x[x]x|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec\initial spec\ui-redesign` | passed | 該当なし |
+| `git diff --name-only -- spec\complete` | passed | 完了済みwork unitの差分なし |
+| `git diff --check` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
+| Python標準 gate | not run | 設計文書だけを変更し、production code、dependency、lockを変更していない |
 
 ### 実装完了時の標準 gate
 
