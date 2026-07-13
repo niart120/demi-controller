@@ -1,7 +1,7 @@
 """Dedicated worker-thread controller runtime."""
 
 import asyncio
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING
 
 from demi.application.state import ConnectionState
@@ -57,6 +57,9 @@ class ControllerRuntime:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._commands: asyncio.Queue[ControllerCommand] | None = None
         self._frame_event: asyncio.Event | None = None
+        self._shutdown_event: asyncio.Event | None = None
+        self._state_lock = Lock()
+        self._shutdown_requested = False
         self._ready = Event()
         self._adapter: ControllerAdapter | None = None
         self._connection_state = ConnectionState.STOPPED
@@ -87,45 +90,75 @@ class ControllerRuntime:
         return self._watchdog.watchdog_tripped
 
     def start(self) -> None:
-        """Start the worker thread and its asyncio event loop."""
-        if self.is_alive:
-            return
-        self._ready.clear()
-        self._runtime_stopped = False
-        self._thread = Thread(target=self._thread_main, name="demi-controller", daemon=True)
-        self._thread.start()
+        """Start the non-daemon worker thread and its asyncio event loop.
+
+        Raises:
+            RuntimeError: The worker does not become ready within five seconds.
+        """
+        with self._state_lock:
+            if self.is_alive:
+                return
+            self._ready.clear()
+            self._runtime_stopped = False
+            self._shutdown_requested = False
+            self._thread = Thread(target=self._thread_main, name="demi-controller")
+            self._thread.start()
         if not self._ready.wait(timeout=5.0):
             raise RuntimeError
 
     def post(self, command: ControllerCommand) -> None:
-        """Queue an ordered command for the worker thread."""
-        loop = self._loop
-        commands = self._commands
-        if loop is None or commands is None or not self.is_alive:
-            raise RuntimeError
-        loop.call_soon_threadsafe(commands.put_nowait, command)
+        """Queue an ordered command for the worker thread.
+
+        Args:
+            command: Immutable command to execute after earlier commands.
+
+        Raises:
+            RuntimeError: The runtime is stopped or shutdown has started.
+        """
+        with self._state_lock:
+            loop = self._loop
+            commands = self._commands
+            if self._shutdown_requested or loop is None or commands is None or not self.is_alive:
+                raise RuntimeError
+            loop.call_soon_threadsafe(commands.put_nowait, command)
 
     def offer_frame(self, frame: ControllerFrame) -> bool:
         """Offer a frame to the latest-value slot.
 
         Returns:
-            ``True`` when the frame replaced the mailbox value.
+            ``True`` when the frame replaced the mailbox value. ``False`` when
+            it is stale or shutdown has started.
         """
-        accepted = self._mailbox.offer(frame)
-        if not accepted:
-            return False
-        loop = self._loop
-        frame_event = self._frame_event
-        if loop is not None and frame_event is not None and self.is_alive:
-            loop.call_soon_threadsafe(frame_event.set)
-        return True
+        with self._state_lock:
+            if self._shutdown_requested:
+                return False
+            accepted = self._mailbox.offer(frame)
+            if not accepted:
+                return False
+            loop = self._loop
+            frame_event = self._frame_event
+            if loop is not None and frame_event is not None and self.is_alive:
+                loop.call_soon_threadsafe(frame_event.set)
+            return True
 
     def close(self) -> None:
-        """Request ordered shutdown and join the worker thread."""
-        thread = self._thread
-        if thread is None or not thread.is_alive():
-            return
-        self.post(Shutdown())
+        """Cancel active adapter work, run cleanup, and join the worker.
+
+        Concurrent and repeated calls wait for or observe the same shutdown.
+
+        Raises:
+            RuntimeError: The worker does not stop within five seconds.
+        """
+        with self._state_lock:
+            thread = self._thread
+            if thread is None or not thread.is_alive():
+                return
+            if not self._shutdown_requested:
+                self._shutdown_requested = True
+                loop = self._loop
+                shutdown_event = self._shutdown_event
+                if loop is not None and shutdown_event is not None:
+                    loop.call_soon_threadsafe(shutdown_event.set)
         thread.join(timeout=5.0)
         if thread.is_alive():
             raise RuntimeError
@@ -136,6 +169,7 @@ class ControllerRuntime:
         self._loop = loop
         self._commands = asyncio.Queue()
         self._frame_event = asyncio.Event()
+        self._shutdown_event = asyncio.Event()
         self._ready.set()
         try:
             loop.run_until_complete(self._worker_main())
@@ -143,15 +177,18 @@ class ControllerRuntime:
             self._loop = None
             self._commands = None
             self._frame_event = None
+            self._shutdown_event = None
             loop.close()
 
     async def _worker_main(self) -> None:
         command_task: asyncio.Task[ControllerCommand] | None = None
         frame_task: asyncio.Task[bool] | None = None
         watchdog_task: asyncio.Task[None] | None = None
+        shutdown_task: asyncio.Task[bool] | None = None
         commands = self._commands
         frame_event = self._frame_event
-        if commands is None or frame_event is None:
+        shutdown_event = self._shutdown_event
+        if commands is None or frame_event is None or shutdown_event is None:
             return
         try:
             self._adapter = self._adapter_factory()
@@ -161,32 +198,69 @@ class ControllerRuntime:
             command_task = asyncio.create_task(commands.get())
             frame_task = asyncio.create_task(frame_event.wait())
             watchdog_task = asyncio.create_task(self._watchdog_loop())
+            shutdown_task = asyncio.create_task(shutdown_event.wait())
             while True:
                 done, _ = await asyncio.wait(
-                    {command_task, frame_task, watchdog_task},
+                    {command_task, frame_task, watchdog_task, shutdown_task},
                     return_when=asyncio.FIRST_COMPLETED,
                 )
+                if shutdown_task in done:
+                    break
                 if command_task in done:
                     command = command_task.result()
                     if isinstance(command, Shutdown):
+                        with self._state_lock:
+                            self._shutdown_requested = True
                         break
-                    await self._handle_command(command)
+                    operation_task = asyncio.create_task(self._handle_command(command))
+                    if not await self._complete_operation_or_shutdown(
+                        operation_task, shutdown_task
+                    ):
+                        break
                     command_task = asyncio.create_task(commands.get())
                 if frame_task in done:
                     frame_event.clear()
-                    await self._consume_latest_frame()
+                    operation_task = asyncio.create_task(self._consume_latest_frame())
+                    if not await self._complete_operation_or_shutdown(
+                        operation_task, shutdown_task
+                    ):
+                        break
                     frame_task = asyncio.create_task(frame_event.wait())
                 if watchdog_task in done:
+                    watchdog_task.result()
                     watchdog_task = asyncio.create_task(self._watchdog_loop())
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.UNEXPECTED), error
             )
         finally:
-            for task in (command_task, frame_task, watchdog_task):
-                if task is not None:
-                    task.cancel()
+            pending_tasks = tuple(
+                task
+                for task in (command_task, frame_task, watchdog_task, shutdown_task)
+                if task is not None
+            )
+            for task in pending_tasks:
+                task.cancel()
+            if pending_tasks:
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
             await self._shutdown_adapter()
+
+    @staticmethod
+    async def _complete_operation_or_shutdown(
+        operation_task: asyncio.Task[None],
+        shutdown_task: asyncio.Task[bool],
+    ) -> bool:
+        """Complete one adapter operation or cancel it for shutdown."""
+        done, _ = await asyncio.wait(
+            {operation_task, shutdown_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if shutdown_task in done:
+            operation_task.cancel()
+            await asyncio.gather(operation_task, return_exceptions=True)
+            return False
+        operation_task.result()
+        return True
 
     async def _watchdog_loop(self) -> None:
         while True:

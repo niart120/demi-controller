@@ -252,7 +252,7 @@ AppState = IDLE
 show warning
 ```
 
-ワーカーがニュートラル化した後に遅延フレームが届いても、`capture_epoch` が一致しなければ破棄する。これにより、前回捕捉セッションの遅延フレームを再生しない。
+ワーカーがニュートラル化した後に遅延フレームが届いても、`capture_epoch` が一致しなければ破棄する。これにより、終了済み捕捉セッションの遅延フレームを再生しない。
 
 ## 11. OSスリープとアダプター抜去
 
@@ -276,15 +276,16 @@ show warning
 4. release exclusive mouse
 5. clear physical input
 6. offer neutral frame
-7. post Shutdown
-8. worker apply physical rest state, best effort
-9. worker neutral fallback if needed
-10. worker close controller
-11. stop asyncio loop
-12. join worker thread
-13. save window/settings if valid
-14. close pyglet window
-15. AppState = STOPPED
+7. ControllerRuntime.close() marks shutdown started and signals the worker outside the command queue
+8. worker cancels and collects the active adapter operation
+9. worker apply physical rest state, best effort
+10. worker neutral fallback if needed
+11. worker close controller
+12. emit RuntimeStopped and stop asyncio loop
+13. join non-daemon worker thread
+14. save window/settings if valid
+15. close pyglet window
+16. AppState = STOPPED
 ```
 
 ワーカースレッドの終了待ちは上限を持つ。上限超過時はエラーを記録し、デーモンスレッドへ放置せず、可能な範囲でイベントループ停止を要求する。
@@ -296,7 +297,7 @@ show warning
 - 例外フックでログ
 - 捕捉解除
 - ニュートラルフレーム
-- Shutdown
+- `ControllerRuntime.close()`
 - 非ゼロ終了
 
 ワーカー:
