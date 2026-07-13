@@ -8,6 +8,7 @@ from PySide6.QtGui import QKeyEvent, QMouseEvent
 from demi.domain.physical_input import PhysicalInputState
 
 type CaptureActivity = Callable[[], bool]
+type CaptureTransition = Callable[[], object]
 
 
 class QtInputAdapter(QObject):
@@ -18,23 +19,46 @@ class QtInputAdapter(QObject):
         *,
         state: PhysicalInputState,
         is_captured: CaptureActivity,
+        on_stop_capture: CaptureTransition | None = None,
+        on_focus_lost: CaptureTransition | None = None,
+        on_focus_gained: CaptureTransition | None = None,
+        on_dialog_opened: CaptureTransition | None = None,
     ) -> None:
         """Create an adapter with framework-independent state storage.
 
         Args:
             state: Mutable held-source state for the current capture session.
             is_captured: Returns whether controller input capture is active.
+            on_stop_capture: Handles an F12 capture-release request.
+            on_focus_lost: Handles a window or application focus loss.
+            on_focus_gained: Handles a window or application focus gain.
+            on_dialog_opened: Neutralizes capture before a dialog opens.
         """
         super().__init__()
         self._state = state
         self._is_captured = is_captured
+        self._on_stop_capture = on_stop_capture
+        self._on_focus_lost = on_focus_lost
+        self._on_focus_gained = on_focus_gained
+        self._on_dialog_opened = on_dialog_opened
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override name.
         """Normalize an eligible event without consuming Qt's normal handling."""
         del watched
-        if not self._is_captured():
+        event_type = event.type()
+        if event_type in _FOCUS_LOSS_EVENTS:
+            _invoke(self._on_focus_lost)
+            return False
+        if event_type in _FOCUS_GAIN_EVENTS:
+            _invoke(self._on_focus_gained)
+            return False
+        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F12:
+            if self._is_captured():
+                _invoke(self._on_stop_capture)
             return False
 
+        if not self._is_captured():
+            return False
         if isinstance(event, QKeyEvent):
             self._handle_key_event(event)
         elif isinstance(event, QMouseEvent):
@@ -59,6 +83,31 @@ class QtInputAdapter(QObject):
             self._state.press_mouse_button(button)
         elif event.type() is QEvent.Type.MouseButtonRelease:
             self._state.release_mouse_button(button)
+
+    def on_dialog_opened(self) -> None:
+        """Request capture neutralization before a modal dialog is shown."""
+        _invoke(self._on_dialog_opened)
+
+
+_FOCUS_LOSS_EVENTS = frozenset(
+    {
+        QEvent.Type.FocusOut,
+        QEvent.Type.WindowDeactivate,
+        QEvent.Type.ApplicationDeactivate,
+    }
+)
+_FOCUS_GAIN_EVENTS = frozenset(
+    {
+        QEvent.Type.FocusIn,
+        QEvent.Type.WindowActivate,
+        QEvent.Type.ApplicationActivate,
+    }
+)
+
+
+def _invoke(callback: CaptureTransition | None) -> None:
+    if callback is not None:
+        callback()
 
 
 def _key_symbol(value: int) -> str | None:
