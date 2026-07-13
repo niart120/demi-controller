@@ -24,5 +24,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"unknown argument: {arguments[0]}\n")
         return 2
 
-    sys.stderr.write("GUI は UI 更新中のため現在は起動できません。\n")
-    return 1
+    from demi.app import run_application  # noqa: PLC0415 - GUI起動時までapplicationをimportしない。
+
+    return run_application()

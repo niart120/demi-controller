@@ -45,11 +45,20 @@ def test_package_import_and_version_output_do_not_import_pyglet(
     assert capsys.readouterr().out == f"{package.__version__}\n"
 
 
-def test_cli_without_arguments_reports_legacy_ui_unavailable(
-    capsys: pytest.CaptureFixture[str],
+def test_cli_without_arguments_returns_the_application_runner_status(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert main([]) == 1
-    assert capsys.readouterr().err == "GUI は UI 更新中のため現在は起動できません。\n"
+    calls = 0
+
+    def run_application() -> int:
+        nonlocal calls
+        calls += 1
+        return 23
+
+    monkeypatch.setattr("demi.app.run_application", run_application)
+
+    assert main([]) == 23
+    assert calls == 1
 
 
 def test_cli_does_not_create_the_application_for_unknown_arguments(
@@ -71,10 +80,15 @@ def test_module_entry_point_uses_the_same_version_output(
     assert capsys.readouterr().out == f"{importlib.metadata.version('demi-controller')}\n"
 
 
-def test_module_and_packaging_launcher_report_legacy_ui_unavailable(
-    capsys: pytest.CaptureFixture[str],
+def test_module_and_packaging_launcher_return_the_application_runner_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    statuses = iter((41, 42))
+
+    def run_application() -> int:
+        return next(statuses)
+
+    monkeypatch.setattr("demi.app.run_application", run_application)
     monkeypatch.setattr(sys, "argv", ["demi"])
 
     with pytest.raises(SystemExit) as module_exit:
@@ -82,9 +96,8 @@ def test_module_and_packaging_launcher_report_legacy_ui_unavailable(
     with pytest.raises(SystemExit) as launcher_exit:
         runpy.run_path("packaging/launcher.py", run_name="__main__")
 
-    assert module_exit.value.code == 1
-    assert launcher_exit.value.code == 1
-    assert capsys.readouterr().err == "GUI は UI 更新中のため現在は起動できません。\n" * 2
+    assert module_exit.value.code == 41
+    assert launcher_exit.value.code == 42
 
 
 def test_project_demi_compatibility_script_points_to_the_canonical_cli() -> None:
