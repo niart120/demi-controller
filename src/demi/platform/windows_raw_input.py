@@ -2,6 +2,7 @@
 
 import ctypes
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -20,6 +21,7 @@ MOUSE_MOVE_ABSOLUTE = 0x0001
 _WINDOWS_GENERIC_MSG = b"windows_generic_MSG"
 
 type NativeEventType = QByteArray | bytes | bytearray | memoryview
+type ReadFailureCallback = Callable[[], object]
 
 
 class RawInputConfigurationError(ValueError):
@@ -370,6 +372,8 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         on_relative_motion: RelativeMotionSink | None = None,
         message_reader: NativeMessageReader | None = None,
         raw_input_reader: RawInputReader | None = None,
+        on_read_failure: ReadFailureCallback | None = None,
+        maximum_consecutive_read_failures: int = 3,
     ) -> None:
         """Create a backend with an injectable Win32 registration boundary.
 
@@ -379,7 +383,19 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
                 capture is active.
             message_reader: Decoder for Qt native ``MSG`` addresses.
             raw_input_reader: Decoder for ``HRAWINPUT`` payloads.
+            on_read_failure: Called after repeated native read failures.
+            maximum_consecutive_read_failures: Number of consecutive failed
+                reads allowed before capture must be released.
+
+        Raises:
+            RawInputConfigurationError: If the failure threshold is invalid.
         """
+        if (
+            isinstance(maximum_consecutive_read_failures, bool)
+            or not isinstance(maximum_consecutive_read_failures, int)
+            or maximum_consecutive_read_failures <= 0
+        ):
+            raise RawInputConfigurationError
         super().__init__()
         self._registrar = registrar if registrar is not None else CtypesRawInputRegistrar()
         self._on_relative_motion = on_relative_motion
@@ -389,6 +405,9 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         self._raw_input_reader = (
             raw_input_reader if raw_input_reader is not None else CtypesRawInputReader()
         )
+        self._on_read_failure = on_read_failure
+        self._maximum_consecutive_read_failures = maximum_consecutive_read_failures
+        self._consecutive_read_failures = 0
         self._target_window_handle: int | None = None
         self._capture_epoch: int | None = None
 
@@ -439,13 +458,22 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
             or not _is_windows_generic_message(event_type)
         ):
             return False
-        native_message = self._message_reader.read(message)
+        try:
+            native_message = self._message_reader.read(message)
+        except (OSError, ValueError):
+            self._record_read_failure()
+            return False
         if (
             native_message.message != WM_INPUT
             or native_message.window_handle != target_window_handle
         ):
             return False
-        packet = self._raw_input_reader.read_mouse(native_message.l_param)
+        try:
+            packet = self._raw_input_reader.read_mouse(native_message.l_param)
+        except (OSError, ValueError):
+            self._record_read_failure()
+            return False
+        self._consecutive_read_failures = 0
         if packet is None or packet.flags & MOUSE_MOVE_ABSOLUTE:
             return False
         self._on_relative_motion(float(packet.dx), float(packet.dy))
@@ -487,6 +515,7 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         )
         self._target_window_handle = target_window_handle
         self._capture_epoch = capture_epoch
+        self._consecutive_read_failures = 0
 
     def stop_capture(self) -> None:
         """Remove the foreground mouse registration after capture ends."""
@@ -502,3 +531,11 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         )
         self._target_window_handle = None
         self._capture_epoch = None
+        self._consecutive_read_failures = 0
+
+    def _record_read_failure(self) -> None:
+        self._consecutive_read_failures += 1
+        if self._consecutive_read_failures != self._maximum_consecutive_read_failures:
+            return
+        if self._on_read_failure is not None:
+            self._on_read_failure()

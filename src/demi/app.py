@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING, Protocol
 
-from demi.application.coordinator import CaptureCoordinator, PointerCapturePort
+from demi.application.coordinator import CaptureCoordinator, CaptureFailure, PointerCapturePort
 from demi.application.dialogs import DialogKind, DialogManager
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
@@ -286,6 +286,19 @@ class ApplicationSession:
         if self._dialogs.model.visible or self._presentation.model.color_reconnect_pending:
             return False
         return self._coordinator.toggle_capture()
+
+    def report_capture_failure(self, failure: CaptureFailure) -> None:
+        """Show a safe relative-pointer failure warning in the presentation model.
+
+        Args:
+            failure: Category reported by the capture lifecycle coordinator.
+        """
+        messages = {
+            CaptureFailure.RELATIVE_POINTER_REGISTRATION: "相対マウス入力を開始できませんでした",
+            CaptureFailure.RELATIVE_POINTER_READ: "相対マウス入力を停止しました",
+            CaptureFailure.POINTER_CAPTURE: "入力捕捉を開始できませんでした",
+        }
+        self._presentation.set_warning(messages[failure])
 
     def connection_action(self) -> None:
         """Perform the state-dependent toolbar connection action."""
@@ -600,6 +613,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )
+        coordinator.set_capture_failure_reporter(session.report_capture_failure)
         shutdown = ApplicationShutdownCoordinator(
             capture=coordinator,
             runtime=runtime,
