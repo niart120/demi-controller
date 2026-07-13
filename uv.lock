@@ -489,7 +489,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "platformdirs" },
-    { name = "pyglet" },
     { name = "swbt-python" },
     { name = "tomli-w" },
 ]
@@ -509,7 +508,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "platformdirs", specifier = ">=4.10.0" },
-    { name = "pyglet", specifier = ">=2.1,<2.2" },
     { name = "swbt-python", specifier = ">=0.3.0,<0.4.0" },
     { name = "tomli-w", specifier = ">=1.2.0" },
 ]
@@ -1143,15 +1141,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8b/04/e7c1fe4dc78a6fdbfd6c337b1c3732ff543b8a397683ab38378447baa331/pyee-13.0.1.tar.gz", hash = "sha256:0b931f7c14535667ed4c7e0d531716368715e860b988770fc7eb8578d1f67fc8", size = 31655, upload-time = "2026-02-14T21:12:28.044Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/c4/b4d4827c93ef43c01f599ef31453ccc1c132b353284fc6c87d535c233129/pyee-13.0.1-py3-none-any.whl", hash = "sha256:af2f8fede4171ef667dfded53f96e2ed0d6e6bd7ee3bb46437f77e3b57689228", size = 15659, upload-time = "2026-02-14T21:12:26.263Z" },
-]
-
-[[package]]
-name = "pyglet"
-version = "2.1.15"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/26/ee/5caebffaf0345e5ccf342c30605898bd07654cee626154f7af2e465cc81c/pyglet-2.1.15.tar.gz", hash = "sha256:0ef34fe730808a97e48c24dd6ed4ff614024b980955ed8dbc2dd01ededaa08cb", size = 6597005, upload-time = "2026-06-28T11:39:09.98Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/a8/9a203001fa496934708baf6cadc54b62e453f1256d5d88589c71019dd751/pyglet-2.1.15-py3-none-any.whl", hash = "sha256:8709131baf5e96c496d38197ff9f9207ad06f273c9694570008b145c58bf51ae", size = 1036800, upload-time = "2026-06-28T11:39:04.717Z" },
 ]
 
 [[package]]

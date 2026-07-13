@@ -9,6 +9,13 @@ def test_packaging_launcher_and_build_entrypoints_are_present() -> None:
     assert (root / "packaging" / "smoke.py").is_file()
 
 
+def test_project_metadata_and_lock_do_not_resolve_pyglet() -> None:
+    root = Path(__file__).parents[2]
+
+    assert "pyglet" not in (root / "pyproject.toml").read_text(encoding="utf-8").lower()
+    assert "pyglet" not in (root / "uv.lock").read_text(encoding="utf-8").lower()
+
+
 def test_package_workflow_builds_three_os_artifacts() -> None:
     workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "package.yml").read_text(
         encoding="utf-8"
