@@ -2,6 +2,29 @@
 
 A desktop application that converts PC keyboard and mouse inputs into virtual Pro Controller inputs and sends Bluetooth HID inputs to the target device.
 
+## 起動
+
+Python 3.12 以上と `uv` を用意して、開発環境から GUI を起動する。
+
+```powershell
+uv sync --dev
+uv run demi
+```
+
+`uv run python -m demi` と `uv run project-demi` も同じ GUI を起動する。初回起動や USB Bluetooth アダプターが未接続の状態でも、コントローラー入力のプレビューと設定画面は開ける。接続や新規ペアリングには専用の USB Bluetooth アダプターと対象機器が必要になる。
+
+Windows 用 standalone artifact の entry point は次である。
+
+```powershell
+.\dist\standalone\demi.exe
+```
+
+表示を開かずに配布バージョンだけ確認するには、次を実行する。
+
+```powershell
+uv run demi --version
+```
+
 ## 開発
 
 ```powershell
@@ -30,17 +53,3 @@ uv run python packaging\smoke.py
 ```
 
 生成先は `dist\standalone` です。Windows、macOS、Linux の artifact は対象 OS 上で個別に build します。
-
-## エージェント作業
-
-このリポジトリは次を使う。
-
-- `AGENTS.md`: リポジトリ内の常設指示
-- `SKILLS.md`: リポジトリ内 skill の索引
-- `spec/initial`: 継続的に参照するプロジェクト規約
-- `spec/wip`: 作業中の作業単位
-- `spec/complete`: 完了した作業記録
-- `spec/dev-journal.md`: 小さい観測と先送り判断
-- `.agents/skills`: 呼び出し可能なローカル手順
-
-作業単位は小さく保つ。完了前に、事実、未検証事項、検証コマンド、結果を対象の仕様書に記録する。
