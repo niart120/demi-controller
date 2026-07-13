@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import Event, get_ident
 
 from demi.application.state import ConnectionState
+from demi.controller.adapter import ControllerAdapterError
 from demi.controller.commands import (
     ConnectSaved,
     Disconnect,
@@ -10,7 +11,6 @@ from demi.controller.commands import (
     RequestStatus,
     StartPairing,
 )
-from demi.controller.adapter import ControllerAdapterError
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,

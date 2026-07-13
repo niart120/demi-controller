@@ -241,9 +241,9 @@ class ControllerRuntime:
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
-            self._emit_error(
-                self._category_for_error(error, ControllerErrorCategory.RECONNECT_FAILED),
+            await self._emit_error_and_recover(
                 error,
+                ControllerErrorCategory.RECONNECT_FAILED,
             )
 
     async def _start_pairing(self, command: StartPairing) -> None:
@@ -265,9 +265,9 @@ class ControllerRuntime:
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
-            self._emit_error(
-                self._category_for_error(error, ControllerErrorCategory.PAIRING_TIMEOUT),
+            await self._emit_error_and_recover(
                 error,
+                ControllerErrorCategory.PAIRING_TIMEOUT,
             )
 
     async def _disconnect(self) -> None:
@@ -297,9 +297,11 @@ class ControllerRuntime:
             await adapter.recreate_with_colors(command.colors)
             await self._apply_rest_state()
         except Exception as error:  # noqa: BLE001
-            self._emit_error(
-                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+            self._connected = False
+            self._watchdog.set_connected(False)
+            await self._emit_error_and_recover(
                 error,
+                ControllerErrorCategory.CONNECTION_LOST,
             )
 
     async def _consume_latest_frame(self) -> None:
@@ -315,9 +317,11 @@ class ControllerRuntime:
         try:
             await self._adapter.apply_frame(frame)
         except Exception as error:  # noqa: BLE001
-            self._emit_error(
-                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+            self._connected = False
+            self._watchdog.set_connected(False)
+            await self._emit_error_and_recover(
                 error,
+                ControllerErrorCategory.CONNECTION_LOST,
             )
 
     async def _neutralize_for_watchdog(self) -> None:
@@ -329,9 +333,11 @@ class ControllerRuntime:
                 WatchdogNeutralized(capture_epoch=self._watchdog.capture_epoch or 0)
             )
         except Exception as error:  # noqa: BLE001
-            self._emit_error(
-                self._category_for_error(error, ControllerErrorCategory.CONNECTION_LOST),
+            self._connected = False
+            self._watchdog.set_connected(False)
+            await self._emit_error_and_recover(
                 error,
+                ControllerErrorCategory.CONNECTION_LOST,
             )
 
     async def _apply_rest_state(self) -> None:
@@ -358,8 +364,24 @@ class ControllerRuntime:
         try:
             if adapter is not None:
                 if self._connected:
-                    await self._apply_rest_state()
-                    await adapter.disconnect()
+                    try:
+                        await self._apply_rest_state()
+                    except Exception as error:  # noqa: BLE001
+                        self._emit_error(
+                            self._category_for_error(
+                                error, ControllerErrorCategory.SHUTDOWN_FAILED
+                            ),
+                            error,
+                        )
+                    try:
+                        await adapter.disconnect()
+                    except Exception as error:  # noqa: BLE001
+                        self._emit_error(
+                            self._category_for_error(
+                                error, ControllerErrorCategory.SHUTDOWN_FAILED
+                            ),
+                            error,
+                        )
                 await adapter.close()
         except Exception as error:  # noqa: BLE001
             self._emit_error(
@@ -373,6 +395,37 @@ class ControllerRuntime:
             self._set_connection_state(ConnectionState.STOPPED)
             self._event_sink.emit(RuntimeStopped())
             self._runtime_stopped = True
+
+    async def _emit_error_and_recover(
+        self,
+        error: Exception,
+        fallback: ControllerErrorCategory,
+    ) -> None:
+        """Release a failed connection and return the runtime to ready."""
+        self._set_connection_state(ConnectionState.ERROR)
+        self._emit_error(self._category_for_error(error, fallback), error)
+        await self._best_effort_release_adapter()
+        self._set_connection_state(ConnectionState.READY)
+
+    async def _best_effort_release_adapter(self) -> None:
+        """Disconnect and close an adapter while preserving later cleanup."""
+        adapter = self._adapter
+        if adapter is None:
+            return
+        try:
+            await adapter.disconnect()
+        except Exception as error:  # noqa: BLE001
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
+                error,
+            )
+        try:
+            await adapter.close()
+        except Exception as error:  # noqa: BLE001
+            self._emit_error(
+                self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
+                error,
+            )
 
     def _set_connection_state(
         self,

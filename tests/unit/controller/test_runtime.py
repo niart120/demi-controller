@@ -100,7 +100,7 @@ class FakeAdapter:
         del frame
         self.apply_calls += 1
         if self.apply_calls == self.fail_on_apply_call:
-            raise RuntimeError("rest apply failed")
+            raise RuntimeError
 
     async def close(self) -> None:
         """Record the worker thread that closed the adapter."""
