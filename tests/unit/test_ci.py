@@ -29,5 +29,5 @@ def test_ci_workflow_runs_source_gates_on_all_supported_os() -> None:
 
     assert "runs-on: ${{ matrix.os }}" in workflow
     for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
-        assert f'          - "{runner}"' in workflow
+        assert f"          - {runner}" in workflow
     assert "run: uv run pytest tests/integration" in workflow
