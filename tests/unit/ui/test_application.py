@@ -1,4 +1,7 @@
+from collections.abc import Callable
+
 from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import QApplication
 
 from demi.app import ApplicationDependencies, WindowSpec
 from demi.domain.settings import WindowSettings
@@ -27,6 +30,22 @@ def test_default_dependencies_create_the_qt_runner_and_main_window(
     assert isinstance(gui, QtApplicationRunner)
     assert gui.application is qt_application
     window.close()
+
+
+def test_offscreen_fixture_reuses_the_application_and_cleans_top_level_windows(
+    qt_application: QApplication,
+    qt_top_level_window_cleanup: Callable[[QApplication], None],
+) -> None:
+    first_runner = QtApplicationRunner()
+    second_runner = QtApplicationRunner()
+    window = first_runner.create_main_window(WindowSpec(width=960, height=640, maximized=False))
+    window.show()
+
+    qt_top_level_window_cleanup(qt_application)
+
+    assert first_runner.application is qt_application
+    assert second_runner.application is qt_application
+    assert qt_application.topLevelWidgets() == []
 
 
 def test_runner_creates_a_resizable_main_window(qt_application: object) -> None:
