@@ -1,3 +1,5 @@
+from PySide6.QtGui import QCloseEvent
+
 from demi.app import WindowSpec
 from demi.domain.settings import WindowSettings
 from demi.ui.application import QtApplicationRunner
@@ -39,3 +41,36 @@ def test_main_window_restores_and_saves_window_state(qt_application: object) -> 
 
     assert window.window_state() == WindowSettings(width=1100, height=700, maximized=False)
     window.close()
+
+
+def test_main_window_routes_close_and_quit_to_one_shutdown_callback(
+    qt_application: object,
+) -> None:
+    runner = QtApplicationRunner()
+    close_window = runner.create_main_window(WindowSpec(width=960, height=640, maximized=False))
+    close_states: list[WindowSettings | None] = []
+
+    def request_close(state: WindowSettings | None) -> bool:
+        close_states.append(state)
+        return True
+
+    close_window.set_shutdown_callback(request_close)
+    close_event = QCloseEvent()
+    close_event.ignore()
+    close_window.closeEvent(close_event)
+    duplicate_event = QCloseEvent()
+    duplicate_event.ignore()
+    close_window.closeEvent(duplicate_event)
+
+    assert runner.application is qt_application
+    assert close_states == [WindowSettings(width=960, height=640, maximized=False)]
+    assert close_event.isAccepted() is True
+    assert duplicate_event.isAccepted() is True
+
+    shortcut_window = runner.create_main_window(WindowSpec(width=960, height=640, maximized=False))
+    shortcut_states: list[WindowSettings | None] = []
+    shortcut_window.set_shutdown_callback(lambda state: shortcut_states.append(state) or True)
+
+    shortcut_window.quit_action.trigger()
+
+    assert shortcut_states == [WindowSettings(width=960, height=640, maximized=False)]
