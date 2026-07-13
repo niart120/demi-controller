@@ -26,3 +26,13 @@ def test_dialog_manager_close_is_idempotent_and_pairing_has_confirmation_title()
     manager.close()
     manager.close()
     assert manager.model.kind is DialogKind.NONE
+
+
+def test_dialog_manager_replaces_a_connection_dialog_with_pairing_confirmation() -> None:
+    manager = DialogManager()
+    assert manager.open(DialogKind.CONNECTION) is True
+
+    assert manager.replace(DialogKind.PAIRING_CONFIRMATION) is True
+    assert manager.model.kind is DialogKind.PAIRING_CONFIRMATION
+    assert manager.replace(DialogKind.CONNECTION) is True
+    assert manager.model.kind is DialogKind.CONNECTION

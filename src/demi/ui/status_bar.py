@@ -1,6 +1,6 @@
 """Status bar presentation for connection and capture state."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from demi.application.state import AppState, ConnectionState
 
@@ -78,6 +78,20 @@ class StatusBar:
             warning=warning,
         )
         return self._model
+
+    def set_evaluation_interval_ms(self, value: int) -> None:
+        """Replace the displayed input evaluation interval.
+
+        Args:
+            value: Validated input evaluation interval in milliseconds.
+        """
+        previous = self._evaluation_interval_ms
+        self._evaluation_interval_ms = value
+        self._model = replace(
+            self._model,
+            text=self._model.text.replace(f"{previous} ms", f"{value} ms"),
+            evaluation_interval_ms=value,
+        )
 
     def _build_model(
         self,

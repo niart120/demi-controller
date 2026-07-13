@@ -56,3 +56,45 @@ def test_editor_reports_duplicate_source_and_local_action_conflicts_only() -> No
     assert conflicts[1].binding_indices == (2,)
     assert conflicts[1].local_action == "CTRL+C"
     assert all(conflict.source != "KEY:V" for conflict in conflicts)
+
+
+def test_editor_updates_mouse_settings_without_changing_other_mouse_fields() -> None:
+    editor = SettingsEditor(AppSettings.default())
+
+    editor.update_mouse(gyro_enabled=False, horizontal_sensitivity=2.5, invert_y=True)
+
+    mouse = editor.draft.input.mouse
+    assert mouse.gyro_enabled is False
+    assert mouse.horizontal_sensitivity == 2.5
+    assert mouse.vertical_sensitivity == 1.0
+    assert mouse.invert_y is True
+    assert mouse.pitch_limit_degrees == 75.0
+
+
+def test_editor_updates_input_settings_without_changing_mouse_settings() -> None:
+    editor = SettingsEditor(AppSettings.default())
+    editor.update_mouse(
+        gyro_enabled=False,
+        horizontal_sensitivity=2.5,
+        vertical_sensitivity=1.5,
+        invert_y=True,
+        pitch_limit_degrees=60.0,
+    )
+    existing_mouse = editor.draft.input.mouse
+
+    editor.update_input(evaluation_interval_ms=16, circular_stick_limit=True)
+
+    input_settings = editor.draft.input
+    assert input_settings.evaluation_interval_ms == 16
+    assert input_settings.circular_stick_limit is True
+    assert input_settings.mouse == existing_mouse
+
+
+def test_editor_rejects_invalid_input_settings_without_replacing_the_draft() -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original_input = editor.draft.input
+
+    with pytest.raises(DomainValueError):
+        editor.update_input(evaluation_interval_ms=3)
+
+    assert editor.draft.input == original_input

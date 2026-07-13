@@ -1,0 +1,770 @@
+"""Application composition root for Project_Demi."""
+
+from __future__ import annotations
+
+import logging
+import sys
+import time
+from dataclasses import dataclass
+from logging.handlers import RotatingFileHandler
+from typing import TYPE_CHECKING, Protocol, cast
+
+from demi.application.coordinator import CaptureCoordinator
+from demi.application.dialogs import DialogKind, DialogManager
+from demi.application.presentation import AdapterOption, PresentationStore
+from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
+from demi.application.shutdown import ApplicationShutdownCoordinator
+from demi.application.state import ConnectionState
+from demi.config.errors import SettingsPersistenceError
+from demi.config.paths import resolve_paths
+from demi.config.repository import SettingsRepository
+from demi.controller.commands import (
+    ConnectSaved,
+    Disconnect,
+    DiscoverAdapters,
+    RecreateWithColors,
+    StartPairing,
+)
+from demi.controller.events import (
+    AdaptersDiscovered,
+    ConnectionChanged,
+    ControllerError,
+    ControllerErrorCategory,
+    PairingProgress,
+    RuntimeStopped,
+    WatchdogNeutralized,
+)
+from demi.controller.runtime import ControllerRuntime
+from demi.controller.swbt_adapter import SwbtControllerAdapter
+from demi.domain.errors import DomainValueError
+from demi.domain.settings import DiagnosticLevel, WindowSettings
+from demi.input.publisher import InputPublisher
+from demi.input.pyglet_backend import PygletInputBackend
+from demi.ui.controller_view import ControllerView
+from demi.ui.dialogs import ModalRenderer
+from demi.ui.event_bridge import MainThreadEventBridge
+from demi.ui.status_bar import StatusBar
+from demi.ui.toolbar import Toolbar
+from demi.ui.window import PygletApplication, WindowSpec, create_window
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from demi.application.settings_editor import SettingsEditor
+    from demi.config.paths import SettingsPaths
+    from demi.config.repository import SettingsLoadResult
+    from demi.controller.adapter import ControllerAdapterFactory, RuntimeEventSink
+    from demi.controller.commands import ControllerCommand
+    from demi.controller.events import (
+        RuntimeEvent,
+    )
+    from demi.controller.watchdog import WatchdogClock
+    from demi.domain.controller import ControllerFrame
+    from demi.domain.mapping import InputProfile
+    from demi.domain.settings import AppSettings
+    from demi.ui.window import PygletWindowPort
+
+
+class Clock(Protocol):
+    """Monotonic clock consumed by input and controller boundaries."""
+
+    def monotonic_ns(self) -> int:
+        """Return monotonic time in nanoseconds."""
+
+
+class SettingsRepositoryPort(Protocol):
+    """Settings operations required by the composition root."""
+
+    def load(self) -> SettingsLoadResult:
+        """Load settings and their recovery status."""
+
+    def save(self, settings: AppSettings) -> None:
+        """Persist a validated settings snapshot."""
+
+
+class RuntimePort(Protocol):
+    """Controller operations owned by the desktop application."""
+
+    def start(self) -> None:
+        """Start the controller worker."""
+
+    def post(self, command: ControllerCommand) -> None:
+        """Post one ordered controller command."""
+
+    def offer_frame(self, frame: ControllerFrame) -> bool:
+        """Offer the newest input frame to the controller worker."""
+
+    def close(self) -> None:
+        """Close the controller worker and join its thread."""
+
+
+class WindowPort(Protocol):
+    """Window operations required by capture coordination."""
+
+    @property
+    def width(self) -> int:
+        """Return the current logical window width."""
+
+    @property
+    def height(self) -> int:
+        """Return the current logical window height."""
+
+    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
+        """Enable or disable relative mouse capture."""
+
+    def close(self) -> None:
+        """Request native window closure."""
+
+
+class GuiPort(Protocol):
+    """GUI loop started after application assembly succeeds."""
+
+    def run(self) -> None:
+        """Enter the GUI event loop."""
+
+
+class RuntimeFactory(Protocol):
+    """Create a controller runtime at the composition boundary."""
+
+    def __call__(
+        self,
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        """Create an unstarted runtime."""
+
+
+class SystemClock:
+    """Production monotonic clock backed by the standard library."""
+
+    def monotonic_ns(self) -> int:
+        """Return the current monotonic time in nanoseconds."""
+        return time.monotonic_ns()
+
+
+class ApplicationSession:
+    """Own main-thread settings, presentation, and runtime command decisions."""
+
+    def __init__(
+        self,
+        *,
+        settings: AppSettings,
+        paths: SettingsPaths,
+        repository: SettingsRepositoryPort,
+        runtime: RuntimePort,
+        coordinator: CaptureCoordinator,
+        loaded: SettingsLoadResult | None = None,
+        publisher: InputPublisher | None = None,
+        view: ControllerView | None = None,
+        status_bar: StatusBar | None = None,
+        reconfigure_diagnostic_logging: Callable[[DiagnosticLevel], None] | None = None,
+        log_controller_error: Callable[[ControllerErrorCategory], None] | None = None,
+    ) -> None:
+        """Create a main-thread session before the worker starts.
+
+        Args:
+            settings: Validated settings selected for this process.
+            paths: User-local configuration, data, and log paths.
+            repository: Settings persistence boundary.
+            runtime: Ordered controller command boundary.
+            coordinator: Main-thread capture lifecycle owner.
+            loaded: Optional load result used for a safe recovery notice.
+            publisher: Live input publisher updated after settings saves.
+            view: Live controller preview updated after color saves.
+            status_bar: Status display updated after interval saves.
+            reconfigure_diagnostic_logging: Optional callback that applies a
+                saved diagnostic logging threshold.
+            log_controller_error: Optional safe category-only error logger.
+        """
+        self._settings = settings
+        self._paths = paths
+        self._repository = repository
+        self._runtime = runtime
+        self._coordinator = coordinator
+        self._publisher = publisher if publisher is not None else coordinator.publisher
+        self._view = view
+        self._status_bar = status_bar
+        self._reconfigure_diagnostic_logging = reconfigure_diagnostic_logging
+        self._log_controller_error = log_controller_error
+        self._dialogs = DialogManager()
+        self._settings_modal = SettingsModalController(repository, coordinator, self._dialogs)
+        self._presentation = PresentationStore()
+        self._startup_reconnect_pending = settings.connection.reconnect_on_start and bool(
+            settings.connection.adapter_id
+        )
+        self._startup_reconnect_discovery_complete = False
+        if loaded is not None:
+            self._presentation.set_recovery_notice(settings_recovery_notice(loaded))
+        self._apply_live_settings(settings)
+
+    @property
+    def settings(self) -> AppSettings:
+        """Return the current validated settings snapshot."""
+        return self._settings
+
+    @property
+    def dialogs(self) -> DialogManager:
+        """Return the single-modal state owner used by the GUI."""
+        return self._dialogs
+
+    @property
+    def settings_modal(self) -> SettingsModalController:
+        """Return the settings draft controller used by the GUI."""
+        return self._settings_modal
+
+    @property
+    def presentation(self) -> PresentationStore:
+        """Return main-thread presentation state for the GUI."""
+        return self._presentation
+
+    def begin(self) -> None:
+        """Request initial adapter discovery after the runtime has started."""
+        self._presentation.set_connection(ConnectionState.STARTING)
+        self._runtime.post(DiscoverAdapters())
+
+    def handle_runtime_event(self, event: RuntimeEvent) -> None:
+        """Reduce one worker event on the GUI main thread.
+
+        Args:
+            event: Immutable event drained from the thread-safe event bridge.
+        """
+        if isinstance(event, AdaptersDiscovered):
+            adapters = tuple(
+                AdapterOption(descriptor.id, descriptor.display_name)
+                for descriptor in event.adapters
+            )
+            self._presentation.set_adapters(adapters)
+            self._startup_reconnect_discovery_complete = True
+        elif isinstance(event, ConnectionChanged):
+            self._presentation.set_connection(
+                event.state,
+                adapter_id=event.adapter_id,
+                adapter_label=self._adapter_label(event.adapter_id),
+            )
+            if event.state is ConnectionState.READY and self._startup_reconnect_discovery_complete:
+                self._start_saved_reconnect_once()
+        elif isinstance(event, ControllerError):
+            self._coordinator.stop_capture()
+            self._presentation.set_error(_safe_error_message(event.category))
+            if self._log_controller_error is not None:
+                self._log_controller_error(event.category)
+        elif isinstance(event, WatchdogNeutralized):
+            if (
+                self._coordinator.is_captured
+                and event.capture_epoch == self._coordinator.capture_epoch
+            ):
+                self._coordinator.stop_capture()
+                self._presentation.set_warning("入力監視タイムアウト")
+        elif isinstance(event, PairingProgress):
+            self._presentation.set_warning(event.summary)
+        elif isinstance(event, RuntimeStopped):
+            self._presentation.set_connection(ConnectionState.STOPPED)
+
+    def open_settings(self, kind: DialogKind) -> bool:
+        """Open one editable settings dialog through the capture coordinator.
+
+        Args:
+            kind: Editable dialog requested by the GUI.
+
+        Returns:
+            Whether the dialog was opened.
+        """
+        return self._settings_modal.open(
+            kind,
+            self._settings,
+            connected=self._presentation.model.connection_state is ConnectionState.CONNECTED,
+        )
+
+    def toggle_capture(self) -> bool:
+        """Toggle capture unless an editable modal owns application input.
+
+        Returns:
+            Whether the capture transition was accepted.
+        """
+        if self._dialogs.model.visible or self._presentation.model.color_reconnect_pending:
+            return False
+        return self._coordinator.toggle_capture()
+
+    def connection_action(self) -> None:
+        """Perform the state-dependent toolbar connection action."""
+        state = self._presentation.model.connection_state
+        if state is ConnectionState.CONNECTED:
+            self._coordinator.stop_capture()
+            self._presentation.set_connection(ConnectionState.DISCONNECTING)
+            self._runtime.post(Disconnect())
+            return
+        if state not in {ConnectionState.READY, ConnectionState.ERROR}:
+            return
+        connection = self._settings.connection
+        if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
+            self._presentation.set_warning("接続する USB アダプターを選択してください")
+            self.open_settings(DialogKind.CONNECTION)
+            return
+        self._presentation.acknowledge_error()
+        self._runtime.post(
+            ConnectSaved(
+                adapter_id=connection.adapter_id,
+                bond_path=self._paths.bond_file(connection.bond_slot),
+                timeout_seconds=connection.timeout_seconds,
+                colors=self._settings.controller_colors,
+            )
+        )
+        self._presentation.set_connection(
+            ConnectionState.CONNECTING,
+            adapter_id=connection.adapter_id,
+            adapter_label=self._adapter_label(connection.adapter_id),
+        )
+
+    def save_settings(self) -> bool:
+        """Save the open draft and apply it to live main-thread consumers.
+
+        Returns:
+            ``True`` after a successful save; ``False`` when the draft remains
+            open for correction after a validation or persistence failure.
+        """
+        try:
+            result = self._settings_modal.save()
+        except (DomainValueError, SettingsPersistenceError):
+            self._presentation.set_warning("設定を保存できませんでした")
+            return False
+        previous_diagnostic_level = self._settings.connection.diagnostic_level
+        self._apply_live_settings(result.settings)
+        if (
+            result.settings.connection.diagnostic_level is not previous_diagnostic_level
+            and self._reconfigure_diagnostic_logging is not None
+        ):
+            self._reconfigure_diagnostic_logging(result.settings.connection.diagnostic_level)
+        if result.reconnect_required:
+            self._presentation.set_color_reconnect_pending(True)
+            self._presentation.set_warning(
+                "表示色は更新済みです。対象機器へ反映するには再接続してください"
+            )
+        return True
+
+    def cancel_settings(self) -> bool:
+        """Discard the current modal draft without changing live settings."""
+        return self._settings_modal.cancel()
+
+    def request_pairing(self) -> bool:
+        """Move an editable connection draft to its explicit confirmation step."""
+        if (
+            self._dialogs.model.kind is not DialogKind.CONNECTION
+            or self._settings_modal.editor is None
+        ):
+            return False
+        return self._dialogs.replace(DialogKind.PAIRING_CONFIRMATION)
+
+    def rescan_adapters(self) -> None:
+        """Request fresh adapter discovery while a connection draft is open."""
+        if self._dialogs.model.kind not in {
+            DialogKind.CONNECTION,
+            DialogKind.PAIRING_CONFIRMATION,
+        }:
+            return
+        self._runtime.post(DiscoverAdapters())
+
+    def cancel_pairing(self) -> bool:
+        """Return a pairing confirmation to its editable connection draft."""
+        if self._dialogs.model.kind is not DialogKind.PAIRING_CONFIRMATION:
+            return False
+        return self._dialogs.replace(DialogKind.CONNECTION)
+
+    def confirm_pairing(self) -> bool:
+        """Persist a confirmed draft and post one explicit pairing command."""
+        editor = self._settings_modal.editor
+        if self._dialogs.model.kind is not DialogKind.PAIRING_CONFIRMATION or editor is None:
+            return False
+        connection = editor.draft.connection
+        if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
+            self._presentation.set_warning("ペアリングする USB アダプターを選択してください")
+            self._dialogs.replace(DialogKind.CONNECTION)
+            return False
+        if not self.save_settings():
+            return False
+        self._runtime.post(
+            StartPairing(
+                adapter_id=self._settings.connection.adapter_id,
+                bond_path=self._paths.bond_file(self._settings.connection.bond_slot),
+                timeout_seconds=self._settings.connection.timeout_seconds,
+                colors=self._settings.controller_colors,
+            )
+        )
+        self._presentation.set_connection(
+            ConnectionState.CONNECTING,
+            adapter_id=self._settings.connection.adapter_id,
+            adapter_label=self._adapter_label(self._settings.connection.adapter_id),
+        )
+        return True
+
+    def defer_color_reconnect(self) -> None:
+        """Keep saved colors locally without changing the connected controller."""
+        self._presentation.set_color_reconnect_pending(False)
+
+    def request_color_reconnect(self) -> bool:
+        """Neutralize capture and explicitly recreate a connected controller's colors."""
+        if not self._presentation.model.color_reconnect_pending:
+            return False
+        self._coordinator.stop_capture()
+        self._presentation.set_color_reconnect_pending(False)
+        self._runtime.post(RecreateWithColors(colors=self._settings.controller_colors))
+        return True
+
+    def _apply_live_settings(self, settings: AppSettings) -> None:
+        self._settings = settings
+        self._publisher.reconfigure(
+            profile=_active_profile(settings),
+            mouse_settings=settings.input.mouse,
+            circular_limit=settings.input.circular_stick_limit,
+            evaluation_interval_ms=settings.input.evaluation_interval_ms,
+        )
+        if self._view is not None:
+            self._view.set_colors(settings.controller_colors)
+        if self._status_bar is not None:
+            self._status_bar.set_evaluation_interval_ms(settings.input.evaluation_interval_ms)
+
+    def _start_saved_reconnect_once(self) -> None:
+        if not self._startup_reconnect_pending:
+            return
+        self._startup_reconnect_pending = False
+        connection = self._settings.connection
+        if not self._presentation.has_adapter(connection.adapter_id):
+            self._presentation.set_warning("保存済みの USB アダプターが見つかりません")
+            return
+        self._runtime.post(
+            ConnectSaved(
+                adapter_id=connection.adapter_id,
+                bond_path=self._paths.bond_file(connection.bond_slot),
+                timeout_seconds=connection.timeout_seconds,
+                colors=self._settings.controller_colors,
+            )
+        )
+        self._presentation.set_connection(
+            ConnectionState.CONNECTING,
+            adapter_id=connection.adapter_id,
+            adapter_label=self._adapter_label(connection.adapter_id),
+        )
+
+    def _adapter_label(self, adapter_id: str | None) -> str:
+        if adapter_id is None:
+            return self._presentation.model.adapter_label
+        for adapter in self._presentation.model.adapters:
+            if adapter.id == adapter_id:
+                return adapter.label
+        return "なし"
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationDependencies:
+    """Injectable outer-boundary factories used to assemble the desktop app."""
+
+    paths_resolver: Callable[[], SettingsPaths]
+    repository_factory: Callable[[SettingsPaths], SettingsRepositoryPort]
+    runtime_factory: RuntimeFactory
+    window_factory: Callable[[WindowSpec], WindowPort]
+    gui_factory: Callable[..., GuiPort]
+    clock: Clock
+    logger_configurer: Callable[[SettingsPaths, DiagnosticLevel], logging.Logger]
+
+    @classmethod
+    def default(cls) -> ApplicationDependencies:
+        """Return production factories without creating a display on import."""
+        return cls(
+            paths_resolver=resolve_paths,
+            repository_factory=SettingsRepository,
+            runtime_factory=_create_runtime,
+            window_factory=_create_window,
+            gui_factory=_create_gui,
+            clock=SystemClock(),
+            logger_configurer=configure_logging,
+        )
+
+
+def configure_logging(paths: SettingsPaths, level: DiagnosticLevel) -> logging.Logger:
+    """Configure the local rotating Project_Demi log.
+
+    Args:
+        paths: User-local paths selected for the current operating system.
+        level: Threshold loaded from validated application settings.
+
+    Returns:
+        Configured application logger.
+
+    Raises:
+        OSError: The user-local log directory cannot be created or opened.
+    """
+    paths.log_dir.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("demi")
+    logger.setLevel(getattr(logging, level.value))
+    logger.propagate = False
+    for handler in tuple(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
+    file_handler = RotatingFileHandler(
+        paths.log_dir / "project-demi.log",
+        maxBytes=1_048_576,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logger.addHandler(file_handler)
+    return logger
+
+
+def run_application(dependencies: ApplicationDependencies | None = None) -> int:
+    """Assemble, run, and safely close the desktop application.
+
+    Args:
+        dependencies: Optional outer-boundary factories for tests.
+
+    Returns:
+        Zero after normal GUI shutdown, otherwise a nonzero startup status.
+    """
+    selected_dependencies = (
+        dependencies if dependencies is not None else ApplicationDependencies.default()
+    )
+    runtime: RuntimePort | None = None
+    window: WindowPort | None = None
+    shutdown: ApplicationShutdownCoordinator | None = None
+    logger: logging.Logger | None = None
+    exit_status = 1
+    try:
+        paths = selected_dependencies.paths_resolver()
+        logger = selected_dependencies.logger_configurer(paths, DiagnosticLevel.INFO)
+        repository = selected_dependencies.repository_factory(paths)
+        loaded = repository.load()
+        settings = loaded.settings
+
+        def reconfigure_diagnostic_logging(level: DiagnosticLevel) -> None:
+            """Apply one validated diagnostic threshold to the local logger."""
+            nonlocal logger
+            logger = selected_dependencies.logger_configurer(paths, level)
+
+        def log_controller_error(category: ControllerErrorCategory) -> None:
+            """Record a safe controller error category without worker details."""
+            if logger is not None:
+                logger.error("Controller error: %s", category.value)
+
+        if settings.connection.diagnostic_level is not DiagnosticLevel.INFO:
+            reconfigure_diagnostic_logging(settings.connection.diagnostic_level)
+        logger.info("Starting Project_Demi")
+
+        bridge: MainThreadEventBridge[RuntimeEvent] = MainThreadEventBridge()
+        runtime = selected_dependencies.runtime_factory(
+            adapter_factory=SwbtControllerAdapter,
+            event_sink=bridge,
+            clock=selected_dependencies.clock,
+        )
+        spec = _window_spec_for(settings)
+        window = selected_dependencies.window_factory(spec)
+        publisher = InputPublisher(
+            clock=selected_dependencies.clock,
+            sink=runtime,
+            profile=_active_profile(settings),
+            mouse_settings=settings.input.mouse,
+            circular_limit=settings.input.circular_stick_limit,
+            evaluation_interval_ms=settings.input.evaluation_interval_ms,
+        )
+        coordinator = CaptureCoordinator(publisher=publisher, window=window)
+        backend = PygletInputBackend(coordinator)
+        view = ControllerView(colors=settings.controller_colors)
+        status_bar = StatusBar(evaluation_interval_ms=settings.input.evaluation_interval_ms)
+        session = ApplicationSession(
+            settings=settings,
+            paths=paths,
+            repository=repository,
+            runtime=runtime,
+            coordinator=coordinator,
+            loaded=loaded,
+            publisher=publisher,
+            view=view,
+            status_bar=status_bar,
+            reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
+            log_controller_error=log_controller_error,
+        )
+        shutdown = ApplicationShutdownCoordinator(
+            capture=coordinator,
+            runtime=runtime,
+            repository=repository,
+            settings_provider=lambda: session.settings,
+            window_state_provider=lambda: _window_state_for(
+                window,
+                settings.window.maximized,
+            ),
+            report_error=lambda stage, error: _log_shutdown_error(logger, stage, error),
+        )
+        gui = selected_dependencies.gui_factory(
+            window=window,
+            coordinator=coordinator,
+            backend=backend,
+            view=view,
+            status_bar=status_bar,
+            bridge=bridge,
+            loaded=loaded,
+            paths=paths,
+            repository=repository,
+            runtime=runtime,
+            session=session,
+            actions=session,
+            presentation=session.presentation,
+            event_pump=lambda: bridge.drain(session.handle_runtime_event),
+            settings_provider=lambda: session.settings,
+            dialogs=session.dialogs,
+            editor_provider=lambda: session.settings_modal.editor,
+            settings=settings,
+            on_shutdown_requested=shutdown.request,
+            window_maximized=settings.window.maximized,
+        )
+        runtime.start()
+        session.begin()
+        gui.run()
+        exit_status = 0
+    except Exception as error:  # noqa: BLE001 - CLI boundary converts startup failures.
+        if logger is not None:
+            logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
+                "Project_Demi startup failed: %s",
+                type(error).__name__,
+            )
+        sys.stderr.write("Project_Demi の起動に失敗しました。\n")
+        exit_status = 1
+    finally:
+        if shutdown is not None:
+            already_requested = shutdown.requested
+            shutdown.request()
+            if shutdown.failed:
+                exit_status = 1
+            if not already_requested:
+                _close_window(window, logger)
+        elif runtime is not None:
+            try:
+                runtime.close()
+            except Exception as error:  # noqa: BLE001 - preserve the primary exit status.
+                exit_status = 1
+                if logger is not None:
+                    logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
+                        "Project_Demi shutdown failed: %s",
+                        type(error).__name__,
+                    )
+            _close_window(window, logger)
+    if logger is not None and exit_status == 0:
+        logger.info("Project_Demi stopped normally")
+    return exit_status
+
+
+def _window_state_for(window: WindowPort | None, maximized: bool) -> WindowSettings | None:
+    """Build a validated state snapshot without reading pyglet private APIs."""
+    if window is None:
+        return None
+    try:
+        return WindowSettings(
+            width=window.width,
+            height=window.height,
+            maximized=maximized,
+        )
+    except DomainValueError:
+        return None
+
+
+def _close_window(window: WindowPort | None, logger: logging.Logger | None) -> None:
+    """Close a created native window without masking an earlier startup error."""
+    if window is None:
+        return
+    try:
+        window.close()
+    except Exception as error:  # noqa: BLE001 - process cleanup remains best effort.
+        _log_shutdown_error(logger, "window close", error)
+
+
+def _log_shutdown_error(
+    logger: logging.Logger | None,
+    stage: str,
+    error: Exception,
+) -> None:
+    """Record a safe shutdown error without exposing adapter or bond details."""
+    if logger is not None:
+        logger.error("Project_Demi %s failed: %s", stage, type(error).__name__)
+
+
+def _create_runtime(
+    *,
+    adapter_factory: ControllerAdapterFactory,
+    event_sink: RuntimeEventSink,
+    clock: WatchdogClock,
+) -> RuntimePort:
+    return ControllerRuntime(
+        adapter_factory=adapter_factory,
+        event_sink=event_sink,
+        clock=clock,
+    )
+
+
+def _create_window(spec: WindowSpec) -> WindowPort:
+    return cast("WindowPort", create_window(spec))
+
+
+def _create_gui(**kwargs: object) -> GuiPort:
+    window = cast("PygletWindowPort", kwargs["window"])
+    coordinator = cast("CaptureCoordinator", kwargs["coordinator"])
+    backend = cast("PygletInputBackend", kwargs["backend"])
+    view = cast("ControllerView", kwargs["view"])
+    status_bar = cast("StatusBar", kwargs["status_bar"])
+    presentation = cast("PresentationStore", kwargs["presentation"])
+    event_pump = cast("Callable[[], int]", kwargs["event_pump"])
+    settings_provider = cast("Callable[[], AppSettings]", kwargs["settings_provider"])
+    dialogs = cast("DialogManager", kwargs["dialogs"])
+    editor_provider = cast("Callable[[], SettingsEditor | None]", kwargs["editor_provider"])
+    settings = cast("AppSettings", kwargs["settings"])
+    on_shutdown_requested = cast(
+        "Callable[[WindowSettings | None], None]",
+        kwargs["on_shutdown_requested"],
+    )
+    window_maximized = cast("bool", kwargs["window_maximized"])
+    return PygletApplication(
+        window=window,
+        coordinator=coordinator,
+        backend=backend,
+        view=view,
+        toolbar=Toolbar(),
+        status_bar=status_bar,
+        presentation=presentation,
+        event_pump=event_pump,
+        actions=cast("ApplicationSession", kwargs["actions"]),
+        settings_provider=settings_provider,
+        dialogs=dialogs,
+        editor_provider=editor_provider,
+        modal_renderer=ModalRenderer(),
+        evaluation_interval_ms=settings.input.evaluation_interval_ms,
+        on_shutdown_requested=on_shutdown_requested,
+        window_maximized=window_maximized,
+    )
+
+
+def _window_spec_for(settings: AppSettings) -> WindowSpec:
+    return WindowSpec(
+        width=settings.window.width,
+        height=settings.window.height,
+        maximized=settings.window.maximized,
+    )
+
+
+def _active_profile(settings: AppSettings) -> InputProfile:
+    for profile in settings.profiles:
+        if profile.id == settings.active_profile:
+            return profile
+    raise RuntimeError
+
+
+def _safe_error_message(category: ControllerErrorCategory) -> str:
+    messages = {
+        ControllerErrorCategory.ADAPTER_NOT_FOUND: "USB アダプターが見つかりません",
+        ControllerErrorCategory.ADAPTER_OPEN_FAILED: "USB アダプターを開けません",
+        ControllerErrorCategory.BOND_NOT_FOUND: "保存済みボンドが見つかりません",
+        ControllerErrorCategory.PAIRING_TIMEOUT: "新規ペアリングが時間内に完了しませんでした",
+        ControllerErrorCategory.RECONNECT_FAILED: "保存済み接続に失敗しました",
+        ControllerErrorCategory.CONNECTION_LOST: "接続が切断されました",
+        ControllerErrorCategory.INVALID_INPUT: "入力をコントローラーへ適用できません",
+        ControllerErrorCategory.SHUTDOWN_FAILED: "終了処理の一部に失敗しました",
+        ControllerErrorCategory.UNEXPECTED: "予期しないコントローラーエラーが発生しました",
+    }
+    return messages[category]

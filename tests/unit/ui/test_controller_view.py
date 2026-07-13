@@ -1,4 +1,5 @@
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
+from demi.domain.settings import ControllerColorSettings
 from demi.ui.controller_view import ControllerView
 
 
@@ -51,3 +52,12 @@ def test_controller_view_can_return_to_neutral_from_a_pressed_frame() -> None:
     assert view.model.buttons == frozenset()
     assert view.model.left_stick == StickVector(x=0.0, y=0.0)
     assert view.model.capture_active is False
+
+
+def test_controller_view_replaces_colors_for_the_next_render() -> None:
+    view = ControllerView()
+    colors = ControllerColorSettings(body="#ABCDEF")
+
+    view.set_colors(colors)
+
+    assert view.colors == colors

@@ -6,6 +6,17 @@ from collections.abc import Sequence
 from demi import __version__
 
 
+def run_application() -> int:
+    """Load and run the GUI only for an argument-free CLI invocation.
+
+    Returns:
+        Process exit status from the desktop application.
+    """
+    from demi.app import run_application as application_runner  # noqa: PLC0415
+
+    return application_runner()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command line interface.
 
@@ -24,5 +35,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"unknown argument: {arguments[0]}\n")
         return 2
 
-    sys.stdout.write("Project_Demi\n")
-    return 0
+    return run_application()

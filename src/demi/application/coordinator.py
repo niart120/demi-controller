@@ -144,6 +144,26 @@ class CaptureCoordinator:
         if self._app_state is AppState.SUSPENDED:
             self._app_state = AppState.IDLE
 
+    def begin_shutdown(self) -> ControllerFrame | None:
+        """Neutralize input and reject further capture transitions once.
+
+        Returns:
+            A capture-inactive neutral frame on the first shutdown request, or
+            ``None`` after shutdown has already started.
+        """
+        if self._app_state in {AppState.SHUTTING_DOWN, AppState.STOPPED}:
+            return None
+        self._app_state = AppState.SHUTTING_DOWN
+        self._capture_epoch += 1
+        with suppress(OSError, RuntimeError):
+            self._window.set_exclusive_mouse(False)
+        self._publisher.state.clear()
+        return self._publish_frame(capture_active=False)
+
+    def finish_shutdown(self) -> None:
+        """Mark a completed shutdown after all outer resources have closed."""
+        self._app_state = AppState.STOPPED
+
     def _leave_capture(self, next_state: AppState) -> ControllerFrame:
         self._app_state = next_state
         self._capture_epoch += 1

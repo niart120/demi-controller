@@ -120,9 +120,26 @@ class ControllerView:
         """Return the latest frame-derived display model."""
         return self._model
 
+    @property
+    def colors(self) -> ControllerColorSettings:
+        """Return the colors used by the next controller rendering pass."""
+        return self._colors
+
     def update(self, frame: ControllerFrame) -> None:
         """Replace the display model with values from one controller frame."""
         self._model = ControllerViewModel.from_frame(frame)
+
+    def set_colors(self, colors: ControllerColorSettings) -> None:
+        """Replace controller colors and rebuild renderables on the next draw.
+
+        Args:
+            colors: Validated four-color controller appearance.
+        """
+        if colors == self._colors:
+            return
+        self._colors = colors
+        self._clear_renderables()
+        self._layout = None
 
     def draw(self, width: float, height: float) -> None:
         """Draw the current model using reusable pyglet shapes and labels.

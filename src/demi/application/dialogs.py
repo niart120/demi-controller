@@ -57,6 +57,20 @@ class DialogManager:
         self._kind = kind
         return True
 
+    def replace(self, kind: DialogKind) -> bool:
+        """Replace the active modal without leaving configuration mode.
+
+        Args:
+            kind: Non-empty modal that supersedes the current modal.
+
+        Returns:
+            ``True`` when an existing modal was replaced.
+        """
+        if kind is DialogKind.NONE or self._kind is DialogKind.NONE:
+            return False
+        self._kind = kind
+        return True
+
     def close(self) -> None:
         """Close the current modal; repeated calls are safe."""
         self._kind = DialogKind.NONE
