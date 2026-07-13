@@ -128,7 +128,8 @@ PyInstaller を standalone builder として固定し、canonical CLI を Window
 | `uv run twine check --strict dist/*.whl dist/*.tar.gz` | passed | wheel / sdist metadata valid |
 | wheel / sdist smoke | passed | wheel package metadata、sdist packaging sources を確認 |
 | `git diff --check` | passed | whitespace error なし |
-| GitHub Actions package matrix | not run | workflow dispatch / tag 実行で確認する |
+| GitHub Actions OS CI | passed | run `29218727033` の Ubuntu / macOS / Windows × Python 3.12 / 3.13、6 jobs がすべて pass |
+| GitHub Actions package matrix | not run | workflow_dispatch は workflow が default branch に入った後に実行する |
 
 ## 10. 先送り事項
 
