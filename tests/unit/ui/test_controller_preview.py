@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
@@ -9,6 +11,17 @@ from demi.ui.controller_preview import (
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
+
+
+@dataclass
+class FakeClock:
+    """Control repaint-rate decisions without waiting for real time."""
+
+    now_ns: int = 0
+
+    def monotonic_ns(self) -> int:
+        """Return the configured repaint timestamp."""
+        return self.now_ns
 
 
 def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
@@ -61,3 +74,42 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     window.set_frame(frame)
 
     assert window.controller_preview.model == model
+
+
+def test_preview_limits_repaint_requests_to_sixty_hz_but_keeps_the_latest_frame(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    clock = FakeClock()
+    repaint_requests: list[None] = []
+    widget = ControllerPreviewWidget(
+        clock=clock,
+        on_repaint_requested=lambda: repaint_requests.append(None),
+    )
+
+    first = _frame(sequence=1)
+    widget.set_frame(first)
+    clock.now_ns += 8_000_000
+    widget.set_frame(_frame(sequence=2))
+    clock.now_ns += 8_000_000
+    widget.set_frame(_frame(sequence=3))
+    clock.now_ns += 1_000_000
+    latest = _frame(sequence=4)
+    widget.set_frame(latest)
+
+    assert len(repaint_requests) == 2
+    assert widget.model == controller_preview_model(latest, ControllerColorSettings())
+
+
+def _frame(*, sequence: int) -> ControllerFrame:
+    return ControllerFrame(
+        sequence=sequence,
+        capture_epoch=1,
+        monotonic_ns=1_000_000_000 + sequence,
+        buttons=frozenset(),
+        left_stick=StickVector(x=0.0, y=0.0),
+        right_stick=StickVector(x=0.0, y=0.0),
+        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        accel_g=AccelG(0.0, 0.0, 1.0),
+        capture_active=True,
+    )

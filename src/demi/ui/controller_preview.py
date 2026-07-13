@@ -1,6 +1,9 @@
 """QPainter controller preview backed by a complete immutable controller frame."""
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen
@@ -8,6 +11,52 @@ from PySide6.QtWidgets import QWidget
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
+
+type RepaintRequest = Callable[[], object]
+
+
+class PreviewClock(Protocol):
+    """Provide the monotonic time used to limit preview repaint requests."""
+
+    def monotonic_ns(self) -> int:
+        """Return the current monotonic time in nanoseconds."""
+
+
+class SystemPreviewClock:
+    """Read repaint timestamps from the process monotonic clock."""
+
+    def monotonic_ns(self) -> int:
+        """Return the current process monotonic timestamp."""
+        return time.monotonic_ns()
+
+
+class PreviewRepaintLimiter:
+    """Allow asynchronous preview repaint requests no more than a fixed rate."""
+
+    def __init__(self, *, clock: PreviewClock, maximum_hz: int = 60) -> None:
+        """Create a repaint limiter with a monotonic clock.
+
+        Args:
+            clock: Monotonic timestamp source, injectable for deterministic tests.
+            maximum_hz: Maximum allowed asynchronous repaint request rate.
+
+        Raises:
+            ValueError: If the requested rate is not a positive integer.
+        """
+        if isinstance(maximum_hz, bool) or not isinstance(maximum_hz, int) or maximum_hz <= 0:
+            raise ValueError
+        self._clock = clock
+        self._minimum_interval_ns = (1_000_000_000 + maximum_hz - 1) // maximum_hz
+        self._last_request_ns: int | None = None
+
+    def allows_repaint(self) -> bool:
+        """Return whether the current time may issue an asynchronous repaint request."""
+        now_ns = self._clock.monotonic_ns()
+        last_request_ns = self._last_request_ns
+        if last_request_ns is not None and now_ns - last_request_ns < self._minimum_interval_ns:
+            return False
+        self._last_request_ns = now_ns
+        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,17 +110,29 @@ class ControllerPreviewWidget(QWidget):
         *,
         colors: ControllerColorSettings | None = None,
         parent: QWidget | None = None,
+        clock: PreviewClock | None = None,
+        on_repaint_requested: RepaintRequest | None = None,
     ) -> None:
         """Create a preview with validated colors and no initial controller frame.
 
         Args:
             colors: Initial controller colors, defaulting to application defaults.
             parent: Optional Qt owner for widget lifetime.
+            clock: Monotonic source used to limit frame-driven repaint requests.
+            on_repaint_requested: Optional asynchronous repaint request boundary.
         """
         super().__init__(parent)
         self._colors = colors if colors is not None else ControllerColorSettings()
         self._frame: ControllerFrame | None = None
         self._model: ControllerPreviewModel | None = None
+        self._repaint_limiter = PreviewRepaintLimiter(
+            clock=clock if clock is not None else SystemPreviewClock()
+        )
+        self._on_repaint_requested = (
+            on_repaint_requested
+            if on_repaint_requested is not None
+            else self._request_widget_repaint
+        )
         self.setMinimumSize(480, 300)
         self.setMouseTracking(True)
 
@@ -88,7 +149,8 @@ class ControllerPreviewWidget(QWidget):
         """
         self._frame = frame
         self._model = controller_preview_model(frame, self._colors)
-        self.update()
+        if self._repaint_limiter.allows_repaint():
+            self._on_repaint_requested()
 
     def set_colors(self, colors: ControllerColorSettings) -> None:
         """Apply four validated colors without changing the current input frame.
@@ -100,7 +162,7 @@ class ControllerPreviewWidget(QWidget):
         frame = self._frame
         if frame is not None:
             self._model = controller_preview_model(frame, colors)
-        self.update()
+        self._on_repaint_requested()
 
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 - Qt override name.
         """Render the saved model without updating domain, runtime, or settings state."""
@@ -134,6 +196,9 @@ class ControllerPreviewWidget(QWidget):
         self._draw_buttons(painter, body, model)
         self._draw_diagnostics(painter, bounds, model)
         self._draw_capture_overlay(painter, body, model.capture_active)
+
+    def _request_widget_repaint(self) -> None:
+        self.update()
 
     @staticmethod
     def _draw_grip(painter: QPainter, center: QPointF, color: QColor) -> None:
