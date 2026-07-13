@@ -129,6 +129,7 @@
 | `src/demi/controller/runtime.py` | modify | shutdown 状態、operation cancellation、受付拒否、non-daemon thread、join 完了 |
 | `tests/unit/controller/test_runtime.py` | modify | adapter operation 待機中の cancellation、後処理、event、冪等性の回帰試験 |
 | `tests/integration/controller/conftest.py` | new | assertion failure 時も non-daemon runtime を回収する integration test fixture |
+| `tests/integration/controller/test_runtime_commands.py` | modify | command と frame task の実行順に依存せず `StatusSnapshot` で frame 消費を同期する |
 | `tests/integration/controller/test_runtime_shutdown.py` | new | application shutdown から待機中 runtime を停止する結合試験 |
 
 ## 9. 検証
@@ -147,6 +148,7 @@
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
 | `git diff --check` | passed | whitespace error なし。Windows の LF / CRLF 変換予告のみ |
 | GitHub Actions run `29249429305` | cancelled | Linux / Windows は成功。macOS integration step で non-daemon worker が残留したと推定し、早期終了時も回収する共通 teardown fixture を追加して再実行する |
+| GitHub Actions run `29250078603` | failed | cleanup fixture により macOS の失敗を取得。`RequestStatus` が frame task より先に完了する競合だったため、`StatusSnapshot.latest_frame` を Event で再確認する同期へ変更 |
 
 ## 10. 先送り事項
 
