@@ -217,8 +217,18 @@ def test_unconnected_frames_are_retained_and_connected_worker_applies_latest_onl
 
     pending = make_frame(sequence=1, epoch=1)
     assert runtime.offer_frame(pending) is True
-    runtime.post(RequestStatus())
-    assert events.status.wait(timeout=1.0)
+    latest_snapshot: StatusSnapshot | None = None
+    for _ in range(10):
+        events.status.clear()
+        runtime.post(RequestStatus())
+        assert events.status.wait(timeout=1.0)
+        latest_snapshot = next(
+            event for event in reversed(events.events) if isinstance(event, StatusSnapshot)
+        )
+        if latest_snapshot.latest_frame == pending:
+            break
+    assert latest_snapshot is not None
+    assert latest_snapshot.latest_frame == pending
     assert runtime.latest_frame == pending
     assert adapter.applied_frames == []
 

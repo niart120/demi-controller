@@ -18,7 +18,7 @@
 | swbt integration | `ControllerCommand`、`RuntimeEvent`、rest state、adapter 所有権 | `spec/initial/swbt-integration.md` |
 | completed Unit 005 | runtime の dedicated thread、asyncio loop、冪等な close、後処理の基礎契約 | `spec/complete/unit_005/CONTROLLER_RUNTIME.md` |
 | completed Unit 011 / Issue #12 | application shutdown から runtime close / join を呼ぶ本番配線 | `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md` |
-| current implementation | command を直列に `await` した後で次の command を読むため、長時間処理中は `Shutdown` を取得できない | `src/demi/controller/runtime.py` |
+| implementation before Unit 012 | command を直列に `await` した後で次の command を読むため、長時間処理中は `Shutdown` を取得できなかった | `src/demi/controller/runtime.py` |
 
 ### 1.3 use case
 
@@ -82,27 +82,27 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | 待機中の `connect_saved()` を `close()` が中断し、120 秒の command timeout を待たず 1 秒以内に `is_alive == False` で戻る | regression | unit | fake adapter の開始 Event と cancellation 記録で同期し、sleep による推測を避ける |
-| todo | 待機中の `start_pairing()` を停止しても pairing / unexpected の `ControllerError` を発行しない | regression | unit | `RuntimeStopped` と event 列を確認する |
-| todo | 待機中の `recreate_with_colors()` を停止した後に `CONNECTED` / `READY` が追加発行されない | regression | unit | 再接続開始後の event suffix を確認する |
-| todo | shutdown 開始後の `post()` と `offer_frame()` が拒否され、adapter へ command / frame が渡らない | edge | unit | shutdown 中と停止完了後を確認する |
-| todo | 待機中の `apply_frame()` を停止し、後続 mailbox frame を適用しない | edge | unit | 終了用 rest state と通常 frame を呼び出し記録で区別する |
-| todo | rest、disconnect、close を順序付きで試行し、各段階の失敗後も残りの後処理と thread 終了へ進む | regression | unit | 各失敗位置を parameterize する |
-| todo | cancellation と後処理を終えた後に `RuntimeStopped` を一度だけ発行する | regression | unit | 重複 `close()` を含めて通知回数を確認する |
-| todo | 同時および逐次の `close()` が冪等で、全呼び出しの完了後に `is_alive == False` となる | edge | unit | adapter の rest / disconnect / close 回数も確認する |
-| todo | worker thread が non-daemon であり、application shutdown 経路から接続待機を中断して join できる | regression | integration | `ApplicationShutdownCoordinator` と実 `ControllerRuntime`、待機 fake adapter を組み立てる |
+| refactor-skipped | 待機中の `connect_saved()` を `close()` が中断し、120 秒の command timeout を待たず 1 秒以内に `is_alive == False` で戻る | regression | unit | 5 秒後の `RuntimeError` を red で確認後、専用 shutdown event と task cancellation で green |
+| refactor-skipped | 待機中の `start_pairing()` を停止しても pairing / unexpected の `ControllerError` を発行しない | regression | unit | 共通 operation cancellation 実装後に追加し、初回 green。`RuntimeStopped` 1 件、`ControllerError` 0 件 |
+| refactor-skipped | 待機中の `recreate_with_colors()` を停止した後に `CONNECTED` / `READY` が追加発行されない | regression | unit | 共通 operation cancellation 実装後に追加し、初回 green。停止開始後の event suffix を確認 |
+| refactor-skipped | shutdown 開始後の `post()` と `offer_frame()` が拒否され、adapter へ command / frame が渡らない | edge | unit | 停止処理中と停止完了後を Event で分け、両方で初回 green |
+| refactor-skipped | 待機中の `apply_frame()` を停止し、後続 mailbox frame を適用しない | edge | unit | active frame の cancellation と後続 sequence の非適用を確認。終了用 rest は別に許可 |
+| refactor-skipped | rest、disconnect、close を順序付きで試行し、各段階の失敗後も残りの後処理と thread 終了へ進む | regression | unit | 3 失敗位置を parameterize し、全ケース初回 green |
+| refactor-skipped | cancellation と後処理を終えた後に `RuntimeStopped` を一度だけ発行する | regression | unit | pairing cancellation、各 cleanup failure、重複 close で通知数 1 件を確認 |
+| refactor-skipped | 同時および逐次の `close()` が冪等で、全呼び出しの完了後に `is_alive == False` となる | edge | unit | 4 thread の同時 close と停止後 close が初回 green。adapter close 1 回 |
+| refactor-skipped | worker thread が non-daemon であり、application shutdown 経路から接続待機を中断して join できる | regression | integration | 実 runtime と `ApplicationShutdownCoordinator` の統合 test が初回 green |
 
 1 秒は fake adapter を使う回帰テストの待機上限であり、Bluetooth 機材に対する性能保証ではない。テストは operation 開始を Event で同期し、接続 timeout を短く書き換えて見かけ上通す方法を使わない。
 
 ## 7. 設計メモ
 
-### 7.1 確認済みの事実
+### 7.1 着手時に確認した事実
 
-- 現行 `close()` は `Shutdown` を command queue へ追加し、worker thread を最大 5 秒 join する。
-- 現行 worker は command を取得後、対応する adapter coroutine を完了まで `await` してから次の command を取得する。
+- 着手時の `close()` は `Shutdown` を command queue へ追加し、worker thread を最大 5 秒 join していた。
+- 着手時の worker は command を取得後、対応する adapter coroutine を完了まで `await` してから次の command を取得していた。
 - 接続設定の timeout は最大 120 秒であり、command 処理中の `Shutdown` は join 上限内に取得されない場合がある。
-- 現行 worker thread は `daemon=True` である。
-- 現行 `_shutdown_adapter()` は rest state、disconnect、close を個別に最善努力し、最後に `RuntimeStopped` を発行する。
+- 着手時の worker thread は `daemon=True` だった。
+- `_shutdown_adapter()` は rest state、disconnect、close を個別に最善努力し、最後に `RuntimeStopped` を発行する。
 
 ### 7.2 採用する設計方針
 
@@ -123,26 +123,32 @@
 
 | path | change | 内容 |
 |---|---|---|
-| `spec/wip/unit_012/CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md` | new | Issue #13 の作業境界、終了契約、TDD Test List |
+| `spec/complete/unit_012/CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md` | new | Issue #13 の作業境界、終了契約、TDD Test List、検証結果 |
+| `spec/initial/architecture.md` | modify | ordered command と queue 外 shutdown signal の worker 境界 |
+| `spec/initial/lifecycle.md` | modify | operation cancellation、後処理、non-daemon thread join の終了順序 |
 | `src/demi/controller/runtime.py` | modify | shutdown 状態、operation cancellation、受付拒否、non-daemon thread、join 完了 |
 | `tests/unit/controller/test_runtime.py` | modify | adapter operation 待機中の cancellation、後処理、event、冪等性の回帰試験 |
-| `tests/integration/lifecycle/test_application_lifecycle.py` | modify | application shutdown から待機中 runtime を停止する結合試験 |
+| `tests/integration/controller/conftest.py` | new | assertion failure 時も non-daemon runtime を回収する integration test fixture |
+| `tests/integration/controller/test_runtime_commands.py` | modify | command と frame task の実行順に依存せず `StatusSnapshot` で frame 消費を同期する |
+| `tests/integration/controller/test_runtime_shutdown.py` | new | application shutdown から待機中 runtime を停止する結合試験 |
 
 ## 9. 検証
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/unit/controller/test_runtime.py` | not run | 実装前。各 TDD item の red / green で実行する |
-| `uv run pytest tests/integration/lifecycle/test_application_lifecycle.py` | not run | 実装前。application shutdown 経路の変更後に実行する |
-| `uv lock --check` | not run | 実装前の仕様作成段階。依存変更は予定していないが完了 gate で実行する |
-| `uv run ruff format --check .` | not run | 実装前。完了 gate で実行する |
-| `uv run ruff check .` | not run | 実装前。完了 gate で実行する |
-| `uv run ty check --no-progress` | not run | 実装前。完了 gate で実行する |
-| `uv run pytest tests/unit` | not run | 実装前。完了 gate で実行する |
-| `uv run pytest tests/integration` | not run | integration test tree があり対象変更を含むため、完了 gate で実行する |
-| `uv build` | not run | 実装前。worker lifecycle の package regression を完了 gate で確認する |
-| `git diff --no-index --check -- NUL spec\wip\unit_012\CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md` | passed | 未追跡の新規仕様書に whitespace error なし。LF / CRLF 変換予告のみ出力 |
-| `rg -n "TO[D]O\|TB[D]\|x{3}\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec\wip\unit_012\CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md` | passed | 該当なし |
+| `uv run pytest tests/unit/controller/test_runtime.py::test_close_cancels_a_waiting_saved_connection_without_waiting_for_timeout -q` | red then passed | red は 5 秒 join 後の `RuntimeError`。green は 1 passed in 0.05s |
+| `uv run pytest tests/unit/controller tests/integration/controller -q` | passed | 42 passed in 0.33s |
+| `uv sync --dev` | passed | 74 packages resolved、71 packages checked |
+| `uv lock --check` | passed | 74 packages resolved |
+| `uv run ruff format --check .` | passed | 91 files already formatted |
+| `uv run ruff check .` | passed | no findings |
+| `uv run ty check --no-progress` | passed | no findings |
+| `uv run pytest -o cache_dir=.tmp/pytest-cache-unit --basetemp=.tmp/pytest-unit-012 tests/unit` | passed | 197 passed in 0.36s。既定 cache / `%TEMP%` の環境権限を避けるため workspace 内の一時領域を指定 |
+| `uv run pytest -o cache_dir=.tmp/pytest-cache-integration --basetemp=.tmp/pytest-integration-unit-012 tests/integration` | passed | 16 passed in 0.28s |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `git diff --check` | passed | whitespace error なし。Windows の LF / CRLF 変換予告のみ |
+| GitHub Actions run `29249429305` | cancelled | Linux / Windows は成功。macOS integration step で non-daemon worker が残留したと推定し、早期終了時も回収する共通 teardown fixture を追加して再実行する |
+| GitHub Actions run `29250078603` | failed | cleanup fixture により macOS の失敗を取得。`RequestStatus` が frame task より先に完了する競合だったため、`StatusSnapshot.latest_frame` を Event で再確認する同期へ変更 |
 
 ## 10. 先送り事項
 
@@ -153,7 +159,7 @@
 - [x] Issue #13、関連する初期仕様、既存 runtime、既存 test を確認した
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を観測可能な振る舞いで作成した
-- [ ] TDD Test List の各項目を red / green / refactor で完了した
-- [ ] 標準 gate と対象 integration test の結果を記録した
-- [x] package / release / public API の変更を対象外とし、完了時の package gate を検証欄に記録した
-- [ ] 実装完了後に `spec/complete/unit_012` へ移動した
+- [x] TDD Test List の各項目を green にし、refactor 要否を確認した
+- [x] 標準 gate と対象 integration test の結果を記録した
+- [x] runtime 公開メソッドの docstring を停止契約と整合させ、package metadata 非変更でも package gate を実行した
+- [x] 実装完了後に `spec/complete/unit_012` へ移動した

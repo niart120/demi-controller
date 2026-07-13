@@ -1,10 +1,19 @@
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Event, get_ident
+from threading import Event, Thread, get_ident
+from time import monotonic
+
+import pytest
 
 from demi.application.state import ConnectionState
 from demi.controller.adapter import ControllerAdapterError
-from demi.controller.commands import ConnectSaved, DiscoverAdapters, RecreateWithColors
+from demi.controller.commands import (
+    ConnectSaved,
+    DiscoverAdapters,
+    RecreateWithColors,
+    StartPairing,
+)
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -15,7 +24,7 @@ from demi.controller.events import (
     RuntimeStopped,
 )
 from demi.controller.runtime import ControllerRuntime
-from demi.domain.controller import ControllerFrame
+from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
 from demi.domain.settings import ControllerColorSettings
 
 
@@ -56,6 +65,21 @@ class EventRecorder:
             self.stopped.set()
         if isinstance(event, ControllerError):
             self.error.set()
+
+
+def make_frame(*, sequence: int = 1, epoch: int = 1) -> ControllerFrame:
+    """Build a public-domain frame for runtime lifecycle tests."""
+    return ControllerFrame(
+        sequence=sequence,
+        capture_epoch=epoch,
+        monotonic_ns=sequence,
+        buttons=frozenset(),
+        left_stick=StickVector(x=0.0, y=0.0),
+        right_stick=StickVector(x=0.0, y=0.0),
+        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        accel_g=AccelG(0.0, 0.0, 1.0),
+        capture_active=True,
+    )
 
 
 @dataclass
@@ -131,6 +155,359 @@ class FakeAdapter:
         self.close_thread_id = get_ident()
         self.close_calls += 1
         self.closed = True
+
+
+@dataclass
+class WaitingConnectAdapter(FakeAdapter):
+    """Keep a saved connection pending until the runtime cancels it."""
+
+    connect_started: Event = field(default_factory=Event)
+    connect_cancelled: Event = field(default_factory=Event)
+
+    async def connect_saved(
+        self,
+        adapter_id: str,
+        bond_path: Path,
+        timeout_seconds: float,
+        colors: ControllerColorSettings,
+    ) -> None:
+        """Wait indefinitely and record task cancellation."""
+        del adapter_id, bond_path, timeout_seconds, colors
+        self.connect_calls += 1
+        self.connect_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.connect_cancelled.set()
+            raise
+
+
+@dataclass
+class WaitingPairingAdapter(FakeAdapter):
+    """Keep pairing pending until the runtime cancels it."""
+
+    pairing_started: Event = field(default_factory=Event)
+    pairing_cancelled: Event = field(default_factory=Event)
+
+    async def start_pairing(
+        self,
+        adapter_id: str,
+        bond_path: Path,
+        timeout_seconds: float,
+        colors: ControllerColorSettings,
+    ) -> None:
+        """Wait indefinitely and record task cancellation."""
+        del adapter_id, bond_path, timeout_seconds, colors
+        self.pairing_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.pairing_cancelled.set()
+            raise
+
+
+@dataclass
+class WaitingRecreateAdapter(FakeAdapter):
+    """Keep color recreation pending until the runtime cancels it."""
+
+    recreate_started: Event = field(default_factory=Event)
+    recreate_cancelled: Event = field(default_factory=Event)
+
+    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+        """Wait indefinitely and record task cancellation."""
+        del colors
+        self.recreate_calls += 1
+        self.recreate_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.recreate_cancelled.set()
+            raise
+
+
+@dataclass
+class WaitingCloseAdapter(FakeAdapter):
+    """Pause adapter cleanup so shutdown-in-progress is observable."""
+
+    close_started: Event = field(default_factory=Event)
+    close_release: Event = field(default_factory=Event)
+
+    async def close(self) -> None:
+        """Wait for the test before completing adapter cleanup."""
+        self.close_started.set()
+        if not self.close_release.wait(timeout=1.0):
+            raise TimeoutError
+        await super().close()
+
+
+@dataclass
+class WaitingFrameAdapter(FakeAdapter):
+    """Keep one active frame pending until shutdown cancellation."""
+
+    frame_started: Event = field(default_factory=Event)
+    frame_cancelled: Event = field(default_factory=Event)
+    active_sequences: list[int] = field(default_factory=list)
+
+    async def apply_frame(self, frame: ControllerFrame) -> None:
+        """Block active input but allow rest-state cleanup."""
+        self.apply_calls += 1
+        if not frame.capture_active:
+            return
+        self.active_sequences.append(frame.sequence)
+        self.frame_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.frame_cancelled.set()
+            raise
+
+
+@dataclass
+class CleanupRecordingAdapter(FakeAdapter):
+    """Record ordered shutdown stages and fail at one selected stage."""
+
+    fail_stage: str | None = None
+    cleanup_operations: list[str] = field(default_factory=list)
+    rest_calls: int = 0
+
+    async def apply_frame(self, frame: ControllerFrame) -> None:
+        """Record initial and shutdown rest-state application."""
+        self.apply_calls += 1
+        if frame.capture_active:
+            return
+        self.rest_calls += 1
+        if self.rest_calls == 1:
+            return
+        self.cleanup_operations.append("rest")
+        if self.fail_stage == "rest":
+            raise RuntimeError
+
+    async def disconnect(self) -> None:
+        """Record disconnect and optionally fail it."""
+        self.cleanup_operations.append("disconnect")
+        if self.fail_stage == "disconnect":
+            raise RuntimeError
+
+    async def close(self) -> None:
+        """Record close and optionally fail it."""
+        self.cleanup_operations.append("close")
+        self.close_calls += 1
+        if self.fail_stage == "close":
+            raise RuntimeError
+
+
+def test_close_cancels_a_waiting_saved_connection_without_waiting_for_timeout() -> None:
+    adapter = WaitingConnectAdapter()
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=120.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert adapter.connect_started.wait(timeout=1.0)
+
+    started_at = monotonic()
+    runtime.close()
+    elapsed = monotonic() - started_at
+
+    assert elapsed < 1.0
+    assert adapter.connect_cancelled.is_set()
+    assert runtime.is_alive is False
+
+
+def test_close_cancels_pairing_without_emitting_a_controller_error() -> None:
+    adapter = WaitingPairingAdapter()
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        StartPairing(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=120.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert adapter.pairing_started.wait(timeout=1.0)
+
+    runtime.close()
+
+    assert adapter.pairing_cancelled.is_set()
+    assert not any(isinstance(event, ControllerError) for event in events.events)
+    assert sum(isinstance(event, RuntimeStopped) for event in events.events) == 1
+
+
+def test_close_cancels_color_recreation_without_late_connected_or_ready_events() -> None:
+    adapter = WaitingRecreateAdapter()
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+    runtime.post(RecreateWithColors(ControllerColorSettings(body="#ABCDEF")))
+    assert adapter.recreate_started.wait(timeout=1.0)
+    event_count = len(events.events)
+
+    runtime.close()
+
+    assert adapter.recreate_cancelled.is_set()
+    late_states = [
+        event.state for event in events.events[event_count:] if isinstance(event, ConnectionChanged)
+    ]
+    assert ConnectionState.CONNECTED not in late_states
+    assert ConnectionState.READY not in late_states
+
+
+def test_runtime_rejects_commands_and_frames_during_and_after_shutdown() -> None:
+    adapter = WaitingCloseAdapter()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=EventRecorder(),
+        clock=FakeClock(),
+    )
+    runtime.start()
+    close_caller = Thread(target=runtime.close)
+    close_caller.start()
+    assert adapter.close_started.wait(timeout=1.0)
+    frame = make_frame()
+
+    with pytest.raises(RuntimeError):
+        runtime.post(DiscoverAdapters())
+    assert runtime.offer_frame(frame) is False
+    assert adapter.discover_calls == 0
+    assert adapter.apply_calls == 0
+
+    adapter.close_release.set()
+    close_caller.join(timeout=1.0)
+    assert close_caller.is_alive() is False
+    with pytest.raises(RuntimeError):
+        runtime.post(DiscoverAdapters())
+    assert runtime.offer_frame(frame) is False
+
+
+def test_close_cancels_active_frame_and_does_not_apply_the_pending_mailbox_frame() -> None:
+    adapter = WaitingFrameAdapter()
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+    first = make_frame(sequence=1)
+    pending = make_frame(sequence=2)
+    assert runtime.offer_frame(first) is True
+    assert adapter.frame_started.wait(timeout=1.0)
+    assert runtime.offer_frame(pending) is True
+
+    runtime.close()
+
+    assert adapter.frame_cancelled.is_set()
+    assert adapter.active_sequences == [first.sequence]
+    assert runtime.is_alive is False
+
+
+@pytest.mark.parametrize("fail_stage", ["rest", "disconnect", "close"])
+def test_shutdown_cleanup_preserves_order_and_continues_after_each_failure(
+    fail_stage: str,
+) -> None:
+    adapter = CleanupRecordingAdapter(fail_stage=fail_stage)
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    runtime.close()
+
+    assert adapter.cleanup_operations == ["rest", "disconnect", "close"]
+    assert events.stopped.wait(timeout=1.0)
+    assert sum(isinstance(event, RuntimeStopped) for event in events.events) == 1
+    assert runtime.is_alive is False
+
+
+def test_concurrent_and_repeated_close_calls_share_one_shutdown_completion() -> None:
+    adapter = WaitingConnectAdapter()
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=120.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert adapter.connect_started.wait(timeout=1.0)
+    errors: list[Exception] = []
+
+    def close_runtime() -> None:
+        try:
+            runtime.close()
+        except Exception as error:  # noqa: BLE001 - assertion records thread failure.
+            errors.append(error)
+
+    callers = [Thread(target=close_runtime) for _ in range(4)]
+    for caller in callers:
+        caller.start()
+    for caller in callers:
+        caller.join(timeout=1.0)
+    runtime.close()
+
+    assert errors == []
+    assert all(caller.is_alive() is False for caller in callers)
+    assert adapter.close_calls == 1
+    assert sum(isinstance(event, RuntimeStopped) for event in events.events) == 1
+    assert runtime.is_alive is False
 
 
 def test_runtime_starts_worker_and_closes_without_leaking_the_thread() -> None:

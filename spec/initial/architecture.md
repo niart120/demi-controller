@@ -272,6 +272,8 @@ main thread
     └── loop.call_soon_threadsafe(command_queue.put_nowait, command)
 ```
 
+終了要求は順序付きコマンドの後ろへ積まない。`ControllerRuntime.close()` が停止開始を同期的に確定し、`loop.call_soon_threadsafe(shutdown_event.set)` でワーカーを起こす。ワーカーは進行中の adapter operation task を cancel して回収してから、rest、disconnect、close へ進む。停止開始後の `post()` は `RuntimeError`、`offer_frame()` は `False` で拒否する。
+
 入力フレームはロック保護した1スロットへ置く。
 
 ```text
