@@ -69,7 +69,7 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 |---|---|---|---|---|
 | green | 接続中の frame apply が接続喪失したとき、error と ERROR -> READY、cleanup を発行する | regression / edge | integration | `ControllerAdapterError(CONNECTION_LOST)` を fake adapter で再現した |
 | green | 接続喪失後の frame を再送せず、再接続要求を待機できる | regression | integration | 同じ test で active frame の試行が1件だけであることを確認した |
-| green | shutdown の neutral 失敗後も close、RuntimeStopped、thread 終了まで進む | regression / edge | unit | cleanup の best effort を fake adapter で確認した |
+| green | shutdown の neutral / disconnect 失敗後も close、RuntimeStopped、thread 終了まで進む | regression / edge | unit | neutral failure と disconnect failure の両方を fake adapter で確認した |
 | green | `bumble` / `hardware` marker と hardware test entrypoint が通常試験から分離される | new | package | 未設定環境は skip、通常選択から deselect される |
 | green | hardware test log が必須環境情報と未実行理由を保持する | new | docs | hardware 結果を生成せず、未収集項目を明記した |
 | green | unit / integration / marker 選択 / package gate が通る | characterization | package | build と wheel / sdist smoke を含める |
@@ -97,7 +97,7 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/integration/controller/test_runtime_commands.py tests/unit/controller/test_runtime.py -q` | passed | 8 passed。接続喪失後の ERROR -> READY、frame 抑止、shutdown cleanup を確認 |
+| `uv run pytest tests/integration/controller/test_runtime_commands.py tests/unit/controller/test_runtime.py -q` | passed | 9 passed。接続喪失後の ERROR -> READY、frame 抑止、neutral / disconnect failure 後の shutdown cleanup を確認 |
 | `uv run pytest tests/hardware -m hardware -q` | passed | 1 skipped。`DEMI_HARDWARE` 未指定のため manual preflight を実行せず、実機結果を生成しない |
 | `uv run pytest -m "not hardware and not bumble"` | passed | 129 passed、1 deselected。通常試験へ hardware / bumble を混入させない |
 | `uv sync --dev` | passed | 68 packages resolved、local package を install |
