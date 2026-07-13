@@ -1,9 +1,17 @@
 """Qt application lifecycle boundary."""
 
+from __future__ import annotations
+
 import sys
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QApplication
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from demi.app import WindowSpec
+    from demi.ui.main_window import MainWindow
 
 
 class QtApplicationRunner:
@@ -31,3 +39,15 @@ class QtApplicationRunner:
     def run(self) -> int:
         """Enter the Qt event loop and return its exit status."""
         return self._application.exec()
+
+    def create_main_window(self, spec: WindowSpec) -> MainWindow:
+        """Create the process main window after QApplication exists.
+
+        Args:
+            spec: Validated saved dimensions selected by the application layer.
+        """
+        from demi.ui.main_window import (  # noqa: PLC0415 - GUI起動時だけwidgetをimportする。
+            MainWindow,
+        )
+
+        return MainWindow(spec)
