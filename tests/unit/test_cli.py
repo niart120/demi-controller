@@ -2,6 +2,7 @@ import builtins
 import importlib
 import importlib.metadata
 import runpy
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from types import ModuleType
@@ -43,6 +44,49 @@ def test_package_import_and_version_output_do_not_import_pyglet(
     assert package.__version__ == importlib.metadata.version("demi-controller")
     assert main(["--version"]) == 0
     assert capsys.readouterr().out == f"{package.__version__}\n"
+
+
+@pytest.mark.parametrize(
+    ("script", "expected_output"),
+    [
+        ("import demi", ""),
+        ("from demi.cli import main\nassert main(['--version']) == 0", "0.1.0\n"),
+        ("from demi.cli import main\nassert main(['--unknown']) == 2", ""),
+    ],
+)
+def test_display_free_operations_do_not_import_pyside6_in_a_subprocess(
+    script: str,
+    expected_output: str,
+) -> None:
+    result = subprocess.run(  # noqa: S603 - test-owned interpreter and script only.
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                [
+                    "import builtins",
+                    "import sys",
+                    "original_import = builtins.__import__",
+                    "def reject_qt(name, *args, **kwargs):",
+                    "    if name == 'PySide6' or name.startswith('PySide6.'):",
+                    "        raise AssertionError(name)",
+                    "    return original_import(name, *args, **kwargs)",
+                    "builtins.__import__ = reject_qt",
+                    script,
+                    "assert not any("
+                    "name == 'PySide6' or name.startswith('PySide6.') "
+                    "for name in sys.modules"
+                    ")",
+                ]
+            ),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected_output
 
 
 def test_cli_without_arguments_returns_the_application_runner_status(

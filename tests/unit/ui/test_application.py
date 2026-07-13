@@ -1,14 +1,32 @@
 from PySide6.QtGui import QCloseEvent
 
-from demi.app import WindowSpec
+from demi.app import ApplicationDependencies, WindowSpec
 from demi.domain.settings import WindowSettings
 from demi.ui.application import QtApplicationRunner
+from demi.ui.main_window import MainWindow
 
 
 def test_runner_reuses_the_process_qapplication(qt_application: object) -> None:
     runner = QtApplicationRunner()
 
     assert runner.application is qt_application
+
+
+def test_default_dependencies_create_the_qt_runner_and_main_window(
+    qt_application: object,
+) -> None:
+    dependencies = ApplicationDependencies.default()
+
+    window = dependencies.window_factory(WindowSpec(width=960, height=640, maximized=False))
+    gui = dependencies.gui_factory(
+        window=window,
+        on_shutdown_requested=lambda _state: True,
+    )
+
+    assert isinstance(window, MainWindow)
+    assert isinstance(gui, QtApplicationRunner)
+    assert gui.application is qt_application
+    window.close()
 
 
 def test_runner_creates_a_resizable_main_window(qt_application: object) -> None:

@@ -57,6 +57,15 @@ class MainWindow(QMainWindow):
         """
         self._shutdown_callback = callback
 
+    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
+        """Accept capture requests until unit_015 supplies a Qt adapter.
+
+        Args:
+            exclusive: Requested capture state. The minimal shell does not yet
+                alter pointer capture.
+        """
+        del exclusive
+
     def window_state(self) -> WindowSettings | None:
         """Return a valid saved state without losing a maximized normal size."""
         size = self.normalGeometry().size() if self.isMaximized() else self.size()

@@ -11,7 +11,6 @@ from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
 from demi.controller.commands import (
     ConnectSaved,
     Disconnect,
-    DiscoverAdapters,
     RecreateWithColors,
     StartPairing,
 )
@@ -24,7 +23,7 @@ from demi.controller.events import (
     WatchdogNeutralized,
 )
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings, DiagnosticLevel, InputSettings
+from demi.domain.settings import AppSettings, DiagnosticLevel, InputSettings, WindowSettings
 from demi.input.publisher import InputPublisher
 
 
@@ -75,12 +74,21 @@ class FakeWindow:
 
     width: int = 960
     height: int = 640
+    maximized: bool = False
     exclusive_mouse: list[bool] = field(default_factory=list)
     close_calls: int = 0
 
     def set_exclusive_mouse(self, exclusive: bool = True) -> None:
         """Record relative mouse changes."""
         self.exclusive_mouse.append(exclusive)
+
+    def window_state(self) -> WindowSettings:
+        """Return the current state consumed by ordered shutdown."""
+        return WindowSettings(
+            width=self.width,
+            height=self.height,
+            maximized=self.maximized,
+        )
 
     def close(self) -> None:
         """Record native window teardown."""
@@ -92,13 +100,15 @@ class FakeGui:
     """GUI loop fake that returns immediately."""
 
     runs: int = 0
+    exit_status: int = 0
 
-    def run(self) -> None:
+    def run(self) -> int:
         """Record one GUI loop entry."""
         self.runs += 1
+        return self.exit_status
 
 
-def test_application_runner_assembles_runtime_and_requests_discovery() -> None:
+def test_application_runner_assembles_boundaries_without_starting_the_runtime() -> None:
     paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
     repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
     runtime = FakeRuntime()
@@ -124,9 +134,8 @@ def test_application_runner_assembles_runtime_and_requests_discovery() -> None:
 
     assert run_application(dependencies) == 0
 
-    assert runtime.started == 1
-    assert len(runtime.commands) == 1
-    assert isinstance(runtime.commands[0], DiscoverAdapters)
+    assert runtime.started == 0
+    assert runtime.commands == []
     assert gui.runs == 1
     assert runtime.closed == 1
     assert isinstance(gui_kwargs["session"], ApplicationSession)
@@ -154,6 +163,26 @@ def test_application_runner_returns_nonzero_when_ordered_shutdown_fails() -> Non
 
     assert run_application(dependencies) == 1
     assert runtime.closed == 1
+
+
+def test_application_runner_returns_the_gui_event_loop_status() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
+    runtime = FakeRuntime()
+    gui = FakeGui(exit_status=23)
+    logger = logging.getLogger("demi-test-gui-status")
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(result),
+        runtime_factory=lambda **_kwargs: runtime,
+        window_factory=lambda _spec: FakeWindow(),
+        gui_factory=lambda **_kwargs: gui,
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logger,
+    )
+
+    assert run_application(dependencies) == 23
+    assert gui.runs == 1
 
 
 def test_window_spec_preserves_the_saved_maximized_state() -> None:
