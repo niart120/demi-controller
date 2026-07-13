@@ -16,7 +16,11 @@ from demi.application.coordinator import (
     RelativePointerCapturePort,
 )
 from demi.application.dialogs import DialogKind, DialogManager
-from demi.application.frame_fanout import ControllerFrameFanout, FramePreviewPort
+from demi.application.frame_fanout import (
+    ControllerColorPreviewPort,
+    ControllerFrameFanout,
+    FramePreviewPort,
+)
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
 from demi.application.shutdown import ApplicationShutdownCoordinator
@@ -612,6 +616,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         )
         spec = _window_spec_for(settings)
         window = selected_dependencies.window_factory(spec)
+        if isinstance(window, ControllerColorPreviewPort):
+            window.set_controller_colors(settings.controller_colors)
         preview = window if isinstance(window, FramePreviewPort) else None
         frame_sink = ControllerFrameFanout(runtime=runtime, preview=preview)
         publisher = InputPublisher(

@@ -3,6 +3,7 @@
 from typing import Protocol, runtime_checkable
 
 from demi.domain.controller import ControllerFrame
+from demi.domain.settings import ControllerColorSettings
 
 
 class RuntimeFrameSink(Protocol):
@@ -18,6 +19,14 @@ class FramePreviewPort(Protocol):
 
     def set_frame(self, frame: ControllerFrame) -> None:
         """Store one evaluated frame for later UI rendering."""
+
+
+@runtime_checkable
+class ControllerColorPreviewPort(Protocol):
+    """Accept the four validated colors used by a controller preview."""
+
+    def set_controller_colors(self, colors: ControllerColorSettings) -> None:
+        """Apply saved colors without changing the current input frame."""
 
 
 class ControllerFrameFanout:

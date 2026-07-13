@@ -23,7 +23,13 @@ from demi.controller.events import (
     WatchdogNeutralized,
 )
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings, DiagnosticLevel, InputSettings, WindowSettings
+from demi.domain.settings import (
+    AppSettings,
+    ControllerColorSettings,
+    DiagnosticLevel,
+    InputSettings,
+    WindowSettings,
+)
 from demi.input.publisher import InputPublisher
 
 
@@ -124,6 +130,22 @@ class FakeInputWindow(FakeWindow):
 
 
 @dataclass
+class FakePreviewWindow(FakeWindow):
+    """Window fake that records colors selected for the frame preview."""
+
+    preview_colors: ControllerColorSettings | None = None
+    preview_frames: list[ControllerFrame] = field(default_factory=list)
+
+    def set_frame(self, frame: ControllerFrame) -> None:
+        """Record one frame selected for preview display."""
+        self.preview_frames.append(frame)
+
+    def set_controller_colors(self, colors: ControllerColorSettings) -> None:
+        """Record the validated preview colors selected at startup."""
+        self.preview_colors = colors
+
+
+@dataclass
 class FakeGui:
     """GUI loop fake that returns immediately."""
 
@@ -195,6 +217,32 @@ def test_application_runner_configures_the_optional_input_window_boundary() -> N
     assert window.configured_publisher is not None
     assert window.configured_coordinator is not None
     assert window.configured_coordinator.publisher is window.configured_publisher
+
+
+def test_application_runner_passes_saved_colors_to_the_preview_window() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    colors = ControllerColorSettings(
+        body="#102030",
+        buttons="#405060",
+        left_grip="#708090",
+        right_grip="#A0B0C0",
+    )
+    settings = replace(AppSettings.default(), controller_colors=colors)
+    repository_result = SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)
+    window = FakePreviewWindow()
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(repository_result),
+        runtime_factory=lambda **_kwargs: FakeRuntime(),
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: FakeGui(),
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-preview-colors"),
+    )
+
+    assert run_application(dependencies) == 0
+
+    assert window.preview_colors == colors
 
 
 def test_application_runner_returns_nonzero_when_ordered_shutdown_fails() -> None:

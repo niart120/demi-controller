@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow
 
 from demi.domain.errors import DomainValueError
 from demi.domain.settings import WindowSettings
@@ -19,6 +19,7 @@ from demi.input.relative_pointer import (
     RelativePointerQuality,
 )
 from demi.platform.windows_raw_input import WindowsRawInputBackend
+from demi.ui.controller_preview import ControllerPreviewWidget
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from demi.app import WindowSpec
     from demi.application.coordinator import CaptureCoordinator
     from demi.domain.controller import ControllerFrame
+    from demi.domain.settings import ControllerColorSettings
     from demi.input.publisher import InputPublisher
 
 
@@ -46,9 +48,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Project_Demi")
         self.setMinimumSize(800, 520)
         self.resize(max(spec.width, self.minimumWidth()), max(spec.height, self.minimumHeight()))
-        central_widget = QWidget(self)
-        central_widget.setMouseTracking(True)
-        self.setCentralWidget(central_widget)
+        self._controller_preview = ControllerPreviewWidget(parent=self)
+        self.setCentralWidget(self._controller_preview)
         self.setMouseTracking(True)
         self._shutdown_callback: ShutdownCallback | None = None
         self._close_accepted = False
@@ -103,6 +104,11 @@ class MainWindow(QMainWindow):
         if backend is None:
             return RelativePointerCapability(RelativePointerQuality.UNAVAILABLE)
         return backend.capability
+
+    @property
+    def controller_preview(self) -> ControllerPreviewWidget:
+        """Return the main-window-owned controller preview widget."""
+        return self._controller_preview
 
     @property
     def input_evaluation_interval_ms(self) -> int | None:
@@ -224,6 +230,15 @@ class MainWindow(QMainWindow):
             frame: Complete immutable state from the shared input evaluation.
         """
         self._last_frame = frame
+        self._controller_preview.set_frame(frame)
+
+    def set_controller_colors(self, colors: ControllerColorSettings) -> None:
+        """Update preview colors without changing the current controller frame.
+
+        Args:
+            colors: Four validated controller colors selected by the UI.
+        """
+        self._controller_preview.set_colors(colors)
 
     def window_state(self) -> WindowSettings | None:
         """Return a valid saved state without losing a maximized normal size."""
