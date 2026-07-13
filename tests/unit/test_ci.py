@@ -32,3 +32,12 @@ def test_ci_workflow_runs_source_gates_on_all_supported_os() -> None:
         assert f"          - {runner}" in workflow
     assert "QT_QPA_PLATFORM: offscreen" in workflow
     assert "run: uv run pytest tests/integration" in workflow
+
+
+def test_ci_workflow_installs_the_linux_egl_runtime_for_pyside6() -> None:
+    workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "if: runner.os == 'Linux'" in workflow
+    assert "sudo apt-get install --yes libegl1" in workflow
