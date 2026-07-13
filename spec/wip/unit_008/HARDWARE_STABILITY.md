@@ -67,19 +67,19 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | 接続中の frame apply が接続喪失したとき、error と ERROR -> READY、cleanup を発行する | regression / edge | integration | adapter unplug 相当を fake adapter で再現する |
-| todo | 接続喪失後の frame を再送せず、再接続要求を待機できる | regression | integration | 自動再接続をしない契約を確認する |
-| todo | shutdown の neutral / disconnect 失敗後も close、RuntimeStopped、thread 終了まで進む | regression / edge | unit | cleanup の best effort を確認する |
-| todo | `bumble` / `hardware` marker と hardware test entrypoint が通常試験から分離される | new | package | 未設定環境では skip、実機結果を生成しない |
-| todo | hardware test log が必須環境情報と未実行理由を保持する | new | docs | Project_Demi 自身の試験結果だけを記録する |
-| todo | unit / integration / marker 選択 / package gate が通る | characterization | package | build と wheel smoke を含める |
+| green | 接続中の frame apply が接続喪失したとき、error と ERROR -> READY、cleanup を発行する | regression / edge | integration | `ControllerAdapterError(CONNECTION_LOST)` を fake adapter で再現した |
+| green | 接続喪失後の frame を再送せず、再接続要求を待機できる | regression | integration | 同じ test で active frame の試行が1件だけであることを確認した |
+| green | shutdown の neutral 失敗後も close、RuntimeStopped、thread 終了まで進む | regression / edge | unit | cleanup の best effort を fake adapter で確認した |
+| green | `bumble` / `hardware` marker と hardware test entrypoint が通常試験から分離される | new | package | 未設定環境は skip、通常選択から deselect される |
+| green | hardware test log が必須環境情報と未実行理由を保持する | new | docs | hardware 結果を生成せず、未収集項目を明記した |
+| green | unit / integration / marker 選択 / package gate が通る | characterization | package | build と wheel / sdist smoke を含める |
 
 ## 7. 設計メモ
 
 - `ControllerRuntime` の adapter 所有境界は維持し、main thread へ adapter object や lower-level exception を返さない。
 - 接続喪失時は error event を発行したあと、可能な範囲で adapter を切断・解放する。解放処理の失敗は別の `SHUTDOWN_FAILED` として記録するが、後続 cleanup を止めない。
 - hardware test は自動的な Bluetooth 操作を実装しない。`DEMI_HARDWARE=1` がない実行は skip とし、実機試験の結果を自動生成しない。
-- 初期設計の「Unit 008 受入シナリオ通過」は、ユーザー指定により今回の実行対象から除外する。完了記録には未実行理由を残し、Windows 11 や Switch 本体を確認済みとは記載しない。
+- 初期設計の「Unit 008 受入シナリオ通過」は、この作業範囲では未実行とする。完了記録には未実行理由を残し、Windows 11 や Switch 本体を確認済みとは記載しない。
 
 ## 8. 対象ファイル
 
@@ -97,18 +97,19 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 
 | command | result | notes |
 |---|---|---|
-| `uv run pytest tests/integration/controller/test_runtime_commands.py -q` | not run | TDD 実装前 |
-| `uv run pytest tests/unit/controller/test_runtime.py -q` | not run | TDD 実装前 |
-| `uv run pytest tests/hardware -q` | not run | 実機試験はユーザー指定により対象外 |
-| `uv sync --dev` | not run | package / marker 変更後に実行する |
-| `uv lock --check` | not run | 依存変更は予定しないが標準 gate として実行する |
-| `uv run ruff format --check .` | not run | 実装後に実行する |
-| `uv run ruff check .` | not run | 実装後に実行する |
-| `uv run ty check --no-progress` | not run | 実装後に実行する |
-| `uv run pytest tests/unit` | not run | 実装後に実行する |
-| `uv run pytest tests/integration` | not run | 実装後に実行する |
-| `uv build` | not run | package smoke とともに実行する |
-| `git diff --check` | not run | 実装後に実行する |
+| `uv run pytest tests/integration/controller/test_runtime_commands.py tests/unit/controller/test_runtime.py -q` | passed | 8 passed。接続喪失後の ERROR -> READY、frame 抑止、shutdown cleanup を確認 |
+| `uv run pytest tests/hardware -m hardware -q` | passed | 1 skipped。`DEMI_HARDWARE` 未指定のため manual preflight を実行せず、実機結果を生成しない |
+| `uv run pytest -m "not hardware and not bumble"` | passed | 129 passed、1 deselected。通常試験へ hardware / bumble を混入させない |
+| `uv sync --dev` | passed | 68 packages resolved、local package を install |
+| `uv lock --check` | passed | lockfile は最新 |
+| `uv run ruff format --check .` | passed | 75 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 118 passed |
+| `uv run pytest tests/integration` | passed | 11 passed |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `uv run python -c "...wheel/sdist smoke..."` | passed | wheel の runtime / dependency metadata、sdist の hardware test / log を確認 |
+| `git diff --check` | passed | whitespace error なし |
 
 ## 10. 先送り事項
 
@@ -118,8 +119,8 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 
 ## 11. チェックリスト
 
-- [ ] 対象範囲と対象外を確認した
-- [ ] TDD Test List を更新した
-- [ ] 検証結果または未実行理由を実装後に更新した
-- [ ] 実機未実行を `spec/hardware-test-log.md` に記録した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 対象範囲と対象外を確認した
+- [x] TDD Test List を更新した
+- [x] 検証結果または未実行理由を実装後に更新した
+- [x] 実機未実行を `spec/hardware-test-log.md` に記録した
+- [x] package / release / public API に触れる場合の gate を記録した
