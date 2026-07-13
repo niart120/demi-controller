@@ -16,6 +16,13 @@ def test_project_metadata_and_lock_do_not_resolve_pyglet() -> None:
     assert "pyglet" not in (root / "uv.lock").read_text(encoding="utf-8").lower()
 
 
+def test_package_builder_and_license_inventory_do_not_reference_pyglet() -> None:
+    root = Path(__file__).parents[2]
+
+    assert "pyglet" not in (root / "packaging" / "build.py").read_text(encoding="utf-8").lower()
+    assert "pyglet" not in (root / "packaging" / "LICENSES.md").read_text(encoding="utf-8").lower()
+
+
 def test_package_workflow_builds_three_os_artifacts() -> None:
     workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "package.yml").read_text(
         encoding="utf-8"

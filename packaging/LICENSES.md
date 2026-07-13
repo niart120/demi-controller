@@ -8,7 +8,6 @@ The inventory covers the direct runtime packages and the Bluetooth transport dep
 
 - demi-controller
 - platformdirs
-- pyglet
 - swbt-python
 - tomli-w
 - bumble
