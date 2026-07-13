@@ -99,13 +99,13 @@ Unit 005/006 の controller runtime と swbt adapter を、接続喪失、停止
 |---|---|---|
 | `uv run pytest tests/integration/controller/test_runtime_commands.py tests/unit/controller/test_runtime.py -q` | passed | 9 passed。接続喪失後の ERROR -> READY、frame 抑止、neutral / disconnect failure 後の shutdown cleanup を確認 |
 | `uv run pytest tests/hardware -m hardware -q` | passed | 1 skipped。`DEMI_HARDWARE` 未指定のため manual preflight を実行せず、実機結果を生成しない |
-| `uv run pytest -m "not hardware and not bumble"` | passed | 129 passed、1 deselected。通常試験へ hardware / bumble を混入させない |
+| `uv run pytest -m "not hardware and not bumble"` | passed | 130 passed、1 deselected。通常試験へ hardware / bumble を混入させない |
 | `uv sync --dev` | passed | 68 packages resolved、local package を install |
 | `uv lock --check` | passed | lockfile は最新 |
 | `uv run ruff format --check .` | passed | 75 files already formatted |
 | `uv run ruff check .` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
-| `uv run pytest tests/unit` | passed | 118 passed |
+| `uv run pytest tests/unit` | passed | 119 passed |
 | `uv run pytest tests/integration` | passed | 11 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
 | `uv run python -c "...wheel/sdist smoke..."` | passed | wheel の runtime / dependency metadata、sdist の hardware test / log を確認 |
