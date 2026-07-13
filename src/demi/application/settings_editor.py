@@ -10,6 +10,8 @@ from demi.domain.settings import (
     ConnectionSettings,
     ControllerColorSettings,
     DiagnosticLevel,
+    InputSettings,
+    MouseSettings,
 )
 
 type ColorField = Literal["body", "buttons", "left_grip", "right_grip"]
@@ -126,6 +128,84 @@ class SettingsEditor:
                 right_grip=value,
             )
         self._draft = replace(self._draft, controller_colors=colors)
+
+    def update_mouse(
+        self,
+        *,
+        gyro_enabled: bool | None = None,
+        horizontal_sensitivity: float | None = None,
+        vertical_sensitivity: float | None = None,
+        invert_y: bool | None = None,
+        pitch_limit_degrees: float | None = None,
+    ) -> None:
+        """Replace editable mouse-to-IMU settings after domain validation.
+
+        Args:
+            gyro_enabled: Whether mouse motion contributes controller IMU values.
+            horizontal_sensitivity: Independent yaw sensitivity multiplier.
+            vertical_sensitivity: Independent pitch sensitivity multiplier.
+            invert_y: Whether vertical mouse motion reverses pitch direction.
+            pitch_limit_degrees: Maximum absolute virtual pitch in degrees.
+        """
+        current_input = self._draft.input
+        current_mouse = current_input.mouse
+        mouse = MouseSettings(
+            gyro_enabled=current_mouse.gyro_enabled if gyro_enabled is None else gyro_enabled,
+            horizontal_sensitivity=(
+                current_mouse.horizontal_sensitivity
+                if horizontal_sensitivity is None
+                else horizontal_sensitivity
+            ),
+            vertical_sensitivity=(
+                current_mouse.vertical_sensitivity
+                if vertical_sensitivity is None
+                else vertical_sensitivity
+            ),
+            invert_y=current_mouse.invert_y if invert_y is None else invert_y,
+            pitch_limit_degrees=(
+                current_mouse.pitch_limit_degrees
+                if pitch_limit_degrees is None
+                else pitch_limit_degrees
+            ),
+        )
+        self._draft = replace(
+            self._draft,
+            input=InputSettings(
+                evaluation_interval_ms=current_input.evaluation_interval_ms,
+                circular_stick_limit=current_input.circular_stick_limit,
+                mouse=mouse,
+            ),
+        )
+
+    def update_input(
+        self,
+        *,
+        evaluation_interval_ms: int | None = None,
+        circular_stick_limit: bool | None = None,
+    ) -> None:
+        """Replace editable input loop fields while retaining mouse settings.
+
+        Args:
+            evaluation_interval_ms: Input evaluation interval in milliseconds.
+            circular_stick_limit: Whether stick coordinates use a circular limit.
+        """
+        current = self._draft.input
+        self._draft = replace(
+            self._draft,
+            input=InputSettings(
+                evaluation_interval_ms=(
+                    current.evaluation_interval_ms
+                    if evaluation_interval_ms is None
+                    else evaluation_interval_ms
+                ),
+                circular_stick_limit=(
+                    current.circular_stick_limit
+                    if circular_stick_limit is None
+                    else circular_stick_limit
+                ),
+                mouse=current.mouse,
+            ),
+        )
 
     def reset_profile(self) -> None:
         """Restore the built-in profile while retaining connection and colors."""

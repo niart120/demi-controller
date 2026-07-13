@@ -3,6 +3,7 @@
 from typing import ClassVar, Protocol
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
+from demi.domain.errors import DomainValueError
 from demi.domain.mapping import InputProfile, default_profile
 from demi.domain.physical_input import PhysicalInputState
 from demi.domain.settings import MouseSettings
@@ -21,7 +22,7 @@ class Clock(Protocol):
 class FrameSink(Protocol):
     """Destination for the latest evaluated controller frame."""
 
-    def offer_frame(self, frame: ControllerFrame) -> None:
+    def offer_frame(self, frame: ControllerFrame) -> bool | None:
         """Accept one immutable controller frame."""
 
 
@@ -32,7 +33,7 @@ class InputPublisher:
     invokes :meth:`publish` at the configured evaluation boundary.
     """
 
-    evaluation_interval_ms: ClassVar[int] = 8
+    default_evaluation_interval_ms: ClassVar[int] = 8
 
     def __init__(
         self,
@@ -42,6 +43,7 @@ class InputPublisher:
         profile: InputProfile | None = None,
         mouse_settings: MouseSettings | None = None,
         circular_limit: bool = False,
+        evaluation_interval_ms: int = default_evaluation_interval_ms,
     ) -> None:
         """Initialize an input publisher.
 
@@ -53,6 +55,8 @@ class InputPublisher:
             mouse_settings: Mouse-to-IMU settings, defaulting to application
                 defaults.
             circular_limit: Whether diagonal stick values are normalized.
+            evaluation_interval_ms: Scheduled input evaluation interval.
+            evaluation_interval_ms: Interval between scheduled input evaluations.
         """
         self._clock = clock
         self._sink = sink
@@ -61,6 +65,7 @@ class InputPublisher:
             mouse_settings if mouse_settings is not None else MouseSettings()
         )
         self._circular_limit = circular_limit
+        self._evaluation_interval_ms = self._validate_interval(evaluation_interval_ms)
         self._state = PhysicalInputState()
         self._sequence = 0
         self._last_monotonic_ns: int | None = None
@@ -70,6 +75,35 @@ class InputPublisher:
     def state(self) -> PhysicalInputState:
         """Return the mutable physical input state updated by event handlers."""
         return self._state
+
+    @property
+    def evaluation_interval_ms(self) -> int:
+        """Return the configured input evaluation interval in milliseconds."""
+        return self._evaluation_interval_ms
+
+    def reconfigure(
+        self,
+        *,
+        profile: InputProfile,
+        mouse_settings: MouseSettings,
+        circular_limit: bool,
+        evaluation_interval_ms: int,
+    ) -> None:
+        """Apply saved input settings and reset state across the new boundary.
+
+        Args:
+            profile: Active input profile used by subsequent evaluations.
+            mouse_settings: Mouse-to-IMU settings for a new yaw/pitch model.
+            circular_limit: Whether diagonal sticks are normalized.
+            evaluation_interval_ms: Scheduled evaluation interval from settings.
+        """
+        self._profile = profile
+        self._model = YawPitchModel(mouse_settings)
+        self._circular_limit = circular_limit
+        self._evaluation_interval_ms = self._validate_interval(evaluation_interval_ms)
+        self._state.clear()
+        self._last_monotonic_ns = None
+        self._capture_epoch = None
 
     def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
         """Evaluate current input and offer one controller frame.
@@ -139,3 +173,9 @@ class InputPublisher:
         self._capture_epoch = capture_epoch
         self._sink.offer_frame(frame)
         return frame
+
+    @staticmethod
+    def _validate_interval(value: int) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or not 4 <= value <= 32:
+            raise DomainValueError
+        return value

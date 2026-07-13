@@ -62,6 +62,7 @@ class ControllerRuntime:
         self._connection_state = ConnectionState.STOPPED
         self._latest_frame: ControllerFrame | None = None
         self._connected = False
+        self._connected_adapter_id: str | None = None
         self._runtime_stopped = False
         self._diagnostic_counter = 0
 
@@ -208,22 +209,30 @@ class ControllerRuntime:
             self._emit_status()
 
     async def _discover_adapters(self) -> None:
-        adapter = self._adapter
+        adapter = self._acquire_adapter()
         if adapter is None:
             return
-        self._set_connection_state(ConnectionState.DISCOVERING)
+        adapter_id = self._connected_adapter_id if self._connected else None
+        self._set_connection_state(ConnectionState.DISCOVERING, adapter_id)
         try:
             descriptors = await adapter.discover_adapters()
             self._event_sink.emit(AdaptersDiscovered(adapters=descriptors))
-            self._set_connection_state(ConnectionState.READY)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.ADAPTER_OPEN_FAILED),
                 error,
             )
+        finally:
+            if self._connected:
+                self._set_connection_state(
+                    ConnectionState.CONNECTED,
+                    self._connected_adapter_id,
+                )
+            else:
+                self._set_connection_state(ConnectionState.READY)
 
     async def _connect_saved(self, command: ConnectSaved) -> None:
-        adapter = self._adapter
+        adapter = self._acquire_adapter()
         if adapter is None:
             return
         self._set_connection_state(ConnectionState.CONNECTING, command.adapter_id)
@@ -235,11 +244,13 @@ class ControllerRuntime:
                 command.colors,
             )
             self._connected = True
+            self._connected_adapter_id = command.adapter_id
             self._watchdog.set_connected(True)
             await self._apply_rest_state()
             self._set_connection_state(ConnectionState.CONNECTED, command.adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
+            self._connected_adapter_id = None
             self._watchdog.set_connected(False)
             await self._emit_error_and_recover(
                 error,
@@ -247,7 +258,7 @@ class ControllerRuntime:
             )
 
     async def _start_pairing(self, command: StartPairing) -> None:
-        adapter = self._adapter
+        adapter = self._acquire_adapter()
         if adapter is None:
             return
         self._set_connection_state(ConnectionState.CONNECTING, command.adapter_id)
@@ -259,11 +270,13 @@ class ControllerRuntime:
                 command.colors,
             )
             self._connected = True
+            self._connected_adapter_id = command.adapter_id
             self._watchdog.set_connected(True)
             await self._apply_rest_state()
             self._set_connection_state(ConnectionState.CONNECTED, command.adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
+            self._connected_adapter_id = None
             self._watchdog.set_connected(False)
             await self._emit_error_and_recover(
                 error,
@@ -286,6 +299,7 @@ class ControllerRuntime:
             )
         finally:
             self._connected = False
+            self._connected_adapter_id = None
             self._watchdog.set_connected(False)
             self._set_connection_state(ConnectionState.READY)
 
@@ -293,11 +307,19 @@ class ControllerRuntime:
         adapter = self._adapter
         if adapter is None or not self._connected:
             return
+        adapter_id = self._connected_adapter_id
+        self._connected = False
+        self._watchdog.set_connected(False)
+        self._set_connection_state(ConnectionState.CONNECTING, adapter_id)
         try:
             await adapter.recreate_with_colors(command.colors)
+            self._connected = True
+            self._watchdog.set_connected(True)
             await self._apply_rest_state()
+            self._set_connection_state(ConnectionState.CONNECTED, adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
+            self._connected_adapter_id = None
             self._watchdog.set_connected(False)
             await self._emit_error_and_recover(
                 error,
@@ -390,6 +412,7 @@ class ControllerRuntime:
             )
         finally:
             self._connected = False
+            self._connected_adapter_id = None
             self._watchdog.set_connected(False)
             self._adapter = None
             self._set_connection_state(ConnectionState.STOPPED)
@@ -402,6 +425,9 @@ class ControllerRuntime:
         fallback: ControllerErrorCategory,
     ) -> None:
         """Release a failed connection and return the runtime to ready."""
+        self._connected = False
+        self._connected_adapter_id = None
+        self._watchdog.set_connected(False)
         self._set_connection_state(ConnectionState.ERROR)
         self._emit_error(self._category_for_error(error, fallback), error)
         await self._best_effort_release_adapter()
@@ -410,6 +436,7 @@ class ControllerRuntime:
     async def _best_effort_release_adapter(self) -> None:
         """Disconnect and close an adapter while preserving later cleanup."""
         adapter = self._adapter
+        self._adapter = None
         if adapter is None:
             return
         try:
@@ -426,6 +453,27 @@ class ControllerRuntime:
                 self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
                 error,
             )
+
+    def _acquire_adapter(self) -> "ControllerAdapter | None":
+        """Return a live adapter, recreating one that recovery released."""
+        adapter = self._adapter
+        if adapter is not None:
+            return adapter
+        try:
+            adapter = self._adapter_factory()
+        except Exception as error:  # noqa: BLE001
+            self._set_connection_state(ConnectionState.ERROR)
+            self._emit_error(
+                self._category_for_error(
+                    error,
+                    ControllerErrorCategory.ADAPTER_OPEN_FAILED,
+                ),
+                error,
+            )
+            self._set_connection_state(ConnectionState.READY)
+            return None
+        self._adapter = adapter
+        return adapter
 
     def _set_connection_state(
         self,

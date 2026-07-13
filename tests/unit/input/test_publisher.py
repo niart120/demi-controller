@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
+from demi.domain.mapping import default_profile
+from demi.domain.settings import MouseSettings
 from demi.input.publisher import InputPublisher
 
 
@@ -84,3 +86,21 @@ def test_publisher_exposes_the_eight_millisecond_evaluation_contract() -> None:
     publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
 
     assert publisher.evaluation_interval_ms == 8
+
+
+def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.state.press_key("F")
+    publisher.reconfigure(
+        profile=default_profile(),
+        mouse_settings=MouseSettings(gyro_enabled=False),
+        circular_limit=True,
+        evaluation_interval_ms=16,
+    )
+
+    frame = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert publisher.evaluation_interval_ms == 16
+    assert frame.buttons == frozenset()
+    assert frame.gyro_rate == GyroRate(0.0, 0.0, 0.0)
