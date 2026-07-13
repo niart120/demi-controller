@@ -59,6 +59,7 @@ class FakeAdapter:
 
     close_thread_id: int | None = None
     connect_error: Exception | None = None
+    disconnect_error: Exception | None = None
     apply_calls: int = 0
     fail_on_apply_call: int | None = None
 
@@ -90,6 +91,8 @@ class FakeAdapter:
 
     async def disconnect(self) -> None:
         """Complete a fake disconnect."""
+        if self.disconnect_error is not None:
+            raise self.disconnect_error
 
     async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
         """Complete a fake color recreation."""
@@ -159,6 +162,33 @@ def test_runtime_preserves_adapter_error_category_in_runtime_event() -> None:
 
 def test_runtime_continues_shutdown_cleanup_after_neutral_failure() -> None:
     adapter = FakeAdapter(fail_on_apply_call=2)
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    assert events.ready.wait(timeout=1.0)
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bond.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    runtime.close()
+
+    assert events.stopped.wait(timeout=1.0)
+    assert runtime.is_alive is False
+    assert adapter.close_thread_id is not None
+
+
+def test_runtime_continues_shutdown_cleanup_after_disconnect_failure() -> None:
+    adapter = FakeAdapter(disconnect_error=RuntimeError("disconnect failed"))
     events = EventRecorder()
     runtime = ControllerRuntime(
         adapter_factory=lambda: adapter,
