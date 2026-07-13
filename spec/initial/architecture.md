@@ -23,7 +23,7 @@ demi.application
 
 demi.input
   imports: demi.domain, demi.application
-  pyglet_backend.pyのみpygletをimport可能
+  qt_adapter.pyだけがPySide6入力型をimport可能。OS固有APIはdemi.platform配下へ隔離する
 
 demi.controller
   imports: demi.domain, demi.application
@@ -31,7 +31,7 @@ demi.controller
 
 demi.ui
   imports: demi.domain, demi.application
-  pyglet具象型はui配下だけで扱う
+  PySide6 / Qt Widgetsのwidget型はui配下だけで扱う
 
 demi.config
   imports: demi.domain, Python標準ライブラリ, platformdirs, tomli_w
@@ -62,11 +62,14 @@ src/
     │   └── errors.py
     ├── input/
     │   ├── backend.py
-    │   ├── pyglet_backend.py
+    │   ├── qt_adapter.py
+    │   ├── relative_pointer.py
     │   ├── state_tracker.py
     │   ├── mapper.py
     │   ├── yaw_pitch_model.py
     │   └── publisher.py
+    ├── platform/
+    │   └── windows_raw_input.py
     ├── controller/
     │   ├── runtime.py
     │   ├── mailbox.py
@@ -80,23 +83,16 @@ src/
     │   ├── validation.py
     │   └── migrations.py
     ├── ui/
-    │   ├── window.py
+    │   ├── application.py
+    │   ├── main_window.py
+    │   ├── controller_preview.py
     │   ├── event_bridge.py
-    │   ├── theme.py
-    │   ├── layout.py
-    │   ├── controller_view.py
     │   ├── toolbar.py
     │   ├── status_bar.py
-    │   ├── dialogs/
-    │   │   ├── mapping.py
-    │   │   ├── connection.py
-    │   │   └── colors.py
-    │   └── widgets/
-    │       ├── modal.py
-    │       ├── select.py
-    │       ├── mapping_row.py
-    │       ├── key_capture.py
-    │       └── color_field.py
+    │   └── dialogs/
+    │       ├── mapping.py
+    │       ├── connection.py
+    │       └── colors.py
     └── assets/
         ├── fonts/
         ├── icons/
@@ -238,13 +234,13 @@ class Clock(Protocol):
 
 主スレッドが所有するもの:
 
-- pygletのウィンドウ
-- OpenGL資源
-- `pyglet.gui` 部品
-- `PygletInputBackend`
+- `QApplication` と `QMainWindow`
+- Qt Widgets部品と `ControllerPreviewWidget`
+- Qt入力アダプター
+
 - `PhysicalInputState`
 - `InputMapper`
-- `ControllerView`
+- `ControllerPreviewWidget`
 - `ApplicationPresenter`
 
 主スレッド以外からこれらを操作しない。
@@ -286,7 +282,7 @@ frame_event  = asyncio.Event
 
 ### 5.4 ワーカーから主スレッド
 
-ワーカーは `RuntimeEvent` を生成し、pygletのプラットフォームイベントループへスレッドセーフに投稿する。UIは `event_bridge.py` で受ける。
+ワーカーは `RuntimeEvent` を生成し、Qtのqueued signalまたはスレッドセーフなapplication portへ投稿する。UIは `event_bridge.py` でGUIスレッドへ受け渡す。
 
 ```text
 ControllerRuntimeEvent
@@ -303,7 +299,7 @@ ControllerRuntimeEvent
 
 | 処理 | 周期・契機 |
 |---|---|
-| OSイベント処理 | pygletイベントループ |
+| OSイベント処理 | Qt event loop |
 | 入力状態評価 | 8ミリ秒 |
 | 画面描画 | 最大60Hz |
 | 接続状態表示 | 変化時 |
@@ -311,14 +307,13 @@ ControllerRuntimeEvent
 | 入力停止監視 | 50ミリ秒確認、250ミリ秒閾値 |
 | 設定保存 | 確定操作時。連続色編集は300ミリ秒遅延保存 |
 
-入力評価は `pyglet.clock.schedule_interval()` を使う。独自のpygletイベントループを実装しない。
+入力評価はQtのタイマーを使い、GUIイベントの処理を阻害しない。独自のevent loopを実装しない。
 
 ## 7. 入力フロー
 
 ```text
-on_key_press/on_key_release
-on_mouse_press/on_mouse_release
-on_mouse_motion(dx, dy)
+QKeyEvent / QMouseEvent / focus event ──► QtInputAdapter ─────────┐
+OS relative pointer event ─────────────► RelativePointerBackend ─┤
            │
            ▼
 PhysicalInputState
@@ -330,7 +325,7 @@ PhysicalInputState
 InputMapper + YawPitchModel
   GyroRate + AccelG
            │
-           ├── ControllerFrame ──► ControllerView
+           ├── ControllerFrame ──► ControllerPreviewWidget
            │
            └── ControllerPort.offer_frame()
 ```

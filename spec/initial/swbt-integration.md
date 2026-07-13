@@ -223,7 +223,7 @@ state = InputState(
 
 ## 7. 入力停止監視
 
-目的は、pyglet主スレッド停止時に最後の押下状態を送り続けないことである。
+目的は、Qt GUIスレッド停止時に最後の押下状態を送り続けないことである。
 
 ```text
 monitor interval: 50 ms
