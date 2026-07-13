@@ -36,7 +36,7 @@ pyglet を採用していた `spec/initial` と PySide6 採用判断の矛盾を
 - 現行仕様の UI、入力、ライフサイクル、試験、リスク、診断項目を PySide6 / Qt Widgets 前提へ更新した。
 - 完了済みの `spec/complete/unit_001`〜`unit_012` は変更していない。
 - 旧 UI 撤去の対象範囲と維持する境界は `CURRENT_UI_REMOVAL.md` に記録済みである。
-- 最初の実装 work unit として `spec/wip/unit_013/LEGACY_UI_AND_PYGLET_REMOVAL.md` を作成済みである。
+- milestone 1の完了記録は `spec/complete/unit_013/LEGACY_UI_AND_PYGLET_REMOVAL.md` である。
 - milestone 0 は設計文書だけを対象とし、Python実装・依存関係・lockは変更しない。
 
 ## 3. milestone 1: 旧 UI と pyglet の一括撤去
