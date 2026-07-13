@@ -75,12 +75,12 @@ class FakeWindow:
     width: int = 960
     height: int = 640
     maximized: bool = False
-    exclusive_mouse: list[bool] = field(default_factory=list)
+    pointer_capture: list[bool] = field(default_factory=list)
     close_calls: int = 0
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Record relative mouse changes."""
-        self.exclusive_mouse.append(exclusive)
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Record pointer capture changes."""
+        self.pointer_capture.append(enabled)
 
     def window_state(self) -> WindowSettings:
         """Return the current state consumed by ordered shutdown."""
@@ -509,7 +509,7 @@ def make_coordinator(runtime: FakeRuntime) -> CaptureCoordinator:
     """Build a capture coordinator connected to the fake runtime sink."""
     return CaptureCoordinator(
         publisher=InputPublisher(clock=FakeClock(), sink=runtime),
-        window=FakeWindow(),
+        pointer_capture=FakeWindow(),
     )
 
 

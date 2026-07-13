@@ -75,15 +75,15 @@ class FakeSink:
 class FakeWindow:
     """Window boundary used by the capture coordinator."""
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Accept capture transitions."""
-        del exclusive
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Accept pointer capture transitions."""
+        del enabled
 
 
 def make_session() -> ApplicationSession:
     """Create an application session without pyglet or a controller worker."""
     publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
-    capture = CaptureCoordinator(publisher=publisher, window=FakeWindow())
+    capture = CaptureCoordinator(publisher=publisher, pointer_capture=FakeWindow())
     return ApplicationSession(
         runtime=FakeRuntime(),
         coordinator=capture,

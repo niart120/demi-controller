@@ -35,18 +35,18 @@ class FakeWindow:
     exclusive_calls: list[bool] = field(default_factory=list)
     fail_on_enable: bool = False
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Record or reject an exclusive mouse request."""
-        if exclusive and self.fail_on_enable:
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Record or reject a pointer capture request."""
+        if enabled and self.fail_on_enable:
             raise OSError
-        self.exclusive_calls.append(exclusive)
+        self.exclusive_calls.append(enabled)
 
 
 def make_coordinator(window: FakeWindow) -> tuple[CaptureCoordinator, FakeSink]:
     """Create a coordinator and its recording sink."""
     sink = FakeSink()
     publisher = InputPublisher(clock=FakeClock(), sink=sink)
-    return CaptureCoordinator(publisher=publisher, window=window), sink
+    return CaptureCoordinator(publisher=publisher, pointer_capture=window), sink
 
 
 def test_capture_start_and_stop_emit_epoch_neutrals_and_clear_state() -> None:

@@ -45,9 +45,9 @@ class FakeWindow:
 
     exclusive_calls: list[bool] = field(default_factory=list)
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Record an exclusive mouse transition."""
-        self.exclusive_calls.append(exclusive)
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Record a pointer capture transition."""
+        self.exclusive_calls.append(enabled)
 
 
 @dataclass
@@ -71,7 +71,7 @@ def make_controller(
     sink = FakeSink()
     coordinator = CaptureCoordinator(
         publisher=InputPublisher(clock=FakeClock(), sink=sink),
-        window=FakeWindow(),
+        pointer_capture=FakeWindow(),
     )
     dialogs = DialogManager()
     return SettingsModalController(repository, coordinator, dialogs), coordinator, sink, dialogs

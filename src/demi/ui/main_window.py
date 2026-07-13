@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QWidget
 
@@ -57,14 +58,18 @@ class MainWindow(QMainWindow):
         """
         self._shutdown_callback = callback
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Accept capture requests until unit_015 supplies a Qt adapter.
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Apply or release foreground pointer capture for controller input.
 
         Args:
-            exclusive: Requested capture state. The minimal shell does not yet
-                alter pointer capture.
+            enabled: Whether the main window should own pointer capture.
         """
-        del exclusive
+        if enabled:
+            self.grabMouse()
+            self.setCursor(Qt.CursorShape.BlankCursor)
+            return
+        self.releaseMouse()
+        self.unsetCursor()
 
     def window_state(self) -> WindowSettings | None:
         """Return a valid saved state without losing a maximized normal size."""

@@ -38,9 +38,9 @@ class FakeWindow:
 
     exclusive_calls: list[bool] = field(default_factory=list)
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Record an exclusive mouse request."""
-        self.exclusive_calls.append(exclusive)
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Record a pointer capture request."""
+        self.exclusive_calls.append(enabled)
 
 
 def test_f12_focus_dialog_and_shutdown_neutralize_qt_capture(
@@ -51,7 +51,7 @@ def test_f12_focus_dialog_and_shutdown_neutralize_qt_capture(
     sink = FakeSink()
     window = FakeWindow()
     publisher = InputPublisher(clock=clock, sink=sink)
-    coordinator = CaptureCoordinator(publisher=publisher, window=window)
+    coordinator = CaptureCoordinator(publisher=publisher, pointer_capture=window)
     adapter = QtInputAdapter(
         state=publisher.state,
         is_captured=lambda: coordinator.is_captured,

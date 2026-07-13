@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING, Protocol
 
-from demi.application.coordinator import CaptureCoordinator
+from demi.application.coordinator import CaptureCoordinator, PointerCapturePort
 from demi.application.dialogs import DialogKind, DialogManager
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
@@ -100,14 +100,11 @@ class WindowSpec:
     maximized: bool
 
 
-class WindowPort(Protocol):
+class WindowPort(PointerCapturePort, Protocol):
     """Window operations required by capture coordination."""
 
     def window_state(self) -> WindowSettings | None:
         """Return a valid state captured before native window destruction."""
-
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Enable or disable relative mouse capture."""
 
     def close(self) -> bool | None:
         """Request native window closure."""
@@ -591,7 +588,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             circular_limit=settings.input.circular_stick_limit,
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
-        coordinator = CaptureCoordinator(publisher=publisher, window=window)
+        coordinator = CaptureCoordinator(publisher=publisher, pointer_capture=window)
         session = ApplicationSession(
             settings=settings,
             paths=paths,

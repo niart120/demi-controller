@@ -9,20 +9,25 @@ from demi.input.publisher import InputPublisher
 from .state import AppState
 
 
-class WindowPort(Protocol):
-    """Window operation required by capture lifecycle transitions."""
+class PointerCapturePort(Protocol):
+    """Framework-independent pointer capture operation."""
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Enable or disable relative mouse capture."""
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Enable or disable pointer capture for the foreground window."""
 
 
 class CaptureCoordinator:
     """Own capture state, epoch changes, and neutral frame transitions."""
 
-    def __init__(self, *, publisher: InputPublisher, window: WindowPort) -> None:
+    def __init__(
+        self,
+        *,
+        publisher: InputPublisher,
+        pointer_capture: PointerCapturePort,
+    ) -> None:
         """Initialize a coordinator in the focused idle state."""
         self._publisher = publisher
-        self._window = window
+        self._pointer_capture = pointer_capture
         self._app_state = AppState.IDLE
         self._capture_epoch = 0
         self._focused = True
@@ -71,7 +76,7 @@ class CaptureCoordinator:
         self._capture_epoch += 1
         self._publisher.state.clear()
         try:
-            self._window.set_exclusive_mouse(True)
+            self._pointer_capture.set_pointer_capture(True)
         except (OSError, RuntimeError):
             self._publisher.state.clear()
             self._app_state = AppState.IDLE
@@ -156,7 +161,7 @@ class CaptureCoordinator:
         self._app_state = AppState.SHUTTING_DOWN
         self._capture_epoch += 1
         with suppress(OSError, RuntimeError):
-            self._window.set_exclusive_mouse(False)
+            self._pointer_capture.set_pointer_capture(False)
         self._publisher.state.clear()
         return self._publish_frame(capture_active=False)
 
@@ -168,6 +173,6 @@ class CaptureCoordinator:
         self._app_state = next_state
         self._capture_epoch += 1
         with suppress(OSError, RuntimeError):
-            self._window.set_exclusive_mouse(False)
+            self._pointer_capture.set_pointer_capture(False)
         self._publisher.state.clear()
         return self._publish_frame(capture_active=False)
