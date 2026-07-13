@@ -141,6 +141,11 @@ empty_parameter_set_mark = "fail_at_collect"
 filterwarnings = [
     "error",
 ]
+markers = [
+    "bumble: requires a dedicated USB Bluetooth dongle opened through Bumble",
+    "hardware: requires a target NX-family console and Bluetooth HID behavior",
+    "ui: exercises pyglet windowing and may require a display server",
+]
 
 [tool.coverage.run]
 branch = true
