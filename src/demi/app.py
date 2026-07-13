@@ -7,9 +7,14 @@ import sys
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from demi.application.coordinator import CaptureCoordinator, CaptureFailure, PointerCapturePort
+from demi.application.coordinator import (
+    CaptureCoordinator,
+    CaptureFailure,
+    PointerCapturePort,
+    RelativePointerCapturePort,
+)
 from demi.application.dialogs import DialogKind, DialogManager
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
@@ -108,6 +113,19 @@ class WindowPort(PointerCapturePort, Protocol):
 
     def close(self) -> bool | None:
         """Request native window closure."""
+
+
+@runtime_checkable
+class InputCaptureSetupPort(Protocol):
+    """Optional outer UI boundary that installs its own input adapters."""
+
+    def configure_input(
+        self,
+        *,
+        publisher: InputPublisher,
+        coordinator: CaptureCoordinator,
+    ) -> None:
+        """Connect a publisher and coordinator after application assembly."""
 
 
 class GuiPort(Protocol):
@@ -601,7 +619,16 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             circular_limit=settings.input.circular_stick_limit,
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
-        coordinator = CaptureCoordinator(publisher=publisher, pointer_capture=window)
+        relative_pointer_capture = (
+            window if isinstance(window, RelativePointerCapturePort) else None
+        )
+        coordinator = CaptureCoordinator(
+            publisher=publisher,
+            pointer_capture=window,
+            relative_pointer_capture=relative_pointer_capture,
+        )
+        if isinstance(window, InputCaptureSetupPort):
+            window.configure_input(publisher=publisher, coordinator=coordinator)
         session = ApplicationSession(
             settings=settings,
             paths=paths,

@@ -96,6 +96,34 @@ class FakeWindow:
 
 
 @dataclass
+class FakeInputWindow(FakeWindow):
+    """Window fake that records the optional Qt input-boundary setup."""
+
+    configured_publisher: InputPublisher | None = None
+    configured_coordinator: CaptureCoordinator | None = None
+    relative_capture_epochs: list[int] = field(default_factory=list)
+    relative_stop_calls: int = 0
+
+    def configure_input(
+        self,
+        *,
+        publisher: InputPublisher,
+        coordinator: CaptureCoordinator,
+    ) -> None:
+        """Record the input publisher and coordinator selected at composition."""
+        self.configured_publisher = publisher
+        self.configured_coordinator = coordinator
+
+    def start_relative_pointer_capture(self, capture_epoch: int) -> None:
+        """Record one relative-pointer capture start."""
+        self.relative_capture_epochs.append(capture_epoch)
+
+    def stop_relative_pointer_capture(self) -> None:
+        """Record one relative-pointer capture stop."""
+        self.relative_stop_calls += 1
+
+
+@dataclass
 class FakeGui:
     """GUI loop fake that returns immediately."""
 
@@ -144,6 +172,29 @@ def test_application_runner_assembles_boundaries_without_starting_the_runtime() 
     assert gui_kwargs["dialogs"] is gui_kwargs["session"].dialogs
     assert callable(gui_kwargs["editor_provider"])
     assert {"backend", "bridge", "event_pump", "status_bar", "view"}.isdisjoint(gui_kwargs)
+
+
+def test_application_runner_configures_the_optional_input_window_boundary() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
+    runtime = FakeRuntime()
+    window = FakeInputWindow()
+    logger = logging.getLogger("demi-test-input-window")
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(repository_result),
+        runtime_factory=lambda **_kwargs: runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: FakeGui(),
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logger,
+    )
+
+    assert run_application(dependencies) == 0
+
+    assert window.configured_publisher is not None
+    assert window.configured_coordinator is not None
+    assert window.configured_coordinator.publisher is window.configured_publisher
 
 
 def test_application_runner_returns_nonzero_when_ordered_shutdown_fails() -> None:

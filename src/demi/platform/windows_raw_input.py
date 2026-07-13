@@ -8,6 +8,8 @@ from typing import Protocol
 
 from PySide6.QtCore import QAbstractNativeEventFilter, QByteArray
 
+from demi.input.relative_pointer import RelativePointerCapability, RelativePointerQuality
+
 HID_USAGE_PAGE_GENERIC = 0x01
 HID_USAGE_GENERIC_MOUSE = 0x02
 RIDEV_REMOVE = 0x00000001
@@ -410,6 +412,11 @@ class WindowsRawInputBackend(WindowsRawInputFilter):
         self._consecutive_read_failures = 0
         self._target_window_handle: int | None = None
         self._capture_epoch: int | None = None
+
+    @property
+    def capability(self) -> RelativePointerCapability:
+        """Return the verified unaccelerated quality of Win32 Raw Input."""
+        return RelativePointerCapability(RelativePointerQuality.RAW_UNACCELERATED)
 
     def nativeEventFilter(  # noqa: N802 - Qt override name.
         self,

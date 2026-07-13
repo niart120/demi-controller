@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from contextlib import suppress
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from demi.domain.controller import ControllerFrame
 from demi.input.publisher import InputPublisher
@@ -18,6 +18,7 @@ class PointerCapturePort(Protocol):
         """Enable or disable pointer capture for the foreground window."""
 
 
+@runtime_checkable
 class RelativePointerCapturePort(Protocol):
     """Platform-relative pointer lifecycle owned outside application logic."""
 

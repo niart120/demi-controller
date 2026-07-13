@@ -9,6 +9,9 @@ from demi.domain.physical_input import PhysicalInputState
 
 type CaptureActivity = Callable[[], bool]
 type CaptureTransition = Callable[[], object]
+type CaptureEpoch = Callable[[], int]
+type RelativePositionSink = Callable[[float, float, int], object]
+type FocusEventTarget = Callable[[QObject], bool]
 
 
 class QtInputAdapter(QObject):
@@ -23,6 +26,9 @@ class QtInputAdapter(QObject):
         on_focus_lost: CaptureTransition | None = None,
         on_focus_gained: CaptureTransition | None = None,
         on_dialog_opened: CaptureTransition | None = None,
+        capture_epoch: CaptureEpoch | None = None,
+        on_relative_position: RelativePositionSink | None = None,
+        is_focus_event_target: FocusEventTarget | None = None,
     ) -> None:
         """Create an adapter with framework-independent state storage.
 
@@ -33,6 +39,10 @@ class QtInputAdapter(QObject):
             on_focus_lost: Handles a window or application focus loss.
             on_focus_gained: Handles a window or application focus gain.
             on_dialog_opened: Neutralizes capture before a dialog opens.
+            capture_epoch: Returns the epoch that owns a Qt pointer position.
+            on_relative_position: Receives a captured Qt position and its epoch.
+            is_focus_event_target: Limits focus transitions when the adapter
+                is installed application-wide.
         """
         super().__init__()
         self._state = state
@@ -41,15 +51,17 @@ class QtInputAdapter(QObject):
         self._on_focus_lost = on_focus_lost
         self._on_focus_gained = on_focus_gained
         self._on_dialog_opened = on_dialog_opened
+        self._capture_epoch = capture_epoch
+        self._on_relative_position = on_relative_position
+        self._is_focus_event_target = is_focus_event_target
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override name.
         """Normalize an eligible event without consuming Qt's normal handling."""
-        del watched
         event_type = event.type()
-        if event_type in _FOCUS_LOSS_EVENTS:
+        if event_type in _FOCUS_LOSS_EVENTS and self._accepts_focus_event(watched):
             _invoke(self._on_focus_lost)
             return False
-        if event_type in _FOCUS_GAIN_EVENTS:
+        if event_type in _FOCUS_GAIN_EVENTS and self._accepts_focus_event(watched):
             _invoke(self._on_focus_gained)
             return False
         if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F12:
@@ -76,6 +88,9 @@ class QtInputAdapter(QObject):
             self._state.release_key(symbol, modifiers)
 
     def _handle_mouse_event(self, event: QMouseEvent) -> None:
+        if event.type() is QEvent.Type.MouseMove:
+            self._handle_mouse_position(event)
+            return
         button = _mouse_button_symbol(event.button())
         if button is None:
             return
@@ -83,6 +98,18 @@ class QtInputAdapter(QObject):
             self._state.press_mouse_button(button)
         elif event.type() is QEvent.Type.MouseButtonRelease:
             self._state.release_mouse_button(button)
+
+    def _handle_mouse_position(self, event: QMouseEvent) -> None:
+        capture_epoch = self._capture_epoch
+        on_relative_position = self._on_relative_position
+        if capture_epoch is None or on_relative_position is None:
+            return
+        position = event.globalPosition()
+        on_relative_position(position.x(), position.y(), capture_epoch())
+
+    def _accepts_focus_event(self, watched: QObject) -> bool:
+        focus_event_target = self._is_focus_event_target
+        return focus_event_target is None or focus_event_target(watched)
 
     def on_dialog_opened(self) -> None:
         """Request capture neutralization before a modal dialog is shown."""
