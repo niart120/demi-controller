@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
     from demi.app import WindowSpec
     from demi.application.coordinator import CaptureCoordinator
+    from demi.domain.controller import ControllerFrame
     from demi.input.publisher import InputPublisher
 
 
@@ -55,6 +56,12 @@ class MainWindow(QMainWindow):
         self._input_adapter: QtInputAdapter | None = None
         self._native_input_filter: WindowsRawInputBackend | None = None
         self._relative_pointer_backend: RelativePointerBackend | None = None
+        self._input_coordinator: CaptureCoordinator | None = None
+        self._input_evaluation_interval_ms: int | None = None
+        self._input_evaluation_timer = QTimer(self)
+        self._input_evaluation_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._input_evaluation_timer.timeout.connect(self._on_input_evaluation_timeout)
+        self._last_frame: ControllerFrame | None = None
         self._quit_action = QAction(self)
         self._quit_action.setShortcut(QKeySequence.StandardKey.Quit)
         self._quit_action.triggered.connect(self.close)
@@ -96,6 +103,21 @@ class MainWindow(QMainWindow):
         if backend is None:
             return RelativePointerCapability(RelativePointerQuality.UNAVAILABLE)
         return backend.capability
+
+    @property
+    def input_evaluation_interval_ms(self) -> int | None:
+        """Return the configured input evaluation interval, if input is ready."""
+        return self._input_evaluation_interval_ms
+
+    @property
+    def input_evaluation_timer_type(self) -> Qt.TimerType:
+        """Return the Qt timer type selected for scheduled input evaluation."""
+        return self._input_evaluation_timer.timerType()
+
+    @property
+    def last_frame(self) -> ControllerFrame | None:
+        """Return the latest evaluated frame received by the preview boundary."""
+        return self._last_frame
 
     def configure_input(
         self,
@@ -152,6 +174,10 @@ class MainWindow(QMainWindow):
         application.installEventFilter(adapter)
         self._input_application = application
         self._input_adapter = adapter
+        self._input_coordinator = coordinator
+        self._input_evaluation_interval_ms = publisher.evaluation_interval_ms
+        self._input_evaluation_timer.setInterval(self._input_evaluation_interval_ms)
+        self._input_evaluation_timer.start()
 
     def start_relative_pointer_capture(self, capture_epoch: int) -> None:
         """Start the selected relative-pointer backend for the main window."""
@@ -176,6 +202,28 @@ class MainWindow(QMainWindow):
         adapter = self._input_adapter
         if adapter is not None:
             adapter.on_dialog_opened()
+
+    def evaluate_input(self) -> ControllerFrame:
+        """Evaluate one scheduled input tick through the capture coordinator.
+
+        Returns:
+            The frame offered to runtime and preview from this single evaluation.
+
+        Raises:
+            RuntimeError: If the window input boundary is not configured.
+        """
+        coordinator = self._input_coordinator
+        if coordinator is None:
+            raise RuntimeError
+        return coordinator.evaluate()
+
+    def set_frame(self, frame: ControllerFrame) -> None:
+        """Store one evaluated frame for the controller preview boundary.
+
+        Args:
+            frame: Complete immutable state from the shared input evaluation.
+        """
+        self._last_frame = frame
 
     def window_state(self) -> WindowSettings | None:
         """Return a valid saved state without losing a maximized normal size."""
@@ -210,6 +258,10 @@ class MainWindow(QMainWindow):
         if isinstance(backend, QtRelativePointerBackend):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
 
+    def _on_input_evaluation_timeout(self) -> None:
+        if self._input_coordinator is not None:
+            self.evaluate_input()
+
     def _require_relative_pointer_backend(self) -> RelativePointerBackend:
         backend = self._relative_pointer_backend
         if backend is None:
@@ -217,6 +269,9 @@ class MainWindow(QMainWindow):
         return backend
 
     def _remove_input_filters(self) -> None:
+        self._input_evaluation_timer.stop()
+        self._input_evaluation_interval_ms = None
+        self._input_coordinator = None
         application = self._input_application
         if application is None:
             return

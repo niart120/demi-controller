@@ -16,6 +16,7 @@ from demi.application.coordinator import (
     RelativePointerCapturePort,
 )
 from demi.application.dialogs import DialogKind, DialogManager
+from demi.application.frame_fanout import ControllerFrameFanout, FramePreviewPort
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
 from demi.application.shutdown import ApplicationShutdownCoordinator
@@ -611,9 +612,11 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         )
         spec = _window_spec_for(settings)
         window = selected_dependencies.window_factory(spec)
+        preview = window if isinstance(window, FramePreviewPort) else None
+        frame_sink = ControllerFrameFanout(runtime=runtime, preview=preview)
         publisher = InputPublisher(
             clock=selected_dependencies.clock,
-            sink=runtime,
+            sink=frame_sink,
             profile=_active_profile(settings),
             mouse_settings=settings.input.mouse,
             circular_limit=settings.input.circular_stick_limit,
