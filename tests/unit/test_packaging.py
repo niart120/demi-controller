@@ -23,13 +23,7 @@ def test_package_builder_and_license_inventory_do_not_reference_pyglet() -> None
     assert "pyglet" not in (root / "packaging" / "LICENSES.md").read_text(encoding="utf-8").lower()
 
 
-def test_package_workflow_builds_three_os_artifacts() -> None:
-    workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "package.yml").read_text(
-        encoding="utf-8"
-    )
+def test_legacy_package_workflow_is_removed_until_qt_packaging() -> None:
+    workflow = Path(__file__).parents[2] / ".github" / "workflows" / "package.yml"
 
-    assert "runs-on: ${{ matrix.os }}" in workflow
-    for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
-        assert f"          - {runner}" in workflow
-    assert "uv run python packaging/build.py" in workflow
-    assert "uv run python packaging/smoke.py" in workflow
+    assert not workflow.exists()
