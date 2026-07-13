@@ -93,7 +93,7 @@ virtual pitch: 0 rad
 1. PhysicalInputState.clear()
 2. YawPitchModel.reset()
 3. increment capture_epoch
-4. window.set_exclusive_mouse(True)
+4. PointerCapturePort.set_pointer_capture(True)
 5. AppState = CAPTURED
 6. publish initial neutral ControllerFrame(capture_active=True)
 7. update toolbar and border

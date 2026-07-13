@@ -62,7 +62,7 @@ Qt object、入力変換、独自描画の責務は混在させない。
 | `demi.ui.application.QtApplicationRunner` | `QApplication` の生成、event loop、終了 status |
 | `demi.ui.main_window.MainWindow` | window ownership、部品配置、action接続、表示同期 |
 | `demi.ui.controller_preview.ControllerPreviewWidget` | `ControllerFrame` と色から controller を描画 |
-| `demi.ui.input_adapter.QtInputAdapter` | Qt key/mouse/focus event を正規化して capture 境界へ渡す |
+| `demi.input.qt_adapter.QtInputAdapter` | Qt key/mouse/focus event を正規化して capture 境界へ渡す |
 | `demi.ui.event_bridge.QtRuntimeEventBridge` | worker event を queued signal で GUI 主スレッドへ渡す |
 | `demi.ui.dialogs.MappingDialog` | binding一覧、取得、反転、重複警告、保存・取消 |
 | `demi.ui.dialogs.ConnectionDialog` | adapter一覧、再検索、接続設定、pairing確認 |
