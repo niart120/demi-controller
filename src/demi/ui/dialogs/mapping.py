@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
     QApplication,
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -112,6 +113,20 @@ class MappingTableModel(QAbstractTableModel):
         self._editor.update_binding(row, source=source)
         self._reset_from_editor()
 
+    def update_inverted(self, row: int, inverted: bool) -> None:
+        """Replace one binding inversion flag through the draft editor.
+
+        Args:
+            row: Active profile binding row.
+            inverted: Whether the binding is active while its source is absent.
+        """
+        self._editor.update_binding(row, inverted=inverted)
+        self._reset_from_editor()
+
+    def inverted_at(self, row: int) -> bool:
+        """Return the inversion state for one active profile row."""
+        return self._bindings()[row].inverted
+
     def restore_default_profile(self) -> None:
         """Restore the standard profile through the application-owned editor."""
         self._editor.reset_profile()
@@ -177,6 +192,7 @@ class MappingDialog(QDialog):
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._capture_row: int | None = None
+        self._updating_inverted = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
 
@@ -186,6 +202,8 @@ class MappingDialog(QDialog):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.capture_button = QPushButton("次の入力を取得", self)
         self.capture_label = QLabel("入力を取得していません", self)
+        self.inverted_checkbox = QCheckBox("反転", self)
+        self.inverted_checkbox.setEnabled(False)
         self.save_error_label = QLabel("", self)
         self.restore_button = QPushButton("標準に戻す", self)
         self.button_box = QDialogButtonBox(
@@ -195,6 +213,7 @@ class MappingDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.table)
+        layout.addWidget(self.inverted_checkbox)
         layout.addWidget(self.capture_button)
         layout.addWidget(self.capture_label)
         layout.addWidget(self.save_error_label)
@@ -205,6 +224,10 @@ class MappingDialog(QDialog):
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
+        selection_model = self.table.selectionModel()
+        if selection_model is not None:
+            selection_model.currentRowChanged.connect(self._sync_inverted_checkbox)
+        self.inverted_checkbox.toggled.connect(self.set_inverted)
 
     @property
     def conflict_confirmation(self) -> QMessageBox | None:
@@ -244,6 +267,25 @@ class MappingDialog(QDialog):
         self.table.selectRow(row)
         self.capture_label.setText(f"入力: {source}")
         return True
+
+    def set_inverted(self, inverted: bool) -> None:
+        """Update the selected binding inversion through the draft editor.
+
+        Args:
+            inverted: New state requested by the standard check box.
+        """
+        if self._updating_inverted:
+            return
+        selected = self.table.currentIndex()
+        if not selected.isValid():
+            self.inverted_checkbox.setEnabled(False)
+            return
+        try:
+            self._mapping_model.update_inverted(selected.row(), inverted)
+        except DomainValueError:
+            self.inverted_checkbox.setEnabled(False)
+            return
+        self.table.selectRow(selected.row())
 
     def request_accept(self) -> None:
         """Accept immediately or ask for explicit confirmation of conflicts."""
@@ -311,6 +353,17 @@ class MappingDialog(QDialog):
         if self.set_source(row, source):
             self._capture_row = None
         return True
+
+    def _sync_inverted_checkbox(self, current: QModelIndex, _previous: QModelIndex) -> None:
+        if not current.isValid():
+            self.inverted_checkbox.setEnabled(False)
+            return
+        self._updating_inverted = True
+        try:
+            self.inverted_checkbox.setEnabled(True)
+            self.inverted_checkbox.setChecked(self._mapping_model.inverted_at(current.row()))
+        finally:
+            self._updating_inverted = False
 
     def _handle_conflict_confirmation(self, button: QAbstractButton) -> None:
         confirmation = self._conflict_confirmation

@@ -234,3 +234,39 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     assert modal.editor is None
     assert repository.saved == original
     assert repository.save_calls == 1
+
+
+def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved_drafts: list[AppSettings] = []
+
+    def save() -> bool:
+        saved_drafts.append(editor.draft)
+        return True
+
+    dialog = MappingDialog(editor, on_save=save)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.table.selectRow(0)
+    qt_application.processEvents()
+
+    assert dialog.inverted_checkbox.isEnabled()
+    assert not dialog.inverted_checkbox.isChecked()
+
+    dialog.inverted_checkbox.click()
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].inverted is True
+    model = dialog.table.model()
+    assert model is not None
+    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "はい"
+
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+
+    assert saved_drafts[-1].profiles[0].bindings[0].inverted is True
+    assert dialog.result() == int(QDialog.DialogCode.Accepted)
