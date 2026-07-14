@@ -13,11 +13,13 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QHideEvent, QKeyEvent, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QAbstractItemView,
     QApplication,
     QDialog,
     QDialogButtonBox,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableView,
     QVBoxLayout,
@@ -113,6 +115,10 @@ class MappingTableModel(QAbstractTableModel):
         self._editor.reset_profile()
         self._reset_from_editor()
 
+    def conflict_summary(self) -> str:
+        """Return all current conflicts as visible, line-separated text."""
+        return "\n".join(self._format_conflict(conflict) for conflict in self._editor.conflicts())
+
     def _bindings(self) -> tuple[Binding, ...]:
         settings = self._editor.draft
         for profile in settings.profiles:
@@ -164,6 +170,7 @@ class MappingDialog(QDialog):
         self._on_release_capture = on_release_capture
         self._capture_row: int | None = None
         self._input_filter_application: QApplication | None = None
+        self._conflict_confirmation: QMessageBox | None = None
 
         self.table = QTableView(self)
         self.table.setModel(self._mapping_model)
@@ -186,8 +193,13 @@ class MappingDialog(QDialog):
 
         self.capture_button.clicked.connect(self.begin_capture)
         self.restore_button.clicked.connect(self.restore_default_profile)
-        self.button_box.accepted.connect(self.accept)
+        self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.reject)
+
+    @property
+    def conflict_confirmation(self) -> QMessageBox | None:
+        """Return the currently visible binding-conflict confirmation, if any."""
+        return self._conflict_confirmation
 
     def begin_capture(self) -> None:
         """Arm the selected table row for exactly one supported input event."""
@@ -203,6 +215,28 @@ class MappingDialog(QDialog):
         self._mapping_model.restore_default_profile()
         self._capture_row = None
         self.capture_label.setText("標準設定に戻しました")
+
+    def request_accept(self) -> None:
+        """Accept immediately or ask for explicit confirmation of conflicts."""
+        conflict_summary = self._mapping_model.conflict_summary()
+        if not conflict_summary:
+            self.accept()
+            return
+        if self._conflict_confirmation is not None:
+            return
+        confirmation = QMessageBox(
+            QMessageBox.Icon.Warning,
+            "キー割り当ての競合",
+            "重複またはローカル操作との競合があります。",
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
+            self,
+        )
+        confirmation.setInformativeText(conflict_summary)
+        confirmation.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        confirmation.buttonClicked.connect(self._handle_conflict_confirmation)
+        confirmation.finished.connect(self._clear_conflict_confirmation)
+        self._conflict_confirmation = confirmation
+        confirmation.open()
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt override name.
         """Neutralize capture before accepting dialog-local input events."""
@@ -243,6 +277,17 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self.capture_label.setText(f"入力: {source}")
         return True
+
+    def _handle_conflict_confirmation(self, button: QAbstractButton) -> None:
+        confirmation = self._conflict_confirmation
+        if (
+            confirmation is not None
+            and confirmation.standardButton(button) == QMessageBox.StandardButton.Save
+        ):
+            self.accept()
+
+    def _clear_conflict_confirmation(self, _result: int) -> None:
+        self._conflict_confirmation = None
 
     def _install_input_filter(self) -> None:
         if self._input_filter_application is not None:

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QCoreApplication, QEvent, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.settings_editor import SettingsEditor
@@ -119,3 +119,51 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
         dialog.close()
         qt_application.processEvents()
         qt_application.removeEventFilter(adapter)
+
+
+def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    editor.update_binding(1, source="KEY:F")
+    editor.update_binding(2, source="KEY:CTRL+C")
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    model = dialog.table.model()
+    assert model is not None
+
+    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "重複: KEY:F"
+    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "ローカル操作: CTRL+C"
+
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+
+    confirmation = dialog.conflict_confirmation
+    assert confirmation is not None
+    assert confirmation.text() == "重複またはローカル操作との競合があります。"
+    assert confirmation.informativeText() == "重複: KEY:F\nローカル操作: CTRL+C"
+    assert dialog.isVisible()
+
+    cancel_button = confirmation.button(QMessageBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+
+    assert dialog.conflict_confirmation is None
+    assert dialog.isVisible()
+    assert dialog.result() == int(QDialog.DialogCode.Rejected)
+
+    save_button.click()
+    qt_application.processEvents()
+    confirmation = dialog.conflict_confirmation
+    assert confirmation is not None
+    confirmed_save_button = confirmation.button(QMessageBox.StandardButton.Save)
+    assert confirmed_save_button is not None
+    confirmed_save_button.click()
+    qt_application.processEvents()
+
+    assert dialog.result() == int(QDialog.DialogCode.Accepted)
+    assert not dialog.isVisible()
