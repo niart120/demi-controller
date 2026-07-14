@@ -15,6 +15,8 @@ uv run demi
 
 確認済みの配布形態はソース一式と `uv build` で生成した wheel である。Windows 用の単体配布物は提供していない。Bluetoothアダプターと対象機器を使う受入試験の状況は [hardware test log](spec/hardware-test-log.md) を参照する。
 
+ライセンスと third-party notice は、ソース一式では [LICENSE](LICENSE) と [license inventory](packaging/LICENSES.md) を参照する。wheel をインストールした環境では `demi/THIRD_PARTY_NOTICES.md` に Project_Demi、PySide6、Qt の案内を含める。
+
 表示を開かずに配布バージョンだけ確認するには、次を実行する。
 
 ```powershell
