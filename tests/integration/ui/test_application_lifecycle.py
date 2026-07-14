@@ -10,17 +10,29 @@ from PySide6.QtGui import QCloseEvent
 
 from demi.app import ApplicationDependencies, SystemClock, WindowSpec, run_application
 from demi.application.shutdown import ApplicationShutdownCoordinator
+from demi.application.state import ConnectionState
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
+from demi.controller.commands import ConnectSaved, DiscoverAdapters, StartPairing
+from demi.controller.events import (
+    AdapterDescriptor,
+    AdaptersDiscovered,
+    ConnectionChanged,
+    ControllerError,
+    ControllerErrorCategory,
+)
 from demi.domain.settings import AppSettings, WindowSettings
 from demi.ui.application import QtApplicationRunner
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from PySide6.QtWidgets import QApplication
+
     from demi.app import RuntimePort
     from demi.controller.adapter import ControllerAdapterFactory, RuntimeEventSink
     from demi.controller.commands import ControllerCommand
+    from demi.controller.events import RuntimeEvent
     from demi.controller.watchdog import WatchdogClock
     from demi.domain.controller import ControllerFrame
     from demi.ui.main_window import MainWindow
@@ -89,6 +101,23 @@ class ShellRuntime:
     def close(self) -> None:
         """Record worker shutdown."""
         self.closed += 1
+
+
+@dataclass
+class StartupEventRuntime(ShellRuntime):
+    """Runtime fake that emits its startup events through the production sink."""
+
+    startup_events: tuple[RuntimeEvent, ...] = ()
+    event_sink: RuntimeEventSink | None = None
+
+    def start(self) -> None:
+        """Record startup and emit deterministic worker events."""
+        super().start()
+        sink = self.event_sink
+        if sink is None:
+            raise RuntimeError
+        for event in self.startup_events:
+            sink.emit(event)
 
 
 @dataclass
@@ -187,7 +216,147 @@ def test_application_runner_starts_an_empty_qt_shell_and_returns_zero(
 
     assert run_application(dependencies) == 0
     assert runner.application is qt_application
-    assert runtime.started == 0
-    assert runtime.commands == []
+    assert runtime.started == 1
+    assert runtime.commands == [DiscoverAdapters()]
     assert runtime.closed == 1
     assert repository.saved == [replace(settings, window=WindowSettings(width=960, height=640))]
+
+
+def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    settings = AppSettings.default()
+    repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN))
+    runtime = StartupEventRuntime(
+        startup_events=(AdaptersDiscovered(()), ConnectionChanged(ConnectionState.READY)),
+    )
+    runner = QtApplicationRunner()
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    observed: list[tuple[bool, bool, str]] = []
+
+    def create_gui(
+        *,
+        window: MainWindow,
+        on_shutdown_requested: Callable[[WindowSettings | None], bool],
+        **_kwargs: object,
+    ) -> QtApplicationRunner:
+        runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
+
+        def observe_and_close() -> None:
+            observed.append(
+                (
+                    window.main_toolbar.mapping_action.isEnabled(),
+                    window.main_toolbar.connection_settings_action.isEnabled(),
+                    window.status_bar.notice_label.text(),
+                )
+            )
+            window.close()
+
+        QTimer.singleShot(0, observe_and_close)
+        return runner
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, clock
+        runtime.event_sink = event_sink
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=runner.create_main_window,
+        gui_factory=create_gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-qt-first-run"),
+    )
+
+    assert run_application(dependencies) == 0
+    assert runner.application is qt_application
+    assert runtime.started == 1
+    assert runtime.commands == [DiscoverAdapters()]
+    assert observed == [(True, True, "通知: なし")]
+
+
+def test_qt_reconnect_failure_keeps_window_interactive_and_safe(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    settings = replace(
+        AppSettings.default(),
+        connection=replace(
+            AppSettings.default().connection,
+            adapter_id="usb:0",
+            reconnect_on_start=True,
+        ),
+    )
+    repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED))
+    runtime = StartupEventRuntime(
+        startup_events=(
+            AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)),
+            ConnectionChanged(ConnectionState.READY),
+            ControllerError(
+                category=ControllerErrorCategory.RECONNECT_FAILED,
+                summary="bond=/private/secret.json",
+                retryable=True,
+                diagnostic_id="test-0001",
+            ),
+        ),
+    )
+    runner = QtApplicationRunner()
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    observed: list[tuple[bool, bool, str]] = []
+
+    def create_gui(
+        *,
+        window: MainWindow,
+        on_shutdown_requested: Callable[[WindowSettings | None], bool],
+        **_kwargs: object,
+    ) -> QtApplicationRunner:
+        runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
+
+        def observe_and_close() -> None:
+            observed.append(
+                (
+                    window.main_toolbar.connection_action.isEnabled(),
+                    window.main_toolbar.connection_settings_action.isEnabled(),
+                    window.status_bar.notice_label.text(),
+                )
+            )
+            window.close()
+
+        QTimer.singleShot(0, observe_and_close)
+        return runner
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, clock
+        runtime.event_sink = event_sink
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=runner.create_main_window,
+        gui_factory=create_gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-qt-reconnect-failure"
+        ),
+    )
+
+    assert run_application(dependencies) == 0
+    assert runtime.started == 1
+    assert [command for command in runtime.commands if isinstance(command, ConnectSaved)]
+    assert not any(isinstance(command, StartPairing) for command in runtime.commands)
+    assert observed == [(True, True, "エラー: 保存済み接続に失敗しました")]

@@ -11,6 +11,7 @@ from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
 from demi.controller.commands import (
     ConnectSaved,
     Disconnect,
+    DiscoverAdapters,
     RecreateWithColors,
     StartPairing,
 )
@@ -159,7 +160,7 @@ class FakeGui:
         return self.exit_status
 
 
-def test_application_runner_assembles_boundaries_without_starting_the_runtime() -> None:
+def test_application_runner_assembles_boundaries_and_starts_the_runtime() -> None:
     paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
     repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
     runtime = FakeRuntime()
@@ -185,8 +186,8 @@ def test_application_runner_assembles_boundaries_without_starting_the_runtime() 
 
     assert run_application(dependencies) == 0
 
-    assert runtime.started == 0
-    assert runtime.commands == []
+    assert runtime.started == 1
+    assert runtime.commands == [DiscoverAdapters()]
     assert gui.runs == 1
     assert runtime.closed == 1
     assert isinstance(gui_kwargs["session"], ApplicationSession)

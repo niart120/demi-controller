@@ -12,7 +12,8 @@ from demi.ui.main_window import MainWindow
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from demi.app import WindowPort, WindowSpec
+    from demi.app import ApplicationSession, WindowPort, WindowSpec
+    from demi.controller.events import RuntimeEvent
     from demi.domain.settings import WindowSettings
 
 
@@ -72,3 +73,43 @@ class QtApplicationRunner:
             spec: Validated saved dimensions selected by the application layer.
         """
         return MainWindow(spec)
+
+
+class QtApplicationEventRouter:
+    """Apply queued runtime events to one session and its main window."""
+
+    def __init__(self, window: MainWindow) -> None:
+        """Create an unbound GUI-thread event receiver.
+
+        Args:
+            window: Main window updated after each reduced runtime event.
+        """
+        self._window = window
+        self._session: ApplicationSession | None = None
+
+    def bind(self, session: ApplicationSession) -> None:
+        """Bind the assembled application session and render its current state.
+
+        Args:
+            session: Main-thread application state that receives runtime events.
+        """
+        self._session = session
+        self.refresh()
+
+    def handle_runtime_event(self, event: RuntimeEvent) -> None:
+        """Reduce one bridge-delivered event and refresh the main window.
+
+        Args:
+            event: Immutable runtime event delivered on the GUI thread.
+        """
+        session = self._session
+        if session is None:
+            return
+        session.handle_runtime_event(event)
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Render the current session snapshot when a session is bound."""
+        session = self._session
+        if session is not None:
+            self._window.refresh(session.ui_snapshot)

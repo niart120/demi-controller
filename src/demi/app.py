@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeGuard, runtime_checkable
 
 from demi.application.coordinator import (
     CaptureCoordinator,
@@ -67,6 +67,7 @@ if TYPE_CHECKING:
     from demi.domain.mapping import InputProfile
     from demi.domain.settings import AppSettings, WindowSettings
     from demi.ui.application import QtApplicationRunner
+    from demi.ui.main_window import MainWindow
 
 
 class Clock(Protocol):
@@ -634,13 +635,21 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging(settings.connection.diagnostic_level)
         logger.info("Starting Project_Demi")
 
-        runtime = selected_dependencies.runtime_factory(
-            adapter_factory=SwbtControllerAdapter,
-            event_sink=DiscardRuntimeEventSink(),
-            clock=selected_dependencies.clock,
-        )
         spec = _window_spec_for(settings)
         window = selected_dependencies.window_factory(spec)
+        event_sink: RuntimeEventSink = DiscardRuntimeEventSink()
+        event_router = None
+        if _is_qt_main_window(window):
+            from demi.ui.application import QtApplicationEventRouter  # noqa: PLC0415
+            from demi.ui.event_bridge import QtRuntimeEventBridge  # noqa: PLC0415
+
+            event_router = QtApplicationEventRouter(window)
+            event_sink = QtRuntimeEventBridge(event_router.handle_runtime_event, parent=window)
+        runtime = selected_dependencies.runtime_factory(
+            adapter_factory=SwbtControllerAdapter,
+            event_sink=event_sink,
+            clock=selected_dependencies.clock,
+        )
         if isinstance(window, ControllerColorPreviewPort):
             window.set_controller_colors(settings.controller_colors)
         preview = window if isinstance(window, FramePreviewPort) else None
@@ -674,6 +683,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )
+        if event_router is not None:
+            event_router.bind(session)
         coordinator.set_capture_failure_reporter(session.report_capture_failure)
         shutdown = ApplicationShutdownCoordinator(
             capture=coordinator,
@@ -688,6 +699,11 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             """Run ordered shutdown and allow native close only after success."""
             shutdown.request(window_state)
             return not shutdown.failed
+
+        runtime.start()
+        session.begin()
+        if event_router is not None:
+            event_router.refresh()
 
         gui = selected_dependencies.gui_factory(
             window=window,
@@ -744,6 +760,13 @@ def _window_state_for(window: WindowPort | None) -> WindowSettings | None:
     if window is None:
         return None
     return window.window_state()
+
+
+def _is_qt_main_window(window: WindowPort) -> TypeGuard[MainWindow]:
+    """Return whether a window can own Qt runtime-event delivery."""
+    from demi.ui.main_window import MainWindow  # noqa: PLC0415 - GUI起動時だけQtをimportする。
+
+    return isinstance(window, MainWindow)
 
 
 def _close_window(window: WindowPort | None, logger: logging.Logger | None) -> None:
