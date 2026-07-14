@@ -1,8 +1,10 @@
 import ctypes
 from dataclasses import dataclass, field
+from typing import SupportsInt, cast
 
 import pytest
 from PySide6.QtCore import QAbstractNativeEventFilter, QByteArray
+from shiboken6 import Shiboken
 
 from demi.domain.controller import ControllerFrame
 from demi.input.publisher import InputPublisher
@@ -14,16 +16,35 @@ from demi.platform.windows_raw_input import (
     RIDEV_REMOVE,
     RIM_TYPEMOUSE,
     WM_INPUT,
+    CtypesNativeMessageReader,
     NativeWindowsMessage,
     RawInputDevice,
     RawInputRegistrationConflictError,
     RawMousePacket,
     WindowsRawInputBackend,
     WindowsRawInputFilter,
+    _NativeMessage,
     _NativeRawInputHeader,
     _NativeRawMouse,
     decode_raw_mouse_payload,
 )
+
+
+def test_ctypes_native_message_reader_accepts_qt_void_pointer() -> None:
+    native_message = _NativeMessage()
+    native_message.hwnd = 0x1234
+    native_message.message = WM_INPUT
+    native_message.lParam = 0xCAFE
+    # PySide6's stub omits VoidPtr.__int__, which Qt supplies at runtime.
+    message_address = cast("SupportsInt", Shiboken.VoidPtr(ctypes.addressof(native_message)))
+
+    decoded = CtypesNativeMessageReader().read(message_address)
+
+    assert decoded == NativeWindowsMessage(
+        message=WM_INPUT,
+        l_param=0xCAFE,
+        window_handle=0x1234,
+    )
 
 
 def test_native_event_filter_leaves_non_raw_messages_for_qt() -> None:

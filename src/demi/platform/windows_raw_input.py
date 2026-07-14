@@ -4,7 +4,7 @@ import ctypes
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, SupportsInt
 
 from PySide6.QtCore import QAbstractNativeEventFilter, QByteArray
 
@@ -217,7 +217,7 @@ def decode_raw_mouse_payload(payload: bytes | bytearray | memoryview) -> RawMous
 class CtypesNativeMessageReader:
     """Read the Win32 ``MSG`` selected by Qt's native event filter."""
 
-    def read(self, message_address: int) -> NativeWindowsMessage:
+    def read(self, message_address: SupportsInt) -> NativeWindowsMessage:
         """Decode the message and raw-input handle from a native pointer.
 
         Args:
@@ -232,15 +232,17 @@ class CtypesNativeMessageReader:
         """
         if sys.platform != "win32":
             raise RawInputUnavailableError
-        if (
-            isinstance(message_address, bool)
-            or not isinstance(message_address, int)
-            or message_address <= 0
-        ):
+        if isinstance(message_address, bool):
+            raise RawInputReadError
+        try:
+            native_message_address = int(message_address)
+        except (OverflowError, TypeError, ValueError) as error:
+            raise RawInputReadError from error
+        if native_message_address <= 0:
             raise RawInputReadError
         try:
             native_message = ctypes.cast(
-                message_address,
+                native_message_address,
                 ctypes.POINTER(_NativeMessage),
             ).contents
         except (TypeError, ValueError) as error:
