@@ -199,13 +199,18 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `uv run pytest tests/unit/ui/test_application.py tests/integration/ui/test_main_window_dialogs.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/main_window.py tests/integration/ui/test_main_window_dialogs.py` / `uv run ruff check src/demi/ui/main_window.py tests/integration/ui/test_main_window_dialogs.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MainWindow.bind_settings_dialog_factories()`未実装で失敗。greenでは3つのtoolbar actionがfactoryから受け取った非同期`QDialog`をwindow modalで1つだけ開き、active dialogの間は別actionを無視し、終了後に次のdialogを開けることを確認した。追加のrefactorを省略した |
 | `uv run pytest tests/integration/ui/test_connection_dialog.py tests/unit/application/test_settings_editor.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`on_save_and_connect`未実装で失敗。greenでは明示選択したadapter、bond slot、45秒timeout、起動時再接続、DEBUGをdraftへ反映し、Save操作がapplication callbackを1回だけ発行してacceptすることを確認した。callback失敗時は説明を表示してdialogを維持する。追加のrefactorを省略した |
 | `uv run pytest tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_connection_dialog.py tests/integration/ui/test_colors_dialog.py tests/integration/ui/test_dialog_cancellation.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_cancellation.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_cancellation.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`ConnectionDialog`がcancel callbackを受け取れず失敗。greenでは3つのdialogでEscとwindow closeが各1回のcancel callbackを発行し、結果がRejectedになることを確認した。Save後のacceptとpairing確認のbusy取消は変更しないためrefactorを省略した |
-| Computer UseによるWindows実画面のスクリーンショット確認 | not run | native pipeへの接続が`os error 2`で失敗した。別の自動UI操作へ置換せず、接続復旧後に同じ画面を確認する |
+| Computer UseによるWindows実画面のスクリーンショット確認 | not run | native pipeへの接続が`os error 2`で失敗した。2026-07-15の再試行でも同じ失敗を確認した。別の自動UI操作へ置換せず、接続復旧後に同じ画面を確認する |
 | `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ty check --no-progress` | not run | Qt model / action / dialog境界は未実装 |
 | `uv run pytest tests/unit` | not run | Qt standard controls未実装のため |
 | `uv run pytest tests/integration` | not run | dialogとapplication action未実装のため |
 | `uv build` | not run | 仕様執筆だけでsource packageを変更していない。実装完了時に実行する |
+| `uv sync --dev` / `uv lock --check` | passed | 77 packageを解決し、lockの整合を確認した |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | passed | 113 filesの整形、lint、型検査が通過した |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed | 185 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed | 35 passed |
+| `uv build` / `git diff --check` | passed | 制限環境では`uv-build`取得が`os error 10013`で失敗したが、許可後の再実行でsdistとwheelを生成した。差分のwhitespace errorなし |
 
 ## 10. 先送り事項
 
@@ -217,12 +222,12 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 
 ## 11. チェックリスト
 
-- [ ] unit_015のinput / preview前提を確認した
-- [ ] QToolBar / QAction / QStatusBarを実装した
-- [ ] mapping / connection / colorsを標準dialogとmodel/viewで実装した
-- [ ] FR-002〜004、FR-008、FR-010〜014のGUI観測面を確認した
-- [ ] 保存失敗、取消、重複、busy、adapter 0件を確認した
-- [ ] Tab、Enter、Space、Escとenabled stateを確認した
-- [ ] 独自座標hit testが存在しないことを確認した
-- [ ] TDD Test Listと検証結果を更新した
-- [ ] unit_017への引き渡し条件を満たした
+- [x] unit_015のinput / preview前提を確認した
+- [x] QToolBar / QAction / QStatusBarを実装した
+- [x] mapping / connection / colorsを標準dialogとmodel/viewで実装した
+- [x] FR-002〜004、FR-008、FR-010〜014のGUI観測面を確認した
+- [x] 保存失敗、取消、重複、busy、adapter 0件を確認した
+- [x] Tab、Enter、Space、Escとenabled stateを確認した
+- [x] 独自座標hit testが存在しないことを確認した
+- [x] TDD Test Listと検証結果を更新した
+- [x] unit_017への引き渡し条件を満たした
