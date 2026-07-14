@@ -4,7 +4,7 @@ from threading import Thread, get_ident
 
 import pytest
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
 from demi.application.coordinator import CaptureCoordinator
@@ -12,7 +12,7 @@ from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.commands import ControllerCommand
+from demi.controller.commands import ControllerCommand, DiscoverAdapters
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -258,3 +258,82 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     assert window.status_bar.connection_label.text() == "接続: 停止"
     assert window.status_bar.notice_label.text() == "エラー: 保存済み接続に失敗しました"
     assert set(window.refresh_threads) == {main_thread}
+
+
+def test_shutdown_drops_queued_events_timer_timeouts_and_dialog_callbacks(
+    qt_application: QApplication,
+) -> None:
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    window = _RecordingMainWindow(WindowSpec(width=960, height=640, maximized=False))
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=window,
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    bridge = QtRuntimeEventBridge(router.handle_runtime_event, parent=window)
+    window.configure_input(publisher=coordinator.publisher, coordinator=coordinator)
+    dialogs: list[QDialog] = []
+
+    def create_dialog(parent: QWidget) -> QDialog:
+        dialog = QDialog(parent)
+        dialog.finished.connect(lambda _result: runtime.post(DiscoverAdapters()))
+        dialogs.append(dialog)
+        return dialog
+
+    window.bind_settings_dialog_factories(
+        mapping=create_dialog,
+        connection=lambda _parent: None,
+        colors=lambda _parent: None,
+    )
+    window.main_toolbar.mapping_action.trigger()
+    qt_application.processEvents()
+    dialog = dialogs[0]
+    snapshot_before_shutdown = session.ui_snapshot
+    notice_before_shutdown = window.status_bar.notice_label.text()
+    frame_count_before_shutdown = len(runtime.frames)
+
+    worker = Thread(
+        target=lambda: bridge.emit(
+            ControllerError(
+                category=ControllerErrorCategory.UNEXPECTED,
+                summary="bond=private-late-worker-token",
+                retryable=False,
+                diagnostic_id="late-worker-0001",
+            )
+        )
+    )
+    worker.start()
+    worker.join()
+
+    bridge.deactivate()
+    router.deactivate()
+    window.begin_shutdown()
+    qt_application.processEvents()
+    window._input_evaluation_timer.timeout.emit()
+    dialog.finished.emit(0)
+    bridge.emit(
+        ControllerError(
+            category=ControllerErrorCategory.UNEXPECTED,
+            summary="bond=private-post-stop-token",
+            retryable=False,
+            diagnostic_id="late-worker-0002",
+        )
+    )
+    qt_application.processEvents()
+
+    assert session.ui_snapshot == snapshot_before_shutdown
+    assert window.status_bar.notice_label.text() == notice_before_shutdown
+    assert len(runtime.frames) == frame_count_before_shutdown
+    assert runtime.commands == []
+    assert window.input_evaluation_interval_ms is None
+    assert not dialog.isVisible()
+    assert window.active_settings_dialog is None

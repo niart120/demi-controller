@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     from demi.domain.mapping import InputProfile
     from demi.domain.settings import AppSettings, WindowSettings
     from demi.ui.application import QtApplicationRunner
+    from demi.ui.event_bridge import QtRuntimeEventBridge
     from demi.ui.main_window import MainWindow
 
 
@@ -615,6 +616,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
     window: WindowPort | None = None
     shutdown: ApplicationShutdownCoordinator | None = None
     logger: logging.Logger | None = None
+    ui_deactivator: Callable[[], None] | None = None
     exit_status = 1
     try:
         paths = selected_dependencies.paths_resolver()
@@ -641,12 +643,14 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         window = selected_dependencies.window_factory(spec)
         event_sink: RuntimeEventSink = DiscardRuntimeEventSink()
         event_router = None
+        event_bridge: QtRuntimeEventBridge | None = None
         if _is_qt_main_window(window):
             from demi.ui.application import QtApplicationEventRouter  # noqa: PLC0415
             from demi.ui.event_bridge import QtRuntimeEventBridge  # noqa: PLC0415
 
             event_router = QtApplicationEventRouter(window)
-            event_sink = QtRuntimeEventBridge(event_router.handle_runtime_event, parent=window)
+            event_bridge = QtRuntimeEventBridge(event_router.handle_runtime_event, parent=window)
+            event_sink = event_bridge
         runtime = selected_dependencies.runtime_factory(
             adapter_factory=SwbtControllerAdapter,
             event_sink=event_sink,
@@ -697,8 +701,20 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             report_error=lambda stage, error: _log_shutdown_error(logger, stage, error),
         )
 
+        def deactivate_ui() -> None:
+            """Disable Qt callbacks before worker shutdown or native close."""
+            if event_bridge is not None:
+                event_bridge.deactivate()
+            if event_router is not None:
+                event_router.deactivate()
+            if _is_qt_main_window(window):
+                window.begin_shutdown()
+
+        ui_deactivator = deactivate_ui
+
         def request_shutdown(window_state: WindowSettings | None) -> bool:
             """Run ordered shutdown and allow native close only after success."""
+            deactivate_ui()
             shutdown.request(window_state)
             return not shutdown.failed
 
@@ -735,7 +751,6 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             on_shutdown_requested=request_shutdown,
             window_maximized=settings.window.maximized,
         )
-        active_shutdown = shutdown
         main_thread_failed = False
         original_exception_hook = sys.excepthook
 
@@ -757,8 +772,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
                     "Project_Demi main-thread failure: %s",
                     error_type.__name__,
                 )
-            active_shutdown.request()
-            _close_window(window, logger)
+            if request_shutdown(None):
+                _close_window(window, logger)
 
         sys.excepthook = handle_main_thread_exception
         try:
@@ -777,6 +792,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         exit_status = 1
     finally:
         if shutdown is not None:
+            if ui_deactivator is not None:
+                ui_deactivator()
             already_requested = shutdown.requested
             shutdown.request()
             if shutdown.failed:

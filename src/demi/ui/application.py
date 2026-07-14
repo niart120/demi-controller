@@ -88,6 +88,7 @@ class QtApplicationEventRouter:
         self._window = window
         self._session: ApplicationSession | None = None
         self._runtime_stopped_handler: Callable[[], object] | None = None
+        self._active = True
 
     def bind(self, session: ApplicationSession) -> None:
         """Bind the assembled application session and render its current state.
@@ -95,8 +96,16 @@ class QtApplicationEventRouter:
         Args:
             session: Main-thread application state that receives runtime events.
         """
+        if not self._active:
+            return
         self._session = session
         self.refresh()
+
+    def deactivate(self) -> None:
+        """Drop queued runtime callbacks after application shutdown begins."""
+        self._active = False
+        self._session = None
+        self._runtime_stopped_handler = None
 
     def set_runtime_stopped_handler(self, handler: Callable[[], object] | None) -> None:
         """Set the application-owned completion callback for RuntimeStopped.
@@ -106,7 +115,8 @@ class QtApplicationEventRouter:
                 session has rendered a runtime-stopped snapshot, or ``None``
                 to leave the router passive.
         """
-        self._runtime_stopped_handler = handler
+        if self._active:
+            self._runtime_stopped_handler = handler
 
     def handle_runtime_event(self, event: RuntimeEvent) -> None:
         """Reduce one bridge-delivered event and refresh the main window.
@@ -114,6 +124,8 @@ class QtApplicationEventRouter:
         Args:
             event: Immutable runtime event delivered on the GUI thread.
         """
+        if not self._active:
+            return
         session = self._session
         if session is None:
             return
@@ -126,6 +138,8 @@ class QtApplicationEventRouter:
 
     def refresh(self) -> None:
         """Render the current session snapshot when a session is bound."""
+        if not self._active:
+            return
         session = self._session
         if session is not None:
             self._window.refresh(session.ui_snapshot)

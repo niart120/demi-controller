@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         self.setMouseTracking(True)
         self._shutdown_callback: ShutdownCallback | None = None
         self._close_accepted = False
+        self._shutdown_started = False
         self._input_application: QApplication | None = None
         self._input_adapter: QtInputAdapter | None = None
         self._native_input_filter: WindowsRawInputBackend | None = None
@@ -125,6 +126,18 @@ class MainWindow(QMainWindow):
                 destroyed and returns whether native close is safe.
         """
         self._shutdown_callback = callback
+
+    def begin_shutdown(self) -> None:
+        """Stop UI-owned callbacks and close the active dialog once."""
+        if self._shutdown_started:
+            return
+        self._shutdown_started = True
+        self._remove_input_filters()
+        dialog = self._active_settings_dialog
+        self._active_settings_dialog = None
+        if dialog is not None:
+            dialog.blockSignals(True)
+            dialog.done(int(QDialog.DialogCode.Rejected))
 
     def set_pointer_capture(self, enabled: bool) -> None:
         """Apply or release foreground pointer capture for controller input.
@@ -168,6 +181,8 @@ class MainWindow(QMainWindow):
         Args:
             snapshot: Main-thread state selected by the application layer.
         """
+        if self._shutdown_started:
+            return
         self._latest_snapshot = snapshot
         self._main_toolbar.refresh(
             ToolbarState(
@@ -366,7 +381,7 @@ class MainWindow(QMainWindow):
             return
         if callback(self.window_state()):
             self._close_accepted = True
-            self._remove_input_filters()
+            self.begin_shutdown()
             event.accept()
             return
         event.ignore()
@@ -377,7 +392,7 @@ class MainWindow(QMainWindow):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
 
     def _open_settings_dialog(self, factory: SettingsDialogFactory | None) -> None:
-        if factory is None or self._active_settings_dialog is not None:
+        if self._shutdown_started or factory is None or self._active_settings_dialog is not None:
             return
         dialog = factory(self)
         if dialog is None:
@@ -402,7 +417,7 @@ class MainWindow(QMainWindow):
             dialog.set_adapters(snapshot.adapters)
 
     def _on_input_evaluation_timeout(self) -> None:
-        if self._input_coordinator is not None:
+        if not self._shutdown_started and self._input_coordinator is not None:
             self.evaluate_input()
 
     def _require_relative_pointer_backend(self) -> RelativePointerBackend:

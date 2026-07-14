@@ -37,7 +37,12 @@ class QtRuntimeEventBridge(QObject):
         """
         super().__init__(parent)
         self._receiver = receiver
+        self._active = True
         self.runtime_event.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
+
+    def deactivate(self) -> None:
+        """Drop pending and future runtime events after shutdown begins."""
+        self._active = False
 
     @overload
     def emit(self, signal: bytes | bytearray | memoryview, /, *args: None) -> bool: ...
@@ -63,11 +68,15 @@ class QtRuntimeEventBridge(QObject):
         """
         if isinstance(event, (bytes, bytearray, memoryview)):
             return super().emit(event, *args)
+        if not self._active:
+            return None
         self.runtime_event.emit(_runtime_event_from_signal(event))
         return None
 
     @Slot(object)
     def _deliver(self, event: object) -> None:
+        if not self._active:
+            return
         self._receiver(_runtime_event_from_signal(event))
 
 
