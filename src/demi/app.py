@@ -739,16 +739,17 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
                 exit_status = 1
             if not already_requested:
                 _close_window(window, logger)
-        elif runtime is not None:
-            try:
-                runtime.close()
-            except Exception as error:  # noqa: BLE001 - preserve the primary exit status.
-                exit_status = 1
-                if logger is not None:
-                    logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
-                        "Project_Demi shutdown failed: %s",
-                        type(error).__name__,
-                    )
+        else:
+            if runtime is not None:
+                try:
+                    runtime.close()
+                except Exception as error:  # noqa: BLE001 - preserve the primary exit status.
+                    exit_status = 1
+                    if logger is not None:
+                        logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
+                            "Project_Demi shutdown failed: %s",
+                            type(error).__name__,
+                        )
             _close_window(window, logger)
     if logger is not None and exit_status == 0:
         logger.info("Project_Demi stopped normally")

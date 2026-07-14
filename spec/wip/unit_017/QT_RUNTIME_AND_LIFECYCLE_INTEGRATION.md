@@ -107,7 +107,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 | refactor-skipped | startup reconnectは検出済みの保存adapterだけへ`ConnectSaved`を1回発行し、新規pairingを開始しない | regression | integration | `_startup_reconnect_pending`とdiscovery完了の組合せで一致IDへ一度だけConnectSavedを発行する。disabled、0件、保存ID未検出ではConnectSaved / StartPairingを発行しないため、追加refactorは不要 |
 | refactor-skipped | settingsなし / adapterなし / reconnect失敗でもmain windowは操作可能に残る | edge | integration | production compositionはMainWindowがある場合にQt bridgeとGUI-thread routerをruntime sinkへ接続し、runtime start後にdiscoveryを発行する。FIRST_RUN + adapter 0件とretryable reconnect errorで設定actionを維持するため、追加refactorは不要 |
 | refactor-skipped | discovery / connect / disconnectのslow fake実行中もGUI probe eventを100ms未満の間隔で処理する | new | integration | 30ms遅延のworker fakeでdiscovery、connect、disconnectを順に実行し、10ms GUI timerの隣接tick間隔が100ms未満であることを確認する。worker / queued bridge境界を使う既存構造で満たすため、追加refactorは不要 |
-| todo | startup途中のsettings / runtime / window failureは開始済み資源を逆順に一度だけ閉じ、安全なstderrと非ゼロstatusを返す | edge | integration | 秘密値をfixtureに含めて非出力を確認 |
+| refactor-skipped | startup途中のsettings / runtime / window failureは開始済み資源を逆順に一度だけ閉じ、安全なstderrと非ゼロstatusを返す | edge | integration | runtime factory失敗後も作成済みwindowを閉じる。runtime start失敗ではruntime close、settings保存、window closeを各1回実行する。settings loadとwindow factoryの失敗も秘密値をstderrへ出さずstatus 1で終了するため、追加refactorは不要 |
 | todo | main-thread未処理例外はneutral、runtime停止、settings / window cleanupを試行し非ゼロstatusを返す | regression | integration | `os._exit`禁止 |
 | todo | worker faultはqueued error / stoppedを処理し、widgetをworkerから変更せず安全に終了またはREADYへ戻る | regression | integration | retryable分類を尊重する |
 | todo | close / Ctrl+Q / RuntimeStoppedの競合でもtimer、signal、runtime、settings、windowの後処理は一度だけ実行される | edge | integration | unit_012のcancellable closeを使う |
@@ -181,6 +181,9 @@ QtApplicationRunner
 | `uv run pytest tests/unit/application/test_app.py::test_session_reconnects_once_only_when_the_saved_adapter_is_discovered tests/unit/application/test_app.py::test_session_does_not_reconnect_for_a_missing_adapter_or_when_disabled -q -p no:cacheprovider` | passed | 2 passed。一致保存IDだけへConnectSavedを一度だけ発行し、disabled、0件、保存ID未検出でConnectSaved / StartPairingを発行しないことを確認した |
 | `uv run pytest tests/unit/application/test_app.py::test_application_runner_assembles_boundaries_and_starts_the_runtime tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 5 passed。runtime startとDiscoverAdapters発行、FIRST_RUN + adapter 0件、retryable reconnect failure後にもwindow設定actionが操作可能なことを確認した |
 | `uv run pytest tests/integration/ui/test_application_lifecycle.py::test_qt_event_loop_stays_responsive_during_slow_runtime_operations -q -p no:cacheprovider` | passed | 1 passed。30ms worker delayのdiscovery / connect / disconnect中、GUI timerの隣接tick間隔は100ms未満 |
+| `uv run pytest tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 9 passed。settings load、window factory、runtime factory、runtime startの失敗でstatus 1と固定文のstderrを確認し、runtime factory失敗後のwindow closeとruntime start失敗後の逆順cleanupを確認した |
+| `uv run ruff format --check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | All checks passed |
 | `uv run ruff format --check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
 | `uv run ruff format --check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py tests/unit/application/test_application_session.py tests/unit/application/test_ui_state.py tests/integration/ui/test_main_window_snapshot.py` | passed | 6 files already formatted |
@@ -211,7 +214,7 @@ QtApplicationRunner
 - [x] unit_014〜016のQt UI前提を確認した
 - [x] Qt queued signalでworker eventをGUI threadへ渡した
 - [ ] adapter / connection / pairing / watchdog / errorを表示へ反映した
-- [ ] startup reconnect / adapter不在 / startup failureを確認した
+- [x] startup reconnect / adapter不在 / startup failureを確認した
 - [ ] unhandled exceptionの安全な終了を確認した
 - [ ] 100ms応答性probeを実行した
 - [ ] timer / signal / dialog / window / runtimeの所有権を固定した

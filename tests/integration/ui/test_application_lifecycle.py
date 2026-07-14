@@ -30,6 +30,7 @@ from demi.ui.application import QtApplicationRunner
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import pytest
     from PySide6.QtWidgets import QApplication
 
     from demi.app import ApplicationSession, RuntimePort
@@ -177,6 +178,77 @@ class ShellRepository:
         self.saved.append(settings)
 
 
+@dataclass
+class StartupFailureWindow:
+    """Window fake that records cleanup after a partial startup failure."""
+
+    timeline: list[str]
+
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Accept capture cleanup without a native window."""
+        del enabled
+
+    def window_state(self) -> WindowSettings:
+        """Return the valid state available before native closure."""
+        return WindowSettings(width=960, height=640)
+
+    def close(self) -> None:
+        """Record one native window close request."""
+        self.timeline.append("window.close")
+
+
+@dataclass
+class StartupFailureRepository:
+    """Repository fake that can record persistence during failed startup cleanup."""
+
+    loaded: SettingsLoadResult
+    timeline: list[str]
+    saved: list[AppSettings] = field(default_factory=list)
+
+    def load(self) -> SettingsLoadResult:
+        """Return the configured startup result."""
+        return self.loaded
+
+    def save(self, settings: AppSettings) -> None:
+        """Record the final valid settings snapshot."""
+        self.timeline.append("repository.save")
+        self.saved.append(settings)
+
+
+@dataclass
+class FailingStartRuntime(ShellRuntime):
+    """Runtime fake that raises after being constructed and started."""
+
+    timeline: list[str] = field(default_factory=list)
+    error: Exception = field(default_factory=RuntimeError)
+
+    def start(self) -> None:
+        """Record startup before raising the selected worker failure."""
+        super().start()
+        self.timeline.append("runtime.start")
+        raise self.error
+
+    def close(self) -> None:
+        """Record the compensating close request."""
+        super().close()
+        self.timeline.append("runtime.close")
+
+
+@dataclass
+class FailingSettingsRepository:
+    """Repository fake that raises while loading startup settings."""
+
+    error: Exception
+
+    def load(self) -> SettingsLoadResult:
+        """Raise the configured private startup error."""
+        raise self.error
+
+    def save(self, settings: AppSettings) -> None:
+        """Satisfy the outer persistence boundary without saving."""
+        del settings
+
+
 def test_qt_quit_runs_ordered_shutdown_once(qt_application: object) -> None:
     timeline: list[str] = []
     settings = AppSettings.default()
@@ -261,6 +333,166 @@ def test_application_runner_starts_an_empty_qt_shell_and_returns_zero(
     assert runtime.commands == [DiscoverAdapters()]
     assert runtime.closed == 1
     assert repository.saved == [replace(settings, window=WindowSettings(width=960, height=640))]
+
+
+def test_qt_runtime_factory_failure_closes_the_created_window_without_leaking_secret(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    secret = "bond=private-startup-token"  # noqa: S105 - test value must not reach stderr.
+    timeline: list[str] = []
+    window = StartupFailureWindow(timeline)
+    repository = ShellRepository(
+        SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
+    )
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, event_sink, clock
+        raise RuntimeError(secret)
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: QtApplicationRunner(),
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-runtime-factory-failure"
+        ),
+    )
+
+    assert run_application(dependencies) == 1
+
+    captured = capsys.readouterr()
+    assert timeline == ["window.close"]
+    assert captured.out == ""
+    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert secret not in captured.err
+
+
+def test_qt_runtime_start_failure_closes_started_resources_in_reverse_without_leaking_secret(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    secret = "bond=private-runtime-token"  # noqa: S105 - test value must not reach stderr.
+    timeline: list[str] = []
+    settings = AppSettings.default()
+    repository = StartupFailureRepository(
+        loaded=SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN),
+        timeline=timeline,
+    )
+    runtime = FailingStartRuntime(timeline=timeline, error=RuntimeError(secret))
+    window = StartupFailureWindow(timeline)
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, event_sink, clock
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: QtApplicationRunner(),
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-runtime-start-failure"
+        ),
+    )
+
+    assert run_application(dependencies) == 1
+
+    captured = capsys.readouterr()
+    assert runtime.started == 1
+    assert runtime.closed == 1
+    assert timeline == ["runtime.start", "runtime.close", "repository.save", "window.close"]
+    assert len(repository.saved) == 1
+    assert captured.out == ""
+    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert secret not in captured.err
+
+
+def test_qt_settings_load_failure_returns_a_safe_nonzero_status(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    secret = "settings=private-load-token"  # noqa: S105 - test value must not reach stderr.
+    window_created = False
+
+    def create_window(_spec: WindowSpec) -> StartupFailureWindow:
+        nonlocal window_created
+        window_created = True
+        return StartupFailureWindow([])
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FailingSettingsRepository(RuntimeError(secret)),
+        runtime_factory=lambda **_kwargs: ShellRuntime(),
+        window_factory=create_window,
+        gui_factory=lambda **_kwargs: QtApplicationRunner(),
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-settings-load-failure"
+        ),
+    )
+
+    assert run_application(dependencies) == 1
+
+    captured = capsys.readouterr()
+    assert not window_created
+    assert captured.out == ""
+    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert secret not in captured.err
+
+
+def test_qt_window_factory_failure_returns_a_safe_nonzero_status(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    secret = "window=private-construction-token"  # noqa: S105 - test value must not reach stderr.
+    runtime_created = False
+    repository = ShellRepository(
+        SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
+    )
+
+    def create_runtime(**_kwargs: object) -> ShellRuntime:
+        nonlocal runtime_created
+        runtime_created = True
+        return ShellRuntime()
+
+    def create_window(_spec: WindowSpec) -> StartupFailureWindow:
+        raise RuntimeError(secret)
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=create_window,
+        gui_factory=lambda **_kwargs: QtApplicationRunner(),
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-window-factory-failure"
+        ),
+    )
+
+    assert run_application(dependencies) == 1
+
+    captured = capsys.readouterr()
+    assert not runtime_created
+    assert captured.out == ""
+    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert secret not in captured.err
 
 
 def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(
