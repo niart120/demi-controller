@@ -6,6 +6,7 @@ from typing import Any, override
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -20,12 +21,14 @@ from PySide6.QtWidgets import (
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
 from demi.domain.errors import DomainValueError
+from demi.domain.settings import DiagnosticLevel
 
 _ROOT_INDEX = QModelIndex()
 
 type RescanAction = Callable[[], object]
 type PairingAction = Callable[[], bool]
 type PairingCancellation = Callable[[], object]
+type SettingsAction = Callable[[], bool]
 
 
 class AdapterListModel(QAbstractListModel):
@@ -91,6 +94,7 @@ class ConnectionDialog(QDialog):
         *,
         on_rescan: RescanAction,
         on_request_pairing: PairingAction | None = None,
+        on_save_and_connect: SettingsAction | None = None,
         parent: QWidget | None = None,
     ) -> None:
         """Create a connection dialog that does not own runtime discovery.
@@ -101,6 +105,8 @@ class ConnectionDialog(QDialog):
                 boundary without returning a result synchronously.
             on_request_pairing: Requests replacement by a pairing confirmation
                 dialog after an explicit adapter selection.
+            on_save_and_connect: Saves the edited draft and requests a saved
+                connection through the application boundary.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
@@ -108,36 +114,58 @@ class ConnectionDialog(QDialog):
         self._editor = editor
         self._on_rescan = on_rescan
         self._on_request_pairing = on_request_pairing
+        self._on_save_and_connect = on_save_and_connect
         self._adapter_model = AdapterListModel(self)
         self._updating_adapters = False
 
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
         self.rescan_button = QPushButton("再検索", self)
-        self.connect_button = QPushButton("保存して接続", self)
         self.pairing_button = QPushButton("新規ペアリング", self)
         self.discovery_label = QLabel("USBアダプターを検索してください", self)
+        self.controller_type_label = QLabel("Pro Controller", self)
         self.bond_slot_edit = QLineEdit(editor.draft.connection.bond_slot, self)
         self.timeout_edit = QLineEdit(str(editor.draft.connection.timeout_seconds), self)
+        self.reconnect_on_start_checkbox = QCheckBox("有効にする", self)
+        self.reconnect_on_start_checkbox.setChecked(editor.draft.connection.reconnect_on_start)
+        self.diagnostic_level_combo = QComboBox(self)
+        for diagnostic_level in DiagnosticLevel:
+            self.diagnostic_level_combo.addItem(diagnostic_level.value, diagnostic_level)
+        self.diagnostic_level_combo.setCurrentText(editor.draft.connection.diagnostic_level.value)
         self.connection_error_label = QLabel("", self)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        connect_button = self.button_box.button(QDialogButtonBox.StandardButton.Save)
+        if connect_button is None:
+            raise RuntimeError
+        self.connect_button = connect_button
+        self.connect_button.setText("保存して接続")
         self.connect_button.setEnabled(False)
         self.pairing_button.setEnabled(False)
 
         connection_form = QFormLayout()
+        connection_form.addRow("コントローラー種別", self.controller_type_label)
         connection_form.addRow("ボンドスロット", self.bond_slot_edit)
         connection_form.addRow("接続タイムアウト (秒)", self.timeout_edit)
+        connection_form.addRow("起動時の再接続", self.reconnect_on_start_checkbox)
+        connection_form.addRow("診断ログ水準", self.diagnostic_level_combo)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.adapter_combo)
         layout.addLayout(connection_form)
         layout.addWidget(self.rescan_button)
-        layout.addWidget(self.connect_button)
         layout.addWidget(self.pairing_button)
         layout.addWidget(self.discovery_label)
+        layout.addWidget(self.connection_error_label)
+        layout.addWidget(self.button_box)
 
         self.rescan_button.clicked.connect(self.request_rescan)
         self.adapter_combo.currentIndexChanged.connect(self.select_adapter)
         self.pairing_button.clicked.connect(self.request_pairing)
+        self.button_box.accepted.connect(self.request_connect)
+        self.button_box.rejected.connect(self.reject)
 
     @property
     def adapter_model(self) -> AdapterListModel:
@@ -155,8 +183,23 @@ class ConnectionDialog(QDialog):
     def request_pairing(self) -> None:
         """Request the application-owned pairing confirmation dialog."""
         on_request_pairing = self._on_request_pairing
-        if self.pairing_button.isEnabled() and on_request_pairing is not None:
+        if (
+            self.pairing_button.isEnabled()
+            and on_request_pairing is not None
+            and self.apply_connection_fields()
+        ):
             on_request_pairing()
+
+    def request_connect(self) -> None:
+        """Save the validated draft and request one saved connection."""
+        if not self.connect_button.isEnabled() or not self.apply_connection_fields():
+            return
+        on_save_and_connect = self._on_save_and_connect
+        if on_save_and_connect is not None and not on_save_and_connect():
+            self.connection_error_label.setText("設定を保存できませんでした")
+            return
+        self.connection_error_label.clear()
+        self.accept()
 
     def apply_connection_fields(self) -> bool:
         """Validate editable connection fields without saving the draft.
@@ -168,6 +211,8 @@ class ConnectionDialog(QDialog):
             self._editor.update_connection(
                 bond_slot=self.bond_slot_edit.text(),
                 timeout_seconds=float(self.timeout_edit.text()),
+                reconnect_on_start=self.reconnect_on_start_checkbox.isChecked(),
+                diagnostic_level=self._selected_diagnostic_level(),
             )
         except (DomainValueError, ValueError):
             self.connection_error_label.setText("接続設定の値が正しくありません")
@@ -231,6 +276,12 @@ class ConnectionDialog(QDialog):
     def _set_connection_actions_enabled(self, enabled: bool) -> None:
         self.connect_button.setEnabled(enabled)
         self.pairing_button.setEnabled(enabled)
+
+    def _selected_diagnostic_level(self) -> DiagnosticLevel:
+        try:
+            return DiagnosticLevel(self.diagnostic_level_combo.currentText())
+        except ValueError:
+            raise DomainValueError from None
 
 
 class PairingConfirmationDialog(QDialog):

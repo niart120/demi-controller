@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox
 
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
-from demi.domain.settings import AppSettings, ConnectionSettings
+from demi.domain.settings import AppSettings, ConnectionSettings, DiagnosticLevel
 from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 
 
@@ -190,3 +190,56 @@ def test_pairing_confirmation_starts_only_after_accept_and_not_while_busy(
 
     assert pairing_commands == ["start"]
     assert accepted.result() == int(QDialog.DialogCode.Accepted)
+
+
+def test_connection_dialog_saves_all_connection_fields_before_requesting_connect(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved_connections: list[ConnectionSettings] = []
+    dialog = ConnectionDialog(
+        editor,
+        on_rescan=lambda: None,
+        on_save_and_connect=lambda: saved_connections.append(editor.draft.connection) or True,
+    )
+    dialog.set_adapters((AdapterOption("usb:0", "USB Adapter 0"),))
+    dialog.adapter_combo.setCurrentIndex(0)
+    dialog.bond_slot_edit.setText("slot-2")
+    dialog.timeout_edit.setText("45")
+    dialog.reconnect_on_start_checkbox.setChecked(True)
+    dialog.diagnostic_level_combo.setCurrentText(DiagnosticLevel.DEBUG.value)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.controller_type_label.text() == "Pro Controller"
+    assert isinstance(dialog.button_box, QDialogButtonBox)
+    assert dialog.connect_button.isEnabled()
+
+    dialog.connect_button.click()
+    qt_application.processEvents()
+
+    assert saved_connections == [
+        ConnectionSettings(
+            adapter_id="usb:0",
+            bond_slot="slot-2",
+            timeout_seconds=45.0,
+            reconnect_on_start=True,
+            diagnostic_level=DiagnosticLevel.DEBUG,
+        )
+    ]
+    assert dialog.result() == int(QDialog.DialogCode.Accepted)
+
+    failed = ConnectionDialog(
+        SettingsEditor(AppSettings.default()),
+        on_rescan=lambda: None,
+        on_save_and_connect=lambda: False,
+    )
+    failed.set_adapters((AdapterOption("usb:0", "USB Adapter 0"),))
+    failed.adapter_combo.setCurrentIndex(0)
+    failed.show()
+    qt_application.processEvents()
+    failed.connect_button.click()
+    qt_application.processEvents()
+
+    assert failed.isVisible()
+    assert failed.connection_error_label.text() == "設定を保存できませんでした"
