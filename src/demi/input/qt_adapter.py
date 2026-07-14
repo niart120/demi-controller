@@ -5,7 +5,7 @@ from collections.abc import Callable
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 
-from demi.domain.physical_input import PhysicalInputState
+from demi.domain.physical_input import KeySource, MouseButtonSource, PhysicalInputState
 
 type CaptureActivity = Callable[[], bool]
 type CaptureTransition = Callable[[], object]
@@ -165,6 +165,22 @@ def _key_symbol(value: int) -> str | None:
     return None
 
 
+def key_source_for_event(event: QKeyEvent) -> str | None:
+    """Return the canonical settings source for a supported Qt key event.
+
+    Args:
+        event: Qt key event whose key and modifiers are normalized.
+
+    Returns:
+        The persisted ``KEY:...`` source, or ``None`` when the Qt key has no
+        supported mapping.
+    """
+    symbol = _key_symbol(event.key())
+    if symbol is None:
+        return None
+    return KeySource(symbol, _key_modifiers(event, symbol)).canonical
+
+
 def _key_modifiers(event: QKeyEvent, symbol: str) -> frozenset[str]:
     modifiers: set[str] = set()
     active = event.modifiers()
@@ -190,3 +206,19 @@ def _mouse_button_symbol(button: Qt.MouseButton) -> str | None:
         Qt.MouseButton.TaskButton: "BUTTON_6",
     }
     return standard_buttons.get(button)
+
+
+def mouse_source_for_event(event: QMouseEvent) -> str | None:
+    """Return the canonical settings source for a supported Qt mouse button.
+
+    Args:
+        event: Qt mouse event whose button is normalized.
+
+    Returns:
+        The persisted ``MOUSE:...`` source, or ``None`` when the button has no
+        supported mapping.
+    """
+    button = _mouse_button_symbol(event.button())
+    if button is None:
+        return None
+    return MouseButtonSource(button).canonical

@@ -101,7 +101,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | refactor-skipped | READY / CONNECTEDのconnection actionはconnect / disconnectを1回発行し、busy中の重複操作は発行しない | regression | integration | `MainToolBar`は状態判断を持たず、enabledな`connection_action`をapplication callbackへ1回渡す。接続・切断commandの選択は既存`ApplicationSession`が所有する |
 | refactor-skipped | status barはadapter、connection、capture、pointer quality、preview-only、warning / errorを文字で区別する | regression | unit | `MainStatusBar`の独立した`QLabel`で表示する。errorはwarningより優先する |
 | refactor-skipped | mapping modelはtarget、source、inverted、conflictを公開し、標準復元とdraft編集をapplication境界へ渡す | new | unit | `MappingTableModel`が`SettingsEditor`へ更新と標準復元を委譲し、`QAbstractTableModel`のindex / dataで観測する |
-| todo | mapping dialogの文字 / key / mouse取得はcontroller入力へ流れず、F12はcapture解除を優先する | regression | integration | FR-008 / FR-010 |
+| refactor-skipped | mapping dialogの文字 / key / mouse取得はcontroller入力へ流れず、F12はcapture解除を優先する | regression | integration | `MappingDialog`は表示時に`on_dialog_opened`を発行し、明示的な取得中だけ`QApplication`のイベントフィルターで`QTableView`内のキー / マウスボタンを`SettingsEditor`へ渡す。F12は入力候補にせず`on_release_capture`へ渡す |
 | todo | duplicate sourceとlocal action conflictを保存前に表示し、確定 / 取消を区別する | regression | integration | 同一targetへの異なるsourceは許可する |
 | todo | mapping保存失敗はdialogとdraftを保持し、取消は保存値を変更せず閉じる | edge | integration | FR-013 |
 | todo | connection dialogはadapter再検索を非同期actionとして発行し、結果modelを更新する間もGUI eventを処理できる | regression | integration | FR-002 |
@@ -152,6 +152,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `src/demi/ui/toolbar.py` | new | `QToolBar` / `QAction`構成とstate同期 |
 | `src/demi/ui/status_bar.py` | new | `QStatusBar` / `QLabel`による状態表示 |
 | `src/demi/ui/dialogs/mapping.py` | new | mapping model/view、capture、conflict、save/cancel |
+| `src/demi/input/qt_adapter.py` | modify | Qt key / mouse eventをcanonical mapping sourceへ変換する再利用関数 |
 | `src/demi/ui/dialogs/connection.py` | new | adapter model、再検索、接続設定、pairing確認 |
 | `src/demi/ui/dialogs/colors.py` | new | 4色editor、`QColorDialog`、preview、再接続選択 |
 | `src/demi/application/dialogs.py` | verify / modify | dialog排他と意味のあるstate |
@@ -161,6 +162,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `tests/unit/ui/test_toolbar.py` | new | action state |
 | `tests/unit/ui/test_status_bar.py` | new | status表示 |
 | `tests/unit/ui/dialogs/` | new | model/view、validation、keyboard |
+| `tests/integration/ui/test_mapping_dialog.py` | new | dialog入力取得、capture neutralization、F12保護 |
 | `tests/integration/ui/test_qt_dialogs.py` | new | action、neutral、save/cancel、edge |
 | `spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | modify | FR trace、TDD状態、検証、引き渡し記録 |
 
@@ -175,6 +177,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `uv run pytest tests/unit/ui/test_status_bar.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ruff check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.status_bar`未実装で収集失敗。greenでは6つの文字領域とerror優先を確認した。構造上の重複はなくrefactorを省略した |
 | `uv run pytest tests/unit/ui/test_application.py::test_main_window_uses_standard_toolbar_and_status_bar tests/unit/ui/test_toolbar.py tests/unit/ui/test_status_bar.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/main_window.py tests/unit/ui/test_application.py src/demi/ui/toolbar.py src/demi/ui/status_bar.py` / `uv run ruff check src/demi/ui/main_window.py tests/unit/ui/test_application.py src/demi/ui/toolbar.py src/demi/ui/status_bar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MainWindow`がtoolbar / status barを所有しないため失敗。greenでは`addToolBar()`、`setStatusBar()`と中央previewの維持を確認した |
 | `uv run pytest tests/unit/ui/test_mapping_model.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/unit/ui/test_mapping_model.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/unit/ui/test_mapping_model.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.dialogs.mapping`未実装で収集失敗。greenでは28行、target / source / inverted / duplicate conflict、source更新、標準復元を確認した。Qt stubのindex型を明示したためrefactorは不要 |
+| `uv run pytest tests/unit/input/test_qt_adapter.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/input/qt_adapter.py src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/input/qt_adapter.py src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MappingDialog`未実装によるimport error。greenではcapture中に開いたdialogが`CONFIGURING`へ遷移し、`QTableView`宛てのキー / マウスボタンは明示取得中だけdraftへ反映、controller側の保持入力は空のままと確認した。F12は`KEY:F12`を保存せず解除callbackを1回発行する。構造上の重複はなくrefactorを省略した |
 | Computer UseによるWindows実画面のスクリーンショット確認 | not run | native pipeへの接続が`os error 2`で失敗した。別の自動UI操作へ置換せず、接続復旧後に同じ画面を確認する |
 | `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |

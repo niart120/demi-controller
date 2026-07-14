@@ -1,19 +1,36 @@
 """Model/view presentation for editable controller input bindings."""
 
+from collections.abc import Callable
 from typing import Any, override
 
 from PySide6.QtCore import (
     QAbstractTableModel,
+    QEvent,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
     Qt,
 )
+from PySide6.QtGui import QHideEvent, QKeyEvent, QMouseEvent, QShowEvent
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QPushButton,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 from demi.application.settings_editor import BindingConflict, SettingsEditor
 from demi.domain.mapping import Binding
+from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 
 _ROOT_INDEX = QModelIndex()
+
+type CaptureTransition = Callable[[], object]
 
 
 class MappingTableModel(QAbstractTableModel):
@@ -118,3 +135,133 @@ class MappingTableModel(QAbstractTableModel):
     def _reset_from_editor(self) -> None:
         self.beginResetModel()
         self.endResetModel()
+
+
+class MappingDialog(QDialog):
+    """Edit one mapping draft with standard Qt model/view controls."""
+
+    def __init__(
+        self,
+        editor: SettingsEditor,
+        *,
+        on_dialog_opened: CaptureTransition | None = None,
+        on_release_capture: CaptureTransition | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        """Create a mapping editor without taking ownership of its draft.
+
+        Args:
+            editor: Application-owned immutable settings draft editor.
+            on_dialog_opened: Neutralizes controller capture before the dialog
+                accepts any input.
+            on_release_capture: Handles the fixed F12 capture-release action.
+            parent: Optional Qt parent for dialog ownership.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("キー割り当て")
+        self._mapping_model = MappingTableModel(editor, self)
+        self._on_dialog_opened = on_dialog_opened
+        self._on_release_capture = on_release_capture
+        self._capture_row: int | None = None
+        self._input_filter_application: QApplication | None = None
+
+        self.table = QTableView(self)
+        self.table.setModel(self._mapping_model)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.capture_button = QPushButton("次の入力を取得", self)
+        self.capture_label = QLabel("入力を取得していません", self)
+        self.restore_button = QPushButton("標準に戻す", self)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.table)
+        layout.addWidget(self.capture_button)
+        layout.addWidget(self.capture_label)
+        layout.addWidget(self.restore_button)
+        layout.addWidget(self.button_box)
+
+        self.capture_button.clicked.connect(self.begin_capture)
+        self.restore_button.clicked.connect(self.restore_default_profile)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+    def begin_capture(self) -> None:
+        """Arm the selected table row for exactly one supported input event."""
+        selected = self.table.currentIndex()
+        if not selected.isValid():
+            self.capture_label.setText("対象を選択してください")
+            return
+        self._capture_row = selected.row()
+        self.capture_label.setText("次のキーまたはマウスボタンを押してください")
+
+    def restore_default_profile(self) -> None:
+        """Restore the built-in profile through the application-owned editor."""
+        self._mapping_model.restore_default_profile()
+        self._capture_row = None
+        self.capture_label.setText("標準設定に戻しました")
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt override name.
+        """Neutralize capture before accepting dialog-local input events."""
+        _invoke(self._on_dialog_opened)
+        self._install_input_filter()
+        super().showEvent(event)
+
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt override name.
+        """Stop listening for dialog input once this dialog is hidden."""
+        self._capture_row = None
+        self._remove_input_filter()
+        super().hideEvent(event)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override name.
+        """Consume a requested binding input before ordinary widget handling."""
+        if not self._belongs_to_dialog(watched):
+            return False
+        if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_F12:
+                self._capture_row = None
+                self.capture_label.setText("F12で入力捕捉を解除しました")
+                _invoke(self._on_release_capture)
+                event.accept()
+                return True
+            return self._capture_source(key_source_for_event(event))
+        if isinstance(event, QMouseEvent) and event.type() is QEvent.Type.MouseButtonPress:
+            return self._capture_source(mouse_source_for_event(event))
+        return False
+
+    def _capture_source(self, source: str | None) -> bool:
+        row = self._capture_row
+        if row is None:
+            return False
+        if source is None:
+            return True
+        self._mapping_model.update_source(row, source)
+        self.table.selectRow(row)
+        self._capture_row = None
+        self.capture_label.setText(f"入力: {source}")
+        return True
+
+    def _install_input_filter(self) -> None:
+        if self._input_filter_application is not None:
+            return
+        application = QApplication.instance()
+        if isinstance(application, QApplication):
+            application.installEventFilter(self)
+            self._input_filter_application = application
+
+    def _remove_input_filter(self) -> None:
+        application = self._input_filter_application
+        if application is not None:
+            application.removeEventFilter(self)
+            self._input_filter_application = None
+
+    def _belongs_to_dialog(self, watched: QObject) -> bool:
+        return watched is self or (isinstance(watched, QWidget) and self.isAncestorOf(watched))
+
+
+def _invoke(callback: CaptureTransition | None) -> None:
+    if callback is not None:
+        callback()
