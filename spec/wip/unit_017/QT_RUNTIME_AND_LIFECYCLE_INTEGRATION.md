@@ -98,7 +98,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | worker eventはqueued delivery前にpresentationを変更せず、delivery後だけGUI thread上で更新する | regression | integration | worker / GUI thread idを記録する |
+| refactor-skipped | worker eventはqueued delivery前にpresentationを変更せず、delivery後だけGUI thread上で更新する | regression | integration | worker / GUI thread idを記録し、`QtRuntimeEventBridge`自身の明示的な`QueuedConnection`でdeliveryする。`QObject.emit`の既存signatureをoverloadで保ちつつbridgeが`RuntimeEventSink`を実装するため、追加refactorは不要 |
 | todo | queued bridgeはadapter、connection、pairing、status、watchdog、error、runtime stoppedを順序どおりapplication sessionへ渡す | regression | integration | immutable `RuntimeEvent`だけを渡す |
 | todo | `ApplicationSession`とapplication packageはPySide6型をimportせず、framework非依存snapshotでmain windowを更新する | new | package | source import boundaryを確認する |
 | todo | adapter discoveryはdialog候補とtoolbar stateを更新し、0件 / 保存ID未検出では別adapterを自動選択しない | regression | integration | unit_016 controlへ接続する |
@@ -173,13 +173,16 @@ QtApplicationRunner
 | command | result | notes |
 |---|---|---|
 | `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_017` | passed | 該当なし |
-| `git diff --no-index --check -- NUL spec/wip/unit_017/QT_RUNTIME_AND_LIFECYCLE_INTEGRATION.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
-| `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
-| `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
-| `uv run ty check --no-progress` | not run | queued signal / snapshot境界は未実装 |
-| `uv run pytest tests/unit` | not run | Qt runtime bridge未実装のため |
-| `uv run pytest tests/integration` | not run | production lifecycle未実装のため |
-| `uv build` | not run | 仕様執筆だけでsource packageを変更していない。実装完了時に実行する |
+| `uv run pytest tests/integration/ui/test_qt_runtime_events.py -q -p no:cacheprovider` | passed | 1 passed。bridge自身がQObjectであり、worker emit直後はpresentation未変更、event処理後だけ主スレッドでreceiverを呼ぶ |
+| `uv run ruff format --check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
+| `uv run ruff check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed。QObjectの既存`emit` signatureとRuntimeEvent sinkをoverloadで両立した |
+| `git diff --cached --check` | passed | first TDD itemのstaged diffにwhitespace errorなし |
+| `uv run ruff format --check .` | not run | 全体gateはunit完了時に実行する。bridge対象2ファイルは検査済み |
+| `uv run ruff check .` | not run | 全体gateはunit完了時に実行する。bridge対象2ファイルは検査済み |
+| `uv run pytest tests/unit` | not run | このitemはintegration testだけを追加した。unit suiteはunit完了時に実行する |
+| `uv run pytest tests/integration` | not run | 新規bridge対象testだけを実行した。suite全体はunit完了時に実行する |
+| `uv build` | not run | source packageを変更した。buildはunit完了時の全体gateで実行する |
 | GUI 100ms応答性probe | not run | slow fake adapterとQt event loop統合が未実装 |
 
 ## 10. 先送り事項
@@ -192,8 +195,8 @@ QtApplicationRunner
 
 ## 11. チェックリスト
 
-- [ ] unit_014〜016のQt UI前提を確認した
-- [ ] Qt queued signalでworker eventをGUI threadへ渡した
+- [x] unit_014〜016のQt UI前提を確認した
+- [x] Qt queued signalでworker eventをGUI threadへ渡した
 - [ ] adapter / connection / pairing / watchdog / errorを表示へ反映した
 - [ ] startup reconnect / adapter不在 / startup failureを確認した
 - [ ] unhandled exceptionの安全な終了を確認した
