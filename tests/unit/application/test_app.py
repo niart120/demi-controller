@@ -493,11 +493,16 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
 
     assert isinstance(runtime.commands[-1], ConnectSaved)
     assert session.toggle_capture() is True
+    assert runtime.frames[-1].capture_active is True
     session.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))
+    session.connection_action()
     session.connection_action()
 
     assert coordinator.is_captured is False
-    assert isinstance(runtime.commands[-1], Disconnect)
+    assert runtime.frames[-1].capture_active is False
+    disconnects = [command for command in runtime.commands if isinstance(command, Disconnect)]
+    assert len(disconnects) == 1
+    assert session.presentation.model.connection_state is ConnectionState.DISCONNECTING
 
 
 def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
