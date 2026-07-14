@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
     from demi.app import WindowSpec
     from demi.application.coordinator import CaptureCoordinator
+    from demi.application.ui_state import ApplicationUiSnapshot
     from demi.domain.controller import ControllerFrame
     from demi.domain.settings import ControllerColorSettings
     from demi.input.publisher import InputPublisher
@@ -158,6 +159,31 @@ class MainWindow(QMainWindow):
     def status_bar(self) -> MainStatusBar:
         """Return the standard status bar owned by this main window."""
         return self._status_bar
+
+    def refresh(self, snapshot: ApplicationUiSnapshot) -> None:
+        """Render a framework-independent application snapshot.
+
+        Args:
+            snapshot: Main-thread state selected by the application layer.
+        """
+        self._main_toolbar.refresh(
+            ToolbarState(
+                application_state=snapshot.application_state,
+                connection_state=snapshot.connection_state,
+                dialog_open=snapshot.dialog_open,
+            )
+        )
+        self._status_bar.refresh(
+            StatusBarState(
+                adapter_label=snapshot.adapter_label,
+                connection_state=snapshot.connection_state,
+                application_state=snapshot.application_state,
+                pointer_quality=self.relative_pointer_capability.quality,
+                preview_only=snapshot.preview_only,
+                warning=snapshot.warning,
+                error=snapshot.error,
+            )
+        )
 
     @property
     def active_settings_dialog(self) -> QDialog | None:

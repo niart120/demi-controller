@@ -3,7 +3,8 @@ from pathlib import Path
 
 from demi.app import ApplicationSession
 from demi.application.coordinator import CaptureCoordinator
-from demi.application.state import ConnectionState
+from demi.application.state import AppState, ConnectionState
+from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
 from demi.controller.commands import ControllerCommand
@@ -111,3 +112,31 @@ def test_adapter_events_are_reduced_to_safe_display_choices() -> None:
 
     assert session.presentation.model.adapters[0].id == "usb:0"
     assert session.presentation.model.adapters[0].label == "Bluetooth adapter"
+
+
+def test_session_returns_a_framework_independent_ui_snapshot() -> None:
+    session = make_session()
+
+    session.handle_runtime_event(ConnectionChanged(state=ConnectionState.READY, adapter_id="usb:0"))
+    session.handle_runtime_event(
+        AdaptersDiscovered(
+            adapters=(
+                AdapterDescriptor(
+                    id="usb:0",
+                    display_name="Bluetooth adapter",
+                    transport="usb",
+                ),
+            )
+        )
+    )
+
+    assert session.ui_snapshot == ApplicationUiSnapshot(
+        application_state=AppState.IDLE,
+        connection_state=ConnectionState.READY,
+        adapter_label="Bluetooth adapter",
+        dialog_open=False,
+        preview_only=True,
+        warning="",
+        error=None,
+        color_reconnect_pending=False,
+    )

@@ -25,6 +25,7 @@ from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
 from demi.application.shutdown import ApplicationShutdownCoordinator
 from demi.application.state import ConnectionState
+from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.errors import SettingsPersistenceError
 from demi.config.paths import resolve_paths
 from demi.config.repository import SettingsRepository
@@ -241,6 +242,21 @@ class ApplicationSession:
     def presentation(self) -> PresentationStore:
         """Return main-thread presentation state for the GUI."""
         return self._presentation
+
+    @property
+    def ui_snapshot(self) -> ApplicationUiSnapshot:
+        """Return the current framework-independent state for the main window."""
+        presentation = self._presentation.model
+        return ApplicationUiSnapshot(
+            application_state=self._coordinator.app_state,
+            connection_state=presentation.connection_state,
+            adapter_label=presentation.adapter_label,
+            dialog_open=self._dialogs.model.visible,
+            preview_only=presentation.connection_state is not ConnectionState.CONNECTED,
+            warning=presentation.warning,
+            error=presentation.error,
+            color_reconnect_pending=presentation.color_reconnect_pending,
+        )
 
     def begin(self) -> None:
         """Request initial adapter discovery after the runtime has started."""
