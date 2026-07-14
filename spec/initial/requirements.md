@@ -8,7 +8,7 @@
 
 ### FR-001 起動
 
-Project_Demiは `uv run project-demi` および `python -m demi` で同じアプリケーションを起動できなければならない。
+Project_Demiは `demi`、`project-demi`、`python -m demi` で同じアプリケーションを起動できなければならない。
 
 受入条件:
 

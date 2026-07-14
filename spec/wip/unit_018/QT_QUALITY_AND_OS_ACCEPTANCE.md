@@ -114,7 +114,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | todo | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | compositorを記録する |
 | refactor-skipped | 8ms入力評価の平均 / 95 / 99、preview最大60Hz、100ms GUI応答性、250ms watchdog誤発火を診断値で確認する | characterization | integration | `InputPublisher.timing_metrics`が最大512件の正の評価間隔から平均、nearest-rank p95 / p99を出す。fake clockの8 / 8 / 16 / 8 / 8msで平均9.6ms、p95 / p99 16msを確認し、preview 60Hz、slow runtime中の100ms未満probe、250ms未満watchdog非発火を既存統合 / unit testで再確認した。これはdesktop OSの実時間保証ではないため、追加refactorは不要 |
 | refactor-skipped | diagnosticsはOS、Python、Demi、swbt、PySide6、Qt、pointer capabilityを含み、pyglet版、bond内容、秘密値を含まない | regression | unit | UI境界の`SupportDiagnostics`が許可リストだけをsingle-line logへ整形し、起動 smokeでsupport snapshotと終了時入力統計を確認した。diagnostics収集失敗時も例外型だけを記録して起動を継続するため、追加refactorは不要 |
-| todo | READMEとcurrent `spec/initial`がPySide6実装、source起動、支援範囲、standalone停止状態と一致する | regression | docs | docs-quality-reviewを実施する |
+| refactor-skipped | READMEとcurrent `spec/initial`がPySide6実装、source起動、支援範囲、standalone停止状態と一致する | regression | docs | 文書回帰テストで3 entry point、PySide6 / Qt Widgets、旧未実装説明の撤去、source / wheel、単体配布停止を確認した。README、FR-001、roadmap、hardware test logを現行実装へ合わせ、追加refactorは不要 |
 | todo | source / wheel利用者がProject、PySide6、Qt、third-party license / noticeへ到達でき、欠落を検査できる | new | package | 法的判断完了とは記録しない |
 | todo | current source、test、dependency、lock、builder、README、initial specにpygletのimport /収集 /採用指示が0件である | regression | package | complete / redesign履歴は別分類 |
 | todo | unit_013〜018のTDD、verification、checklist、deferred handoffに重複・抜け・誤った完了表現がない | new | docs | milestone 1〜6を1対1で確認する |
@@ -162,6 +162,8 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `src/demi/input/timing.py` | new | 入力評価間隔の平均、p95、p99を出すbounded metrics |
 | `src/demi/app.py` | verify / modify | safe diagnosticsとsource runner契約 |
 | `README.md` | modify | source起動、支援範囲、standalone停止、license導線 |
+| `tests/unit/test_documentation.py` | new | READMEと初期仕様の現在向け実行・配布説明を回帰検査 |
+| `spec/hardware-test-log.md` | modify | 実機記録で収集するGUI runtime版をPySide6 / Qtへ更新 |
 | `spec/initial/README.md` | modify | 採用UIと実行model |
 | `spec/initial/requirements.md` | modify | PySide6 / Qt、診断、応答性のcurrent契約 |
 | `spec/initial/architecture.md` | modify | Qt UI、input backend、queued signal、ownership |
@@ -206,6 +208,9 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run pytest tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/unit/application/test_app.py tests/unit/application/test_logging.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 38 passed。safe support snapshot、起動／終了ログ、test root、source / wheel GUI smoke、既存lifecycleを確認した |
 | `uv run ruff format --check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | 7 files already formatted |
 | `uv run ruff check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | All checks passed |
+| `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | 1 passed。READMEとinitial specのQt実装、3 entry point、source / wheel、単体配布停止の説明を確認した |
+| `uv run ruff format --check tests/unit/test_documentation.py` | passed | 1 file already formatted |
+| `uv run ruff check tests/unit/test_documentation.py` | passed | All checks passed |
 | `uv run pytest tests/unit` | passed | 187 passed |
 | `uv run pytest tests/integration` | passed | 54 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |

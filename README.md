@@ -11,7 +11,9 @@ uv sync --dev
 uv run demi
 ```
 
-`uv run python -m demi` と `uv run project-demi` も同じ GUI を起動する。この版の GUI はウィンドウ状態の復元と安全な終了を提供する最小構成の画面であり、コントローラー入力のプレビュー、キーボード / マウス操作、設定画面、接続 / ペアリング操作は未実装である。Windows 用の単体配布物は提供していない。
+`uv run python -m demi` と `uv run project-demi` も同じ PySide6 / Qt Widgets GUI を起動する。GUIはコントローラー入力のプレビュー、フォーカス中のキーボード / マウス入力捕捉、キー割り当て・接続・色の設定ダイアログ、接続と新規ペアリングの操作を提供する。入力捕捉は明示操作で開始し、`F12` またはフォーカス喪失で解除される。
+
+確認済みの配布形態はソース一式と `uv build` で生成した wheel である。Windows 用の単体配布物は提供していない。Bluetoothアダプターと対象機器を使う受入試験の状況は [hardware test log](spec/hardware-test-log.md) を参照する。
 
 表示を開かずに配布バージョンだけ確認するには、次を実行する。
 
