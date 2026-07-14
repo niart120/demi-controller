@@ -1,5 +1,6 @@
 """Qt standard toolbar whose public actions follow application state."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from PySide6.QtGui import QAction
@@ -84,3 +85,12 @@ class MainToolBar(QToolBar):
             self.colors_action,
         ):
             action.setEnabled(interaction_available)
+
+    def bind_connection_action(self, callback: Callable[[], object]) -> None:
+        """Route enabled connection action requests to the application layer.
+
+        Args:
+            callback: Semantic connect-or-disconnect request owned by the
+                application layer.
+        """
+        self.connection_action.triggered.connect(lambda _checked=False: callback())
