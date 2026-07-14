@@ -109,7 +109,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | refactor-skipped | 保存adapter未検出時に別候補を自動選択せず、明示選択後だけ保存 / 接続できる | edge | integration | 保存済みIDがmodelにない場合は`QComboBox`を未選択にしてdraftを保持する。利用者の選択後だけ`SettingsEditor.update_connection()`を呼び、接続 / ペアリング操作を有効にする |
 | refactor-skipped | pairingは確認dialogのaccept後だけ開始し、cancel / close / busyではcommandを発行しない | regression | integration | 接続dialogのペアリング操作は確認要求callbackだけを発行する。`PairingConfirmationDialog`はOk時だけ`on_confirm`を呼び、取消 / closeは戻るcallbackのみ、busy中は確認・取消・closeを受け付けない |
 | refactor-skipped | disconnect actionはcapture neutralization後に発行され、処理中のframeと重複disconnectを抑止する | regression | integration | `ApplicationSession.connection_action()`はcapture停止によるneutral frameを先に発行し、`DISCONNECTING`へ遷移する。以後の同じ要求は`Disconnect` commandを追加しない |
-| todo | color draftはpreviewを即時更新し、Cancelは保存色へ戻し、Saveは再接続選択へ進む | regression | integration | FR-012 |
+| refactor-skipped | color draftはpreviewを即時更新し、Cancelは保存色へ戻し、Saveは再接続選択へ進む | regression | integration | `ControllerColorsDialog`は`QColorDialog`と`SettingsEditor`で4色draftを更新し、preview callbackへ即時反映する。取消後は保存済み色へ戻し、接続中の保存後は非同期の再接続選択へ進む |
 | todo | 無効な色、timeout、bond slot、mapping値は保存されず、該当controlと説明がdialogに残る | edge | integration | FR-011〜013 |
 | todo | inverted bindingは文字またはcheck stateで明示され、保存後のdomain値を維持する | regression | integration | FR-014 |
 | todo | Tab / Shift+Tab、Enter、Space、EscがQt標準のfocus移動、action、取消として動作する | new | integration | 独自key routingで再実装しない |
@@ -164,6 +164,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `tests/unit/ui/dialogs/` | new | model/view、validation、keyboard |
 | `tests/integration/ui/test_mapping_dialog.py` | new | dialog入力取得、capture neutralization、F12保護 |
 | `tests/integration/ui/test_connection_dialog.py` | new | アダプター再検索と非同期結果model更新 |
+| `tests/integration/ui/test_colors_dialog.py` | new | 色draft preview、取消、再接続選択 |
 | `tests/integration/ui/test_qt_dialogs.py` | new | action、neutral、save/cancel、edge |
 | `spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | modify | FR trace、TDD状態、検証、引き渡し記録 |
 
@@ -186,6 +187,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `uv run pytest tests/unit/application/test_settings_editor.py tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redはconnection dialogが`SettingsEditor`を受け取らないことで失敗。greenでは保存済み`usb:missing`が発見結果にない場合、先頭候補を選択せずdraftを保持することを確認した。利用者が`usb:1`を選択した後だけdraftと接続 / ペアリング操作が更新される。構造上の重複はなくrefactorを省略した |
 | `uv run pytest tests/unit/application/test_app.py tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`PairingConfirmationDialog`未実装によるimport error。greenでは接続dialogが確認要求callbackだけを発行し、取消 / close / busyでは開始callbackを発行せず、通常のOk後だけ1回発行することを確認した。既存application testで`confirm_pairing()`後の`StartPairing`発行も確認した。構造上の重複はなくrefactorを省略した |
 | `uv run pytest tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py` / `uv run ruff check tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py` / `uv run ty check --no-progress` / `git diff --check` | passed | 強化した回帰テストは既存実装のままgreen。capture中の切断で最後のframeがneutralとなり、`Disconnect`が1回だけ発行され、`DISCONNECTING`中の再要求で増えないことを確認した。実装変更は不要のためrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/unit/application/test_app.py tests/integration/ui/test_colors_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/colors.py tests/integration/ui/test_colors_dialog.py` / `uv run ruff check src/demi/ui/dialogs/colors.py tests/integration/ui/test_colors_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.dialogs.colors`未実装によるimport error。greenでは`#ABCDEF`のdraftをpreviewへ即時反映し、取消で保存済み色へ戻すことを確認した。接続中の保存後は再接続確認を表示し、「再接続する」と「後で」がそれぞれ対応するcallbackを発行してacceptする。構造上の重複はなくrefactorを省略した |
 | Computer UseによるWindows実画面のスクリーンショット確認 | not run | native pipeへの接続が`os error 2`で失敗した。別の自動UI操作へ置換せず、接続復旧後に同じ画面を確認する |
 | `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
