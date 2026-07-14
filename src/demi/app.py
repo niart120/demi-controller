@@ -7,10 +7,20 @@ import sys
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from demi.application.coordinator import CaptureCoordinator
+from demi.application.coordinator import (
+    CaptureCoordinator,
+    CaptureFailure,
+    PointerCapturePort,
+    RelativePointerCapturePort,
+)
 from demi.application.dialogs import DialogKind, DialogManager
+from demi.application.frame_fanout import (
+    ControllerColorPreviewPort,
+    ControllerFrameFanout,
+    FramePreviewPort,
+)
 from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
 from demi.application.shutdown import ApplicationShutdownCoordinator
@@ -100,17 +110,27 @@ class WindowSpec:
     maximized: bool
 
 
-class WindowPort(Protocol):
+class WindowPort(PointerCapturePort, Protocol):
     """Window operations required by capture coordination."""
 
     def window_state(self) -> WindowSettings | None:
         """Return a valid state captured before native window destruction."""
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Enable or disable relative mouse capture."""
-
     def close(self) -> bool | None:
         """Request native window closure."""
+
+
+@runtime_checkable
+class InputCaptureSetupPort(Protocol):
+    """Optional outer UI boundary that installs its own input adapters."""
+
+    def configure_input(
+        self,
+        *,
+        publisher: InputPublisher,
+        coordinator: CaptureCoordinator,
+    ) -> None:
+        """Connect a publisher and coordinator after application assembly."""
 
 
 class GuiPort(Protocol):
@@ -289,6 +309,19 @@ class ApplicationSession:
         if self._dialogs.model.visible or self._presentation.model.color_reconnect_pending:
             return False
         return self._coordinator.toggle_capture()
+
+    def report_capture_failure(self, failure: CaptureFailure) -> None:
+        """Show a safe relative-pointer failure warning in the presentation model.
+
+        Args:
+            failure: Category reported by the capture lifecycle coordinator.
+        """
+        messages = {
+            CaptureFailure.RELATIVE_POINTER_REGISTRATION: "相対マウス入力を開始できませんでした",
+            CaptureFailure.RELATIVE_POINTER_READ: "相対マウス入力を停止しました",
+            CaptureFailure.POINTER_CAPTURE: "入力捕捉を開始できませんでした",
+        }
+        self._presentation.set_warning(messages[failure])
 
     def connection_action(self) -> None:
         """Perform the state-dependent toolbar connection action."""
@@ -583,15 +616,28 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         )
         spec = _window_spec_for(settings)
         window = selected_dependencies.window_factory(spec)
+        if isinstance(window, ControllerColorPreviewPort):
+            window.set_controller_colors(settings.controller_colors)
+        preview = window if isinstance(window, FramePreviewPort) else None
+        frame_sink = ControllerFrameFanout(runtime=runtime, preview=preview)
         publisher = InputPublisher(
             clock=selected_dependencies.clock,
-            sink=runtime,
+            sink=frame_sink,
             profile=_active_profile(settings),
             mouse_settings=settings.input.mouse,
             circular_limit=settings.input.circular_stick_limit,
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
-        coordinator = CaptureCoordinator(publisher=publisher, window=window)
+        relative_pointer_capture = (
+            window if isinstance(window, RelativePointerCapturePort) else None
+        )
+        coordinator = CaptureCoordinator(
+            publisher=publisher,
+            pointer_capture=window,
+            relative_pointer_capture=relative_pointer_capture,
+        )
+        if isinstance(window, InputCaptureSetupPort):
+            window.configure_input(publisher=publisher, coordinator=coordinator)
         session = ApplicationSession(
             settings=settings,
             paths=paths,
@@ -603,6 +649,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )
+        coordinator.set_capture_failure_reporter(session.report_capture_failure)
         shutdown = ApplicationShutdownCoordinator(
             capture=coordinator,
             runtime=runtime,

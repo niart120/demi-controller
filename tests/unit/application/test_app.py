@@ -23,7 +23,13 @@ from demi.controller.events import (
     WatchdogNeutralized,
 )
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings, DiagnosticLevel, InputSettings, WindowSettings
+from demi.domain.settings import (
+    AppSettings,
+    ControllerColorSettings,
+    DiagnosticLevel,
+    InputSettings,
+    WindowSettings,
+)
 from demi.input.publisher import InputPublisher
 
 
@@ -75,12 +81,12 @@ class FakeWindow:
     width: int = 960
     height: int = 640
     maximized: bool = False
-    exclusive_mouse: list[bool] = field(default_factory=list)
+    pointer_capture: list[bool] = field(default_factory=list)
     close_calls: int = 0
 
-    def set_exclusive_mouse(self, exclusive: bool = True) -> None:
-        """Record relative mouse changes."""
-        self.exclusive_mouse.append(exclusive)
+    def set_pointer_capture(self, enabled: bool) -> None:
+        """Record pointer capture changes."""
+        self.pointer_capture.append(enabled)
 
     def window_state(self) -> WindowSettings:
         """Return the current state consumed by ordered shutdown."""
@@ -93,6 +99,50 @@ class FakeWindow:
     def close(self) -> None:
         """Record native window teardown."""
         self.close_calls += 1
+
+
+@dataclass
+class FakeInputWindow(FakeWindow):
+    """Window fake that records the optional Qt input-boundary setup."""
+
+    configured_publisher: InputPublisher | None = None
+    configured_coordinator: CaptureCoordinator | None = None
+    relative_capture_epochs: list[int] = field(default_factory=list)
+    relative_stop_calls: int = 0
+
+    def configure_input(
+        self,
+        *,
+        publisher: InputPublisher,
+        coordinator: CaptureCoordinator,
+    ) -> None:
+        """Record the input publisher and coordinator selected at composition."""
+        self.configured_publisher = publisher
+        self.configured_coordinator = coordinator
+
+    def start_relative_pointer_capture(self, capture_epoch: int) -> None:
+        """Record one relative-pointer capture start."""
+        self.relative_capture_epochs.append(capture_epoch)
+
+    def stop_relative_pointer_capture(self) -> None:
+        """Record one relative-pointer capture stop."""
+        self.relative_stop_calls += 1
+
+
+@dataclass
+class FakePreviewWindow(FakeWindow):
+    """Window fake that records colors selected for the frame preview."""
+
+    preview_colors: ControllerColorSettings | None = None
+    preview_frames: list[ControllerFrame] = field(default_factory=list)
+
+    def set_frame(self, frame: ControllerFrame) -> None:
+        """Record one frame selected for preview display."""
+        self.preview_frames.append(frame)
+
+    def set_controller_colors(self, colors: ControllerColorSettings) -> None:
+        """Record the validated preview colors selected at startup."""
+        self.preview_colors = colors
 
 
 @dataclass
@@ -144,6 +194,55 @@ def test_application_runner_assembles_boundaries_without_starting_the_runtime() 
     assert gui_kwargs["dialogs"] is gui_kwargs["session"].dialogs
     assert callable(gui_kwargs["editor_provider"])
     assert {"backend", "bridge", "event_pump", "status_bar", "view"}.isdisjoint(gui_kwargs)
+
+
+def test_application_runner_configures_the_optional_input_window_boundary() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
+    runtime = FakeRuntime()
+    window = FakeInputWindow()
+    logger = logging.getLogger("demi-test-input-window")
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(repository_result),
+        runtime_factory=lambda **_kwargs: runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: FakeGui(),
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logger,
+    )
+
+    assert run_application(dependencies) == 0
+
+    assert window.configured_publisher is not None
+    assert window.configured_coordinator is not None
+    assert window.configured_coordinator.publisher is window.configured_publisher
+
+
+def test_application_runner_passes_saved_colors_to_the_preview_window() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    colors = ControllerColorSettings(
+        body="#102030",
+        buttons="#405060",
+        left_grip="#708090",
+        right_grip="#A0B0C0",
+    )
+    settings = replace(AppSettings.default(), controller_colors=colors)
+    repository_result = SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)
+    window = FakePreviewWindow()
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(repository_result),
+        runtime_factory=lambda **_kwargs: FakeRuntime(),
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: FakeGui(),
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-preview-colors"),
+    )
+
+    assert run_application(dependencies) == 0
+
+    assert window.preview_colors == colors
 
 
 def test_application_runner_returns_nonzero_when_ordered_shutdown_fails() -> None:
@@ -509,7 +608,7 @@ def make_coordinator(runtime: FakeRuntime) -> CaptureCoordinator:
     """Build a capture coordinator connected to the fake runtime sink."""
     return CaptureCoordinator(
         publisher=InputPublisher(clock=FakeClock(), sink=runtime),
-        window=FakeWindow(),
+        pointer_capture=FakeWindow(),
     )
 
 

@@ -46,3 +46,19 @@ Pinned sources:
 - https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/ac8093c84194b3232acb675ac1accce9bcb456a3/imu_sensor_notes.md
 - https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/ac8093c84194b3232acb675ac1accce9bcb456a3/spi_flash_notes.md
 - https://github.com/libsdl-org/SDL/blob/9149eca2077940bdfa29e743a7cf3aafbf10e3dc/src/joystick/hidapi/SDL_hidapi_switch.c
+
+## 2026-07-15: capture中の外部window click
+
+### 現状
+
+- Windows実displayの手動受入で、capture中に別windowをclickするとDemiはfocus lossを検出し、captureを解除して`idle`へ戻った。
+- この安全なneutralizeは確認できたが、click自体は別windowへ届く。
+
+### 観察
+
+- 意図しないclickが別applicationで操作を起こすおそれがある。
+
+### 方針
+
+- unit_015では既存のfocus loss時neutralizeを維持する。
+- click抑止の可否とUI上の操作方針は未決定である。必要になった時点で独立したwork unitとして、capture中の終了操作、dialog操作、accessibility、Windows入力制約を含めて設計する。
