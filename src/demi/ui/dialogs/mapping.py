@@ -33,6 +33,7 @@ from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 _ROOT_INDEX = QModelIndex()
 
 type CaptureTransition = Callable[[], object]
+type SettingsAction = Callable[[], bool]
 
 
 class MappingTableModel(QAbstractTableModel):
@@ -152,6 +153,8 @@ class MappingDialog(QDialog):
         *,
         on_dialog_opened: CaptureTransition | None = None,
         on_release_capture: CaptureTransition | None = None,
+        on_save: SettingsAction | None = None,
+        on_cancel: SettingsAction | None = None,
         parent: QWidget | None = None,
     ) -> None:
         """Create a mapping editor without taking ownership of its draft.
@@ -161,6 +164,8 @@ class MappingDialog(QDialog):
             on_dialog_opened: Neutralizes controller capture before the dialog
                 accepts any input.
             on_release_capture: Handles the fixed F12 capture-release action.
+            on_save: Saves the application-owned draft and reports success.
+            on_cancel: Discards the application-owned draft and reports success.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
@@ -168,6 +173,8 @@ class MappingDialog(QDialog):
         self._mapping_model = MappingTableModel(editor, self)
         self._on_dialog_opened = on_dialog_opened
         self._on_release_capture = on_release_capture
+        self._on_save = on_save
+        self._on_cancel = on_cancel
         self._capture_row: int | None = None
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
@@ -178,6 +185,7 @@ class MappingDialog(QDialog):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.capture_button = QPushButton("次の入力を取得", self)
         self.capture_label = QLabel("入力を取得していません", self)
+        self.save_error_label = QLabel("", self)
         self.restore_button = QPushButton("標準に戻す", self)
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
@@ -188,13 +196,14 @@ class MappingDialog(QDialog):
         layout.addWidget(self.table)
         layout.addWidget(self.capture_button)
         layout.addWidget(self.capture_label)
+        layout.addWidget(self.save_error_label)
         layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
 
         self.capture_button.clicked.connect(self.begin_capture)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
-        self.button_box.rejected.connect(self.reject)
+        self.button_box.rejected.connect(self.request_reject)
 
     @property
     def conflict_confirmation(self) -> QMessageBox | None:
@@ -220,7 +229,7 @@ class MappingDialog(QDialog):
         """Accept immediately or ask for explicit confirmation of conflicts."""
         conflict_summary = self._mapping_model.conflict_summary()
         if not conflict_summary:
-            self.accept()
+            self._save_or_accept()
             return
         if self._conflict_confirmation is not None:
             return
@@ -249,6 +258,13 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self._remove_input_filter()
         super().hideEvent(event)
+
+    def request_reject(self) -> None:
+        """Discard the draft through the application boundary before closing."""
+        on_cancel = self._on_cancel
+        if on_cancel is not None and not on_cancel():
+            return
+        self.reject()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override name.
         """Consume a requested binding input before ordinary widget handling."""
@@ -284,7 +300,15 @@ class MappingDialog(QDialog):
             confirmation is not None
             and confirmation.standardButton(button) == QMessageBox.StandardButton.Save
         ):
-            self.accept()
+            self._save_or_accept()
+
+    def _save_or_accept(self) -> None:
+        on_save = self._on_save
+        if on_save is not None and not on_save():
+            self.save_error_label.setText("設定を保存できませんでした")
+            return
+        self.save_error_label.clear()
+        self.accept()
 
     def _clear_conflict_confirmation(self, _result: int) -> None:
         self._conflict_confirmation = None

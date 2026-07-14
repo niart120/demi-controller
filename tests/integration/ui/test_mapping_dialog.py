@@ -5,8 +5,11 @@ from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
 
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.dialogs import DialogKind, DialogManager
 from demi.application.settings_editor import SettingsEditor
+from demi.application.settings_modal import SettingsModalController
 from demi.application.state import AppState
+from demi.config.errors import SettingsPersistenceError
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
@@ -40,6 +43,22 @@ class FakeWindow:
 
     def set_pointer_capture(self, enabled: bool) -> None:
         """Accept a requested pointer capture transition."""
+
+
+@dataclass
+class FakeRepository:
+    """Keep the saved snapshot intact when the configured save fails."""
+
+    saved: AppSettings
+    fail_save: bool = False
+    save_calls: int = 0
+
+    def save(self, settings: AppSettings) -> None:
+        """Persist a replacement snapshot unless the failure switch is set."""
+        self.save_calls += 1
+        if self.fail_save:
+            raise SettingsPersistenceError
+        self.saved = settings
 
 
 def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
@@ -167,3 +186,51 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
 
     assert dialog.result() == int(QDialog.DialogCode.Accepted)
     assert not dialog.isVisible()
+
+
+def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
+    qt_application: QApplication,
+) -> None:
+    original = AppSettings.default()
+    repository = FakeRepository(saved=original, fail_save=True)
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=FakeClock(), sink=FakeSink(frames=[])),
+        pointer_capture=FakeWindow(),
+    )
+    modal = SettingsModalController(repository, coordinator, DialogManager())
+    assert modal.open(DialogKind.MAPPING, original) is True
+    editor = modal.editor
+    assert editor is not None
+    editor.update_binding(0, source="KEY:K")
+
+    def save_modal() -> bool:
+        try:
+            modal.save()
+        except SettingsPersistenceError:
+            return False
+        return True
+
+    dialog = MappingDialog(editor, on_save=save_modal, on_cancel=modal.cancel)
+    dialog.show()
+    qt_application.processEvents()
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+
+    assert dialog.isVisible()
+    assert dialog.save_error_label.text() == "設定を保存できませんでした"
+    assert modal.editor is editor
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:K"
+    assert repository.saved == original
+    assert repository.save_calls == 1
+
+    cancel_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+
+    assert not dialog.isVisible()
+    assert modal.editor is None
+    assert repository.saved == original
+    assert repository.save_calls == 1
