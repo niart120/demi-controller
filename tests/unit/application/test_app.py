@@ -332,6 +332,7 @@ def test_session_reconnects_once_only_when_the_saved_adapter_is_discovered() -> 
     assert len(reconnects) == 1
     assert reconnects[0].adapter_id == "usb:0"
     assert reconnects[0].bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.presentation.model.connection_state is ConnectionState.CONNECTING
     assert session.presentation.model.adapter_label == "Adapter"
 
