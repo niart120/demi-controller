@@ -84,11 +84,17 @@ class ConnectionDialog(QDialog):
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
         self.rescan_button = QPushButton("再検索", self)
+        self.connect_button = QPushButton("保存して接続", self)
+        self.pairing_button = QPushButton("新規ペアリング", self)
         self.discovery_label = QLabel("USBアダプターを検索してください", self)
+        self.connect_button.setEnabled(False)
+        self.pairing_button.setEnabled(False)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.adapter_combo)
         layout.addWidget(self.rescan_button)
+        layout.addWidget(self.connect_button)
+        layout.addWidget(self.pairing_button)
         layout.addWidget(self.discovery_label)
 
         self.rescan_button.clicked.connect(self.request_rescan)
@@ -114,4 +120,13 @@ class ConnectionDialog(QDialog):
         """
         self._adapter_model.set_adapters(adapters)
         self.rescan_button.setEnabled(True)
+        has_adapters = bool(adapters)
+        self.adapter_combo.setEnabled(has_adapters)
+        self.connect_button.setEnabled(False)
+        self.pairing_button.setEnabled(False)
+        if not has_adapters:
+            self.discovery_label.setText(
+                "利用可能なUSBアダプターがありません。接続機器を確認して再検索してください"
+            )
+            return
         self.discovery_label.setText(f"{len(adapters)}件のUSBアダプターを検出しました")
