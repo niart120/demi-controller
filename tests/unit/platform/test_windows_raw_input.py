@@ -1,4 +1,5 @@
 import ctypes
+import sys
 from dataclasses import dataclass, field
 from typing import SupportsInt, cast
 
@@ -30,6 +31,7 @@ from demi.platform.windows_raw_input import (
 )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 MSG decoding requires Windows")
 def test_ctypes_native_message_reader_accepts_qt_void_pointer() -> None:
     native_message = _NativeMessage()
     native_message.hwnd = 0x1234
