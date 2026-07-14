@@ -7,6 +7,7 @@ from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QPersistent
 from PySide6.QtWidgets import QComboBox, QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from demi.application.presentation import AdapterOption
+from demi.application.settings_editor import SettingsEditor
 
 _ROOT_INDEX = QModelIndex()
 
@@ -59,12 +60,20 @@ class AdapterListModel(QAbstractListModel):
         self._adapters = adapters
         self.endResetModel()
 
+    def index_of(self, adapter_id: str) -> int:
+        """Return the row for one exact adapter ID, or ``-1`` if absent."""
+        for index, adapter in enumerate(self._adapters):
+            if adapter.id == adapter_id:
+                return index
+        return -1
+
 
 class ConnectionDialog(QDialog):
     """Request asynchronous adapter discovery through standard Qt controls."""
 
     def __init__(
         self,
+        editor: SettingsEditor,
         *,
         on_rescan: RescanAction,
         parent: QWidget | None = None,
@@ -72,14 +81,17 @@ class ConnectionDialog(QDialog):
         """Create a connection dialog that does not own runtime discovery.
 
         Args:
+            editor: Application-owned connection settings draft editor.
             on_rescan: Posts an adapter-discovery request at the application
                 boundary without returning a result synchronously.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
         self.setWindowTitle("接続設定")
+        self._editor = editor
         self._on_rescan = on_rescan
         self._adapter_model = AdapterListModel(self)
+        self._updating_adapters = False
 
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
@@ -98,6 +110,7 @@ class ConnectionDialog(QDialog):
         layout.addWidget(self.discovery_label)
 
         self.rescan_button.clicked.connect(self.request_rescan)
+        self.adapter_combo.currentIndexChanged.connect(self.select_adapter)
 
     @property
     def adapter_model(self) -> AdapterListModel:
@@ -118,15 +131,53 @@ class ConnectionDialog(QDialog):
         Args:
             adapters: Latest safe adapter identities from application state.
         """
-        self._adapter_model.set_adapters(adapters)
+        self._updating_adapters = True
+        try:
+            self._adapter_model.set_adapters(adapters)
+            saved_adapter_index = self._adapter_model.index_of(
+                self._editor.draft.connection.adapter_id
+            )
+            self.adapter_combo.setCurrentIndex(saved_adapter_index)
+        finally:
+            self._updating_adapters = False
         self.rescan_button.setEnabled(True)
         has_adapters = bool(adapters)
         self.adapter_combo.setEnabled(has_adapters)
-        self.connect_button.setEnabled(False)
-        self.pairing_button.setEnabled(False)
         if not has_adapters:
+            self._set_connection_actions_enabled(False)
             self.discovery_label.setText(
                 "利用可能なUSBアダプターがありません。接続機器を確認して再検索してください"
             )
             return
+        if saved_adapter_index < 0:
+            self._set_connection_actions_enabled(False)
+            if self._editor.draft.connection.adapter_id:
+                self.discovery_label.setText(
+                    "保存済みのUSBアダプターが見つかりません。アダプターを選択してください"
+                )
+                return
+            self.discovery_label.setText(f"{len(adapters)}件のUSBアダプターを検出しました")
+            return
+        self._set_connection_actions_enabled(True)
         self.discovery_label.setText(f"{len(adapters)}件のUSBアダプターを検出しました")
+
+    def select_adapter(self, index: int) -> None:
+        """Store one explicit adapter selection in the application-owned draft.
+
+        Args:
+            index: Selected `QComboBox` row, or a negative value when none is
+                selected.
+        """
+        if self._updating_adapters:
+            return
+        adapter_id = self.adapter_combo.itemData(index)
+        if not isinstance(adapter_id, str):
+            self._set_connection_actions_enabled(False)
+            return
+        self._editor.update_connection(adapter_id=adapter_id)
+        self._set_connection_actions_enabled(True)
+        self.discovery_label.setText(f"選択中のUSBアダプター: {self.adapter_combo.itemText(index)}")
+
+    def _set_connection_actions_enabled(self, enabled: bool) -> None:
+        self.connect_button.setEnabled(enabled)
+        self.pairing_button.setEnabled(enabled)

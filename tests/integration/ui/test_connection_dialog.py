@@ -1,7 +1,11 @@
+from dataclasses import replace
+
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from demi.application.presentation import AdapterOption
+from demi.application.settings_editor import SettingsEditor
+from demi.domain.settings import AppSettings, ConnectionSettings
 from demi.ui.dialogs.connection import ConnectionDialog
 
 
@@ -23,7 +27,7 @@ def test_connection_dialog_requests_rescan_and_updates_adapters_without_blocking
             ),
         )
 
-    dialog = ConnectionDialog(on_rescan=request_rescan)
+    dialog = ConnectionDialog(SettingsEditor(AppSettings.default()), on_rescan=request_rescan)
     dialog.show()
     qt_application.processEvents()
 
@@ -45,7 +49,7 @@ def test_connection_dialog_requests_rescan_and_updates_adapters_without_blocking
 def test_connection_dialog_with_no_adapters_keeps_only_rescan_available(
     qt_application: QApplication,
 ) -> None:
-    dialog = ConnectionDialog(on_rescan=lambda: None)
+    dialog = ConnectionDialog(SettingsEditor(AppSettings.default()), on_rescan=lambda: None)
     dialog.set_adapters(())
     dialog.show()
     qt_application.processEvents()
@@ -58,3 +62,38 @@ def test_connection_dialog_with_no_adapters_keeps_only_rescan_available(
     assert dialog.discovery_label.text() == (
         "利用可能なUSBアダプターがありません。接続機器を確認して再検索してください"
     )
+
+
+def test_connection_dialog_requires_explicit_selection_when_saved_adapter_is_missing(
+    qt_application: QApplication,
+) -> None:
+    settings = replace(
+        AppSettings.default(),
+        connection=ConnectionSettings(adapter_id="usb:missing"),
+    )
+    editor = SettingsEditor(settings)
+    dialog = ConnectionDialog(editor, on_rescan=lambda: None)
+    dialog.set_adapters(
+        (
+            AdapterOption("usb:0", "USB Adapter 0"),
+            AdapterOption("usb:1", "USB Adapter 1"),
+        )
+    )
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.adapter_combo.currentIndex() == -1
+    assert editor.draft.connection.adapter_id == "usb:missing"
+    assert not dialog.connect_button.isEnabled()
+    assert not dialog.pairing_button.isEnabled()
+    assert dialog.discovery_label.text() == (
+        "保存済みのUSBアダプターが見つかりません。アダプターを選択してください"
+    )
+
+    dialog.adapter_combo.setCurrentIndex(1)
+    qt_application.processEvents()
+
+    assert dialog.adapter_combo.itemData(dialog.adapter_combo.currentIndex()) == "usb:1"
+    assert editor.draft.connection.adapter_id == "usb:1"
+    assert dialog.connect_button.isEnabled()
+    assert dialog.pairing_button.isEnabled()
