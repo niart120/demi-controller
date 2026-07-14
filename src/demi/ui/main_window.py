@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QDialog, QMainWindow, QWidget
 
+from demi.application.state import AppState, ConnectionState
 from demi.domain.errors import DomainValueError
 from demi.domain.settings import WindowSettings
 from demi.input.qt_adapter import QtInputAdapter
@@ -20,6 +21,8 @@ from demi.input.relative_pointer import (
 )
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
+from demi.ui.status_bar import MainStatusBar, StatusBarState
+from demi.ui.toolbar import MainToolBar, ToolbarState
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
@@ -33,6 +36,7 @@ if TYPE_CHECKING:
 
 type ShutdownCallback = Callable[[WindowSettings | None], bool]
 type RelativePointerBackend = WindowsRawInputBackend | QtRelativePointerBackend
+type SettingsDialogFactory = Callable[[QWidget], QDialog | None]
 
 
 class MainWindow(QMainWindow):
@@ -50,6 +54,41 @@ class MainWindow(QMainWindow):
         self.resize(max(spec.width, self.minimumWidth()), max(spec.height, self.minimumHeight()))
         self._controller_preview = ControllerPreviewWidget(parent=self)
         self.setCentralWidget(self._controller_preview)
+        self._main_toolbar = MainToolBar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._main_toolbar)
+        self._mapping_dialog_factory: SettingsDialogFactory | None = None
+        self._connection_dialog_factory: SettingsDialogFactory | None = None
+        self._colors_dialog_factory: SettingsDialogFactory | None = None
+        self._active_settings_dialog: QDialog | None = None
+        self._main_toolbar.mapping_action.triggered.connect(
+            lambda _checked=False: self._open_settings_dialog(self._mapping_dialog_factory)
+        )
+        self._main_toolbar.connection_settings_action.triggered.connect(
+            lambda _checked=False: self._open_settings_dialog(self._connection_dialog_factory)
+        )
+        self._main_toolbar.colors_action.triggered.connect(
+            lambda _checked=False: self._open_settings_dialog(self._colors_dialog_factory)
+        )
+        self._status_bar = MainStatusBar(self)
+        self.setStatusBar(self._status_bar)
+        self._main_toolbar.refresh(
+            ToolbarState(
+                application_state=AppState.IDLE,
+                connection_state=ConnectionState.STOPPED,
+                dialog_open=False,
+            )
+        )
+        self._status_bar.refresh(
+            StatusBarState(
+                adapter_label="なし",
+                connection_state=ConnectionState.STOPPED,
+                application_state=AppState.IDLE,
+                pointer_quality=RelativePointerQuality.UNAVAILABLE,
+                preview_only=True,
+                warning="",
+                error=None,
+            )
+        )
         self.setMouseTracking(True)
         self._shutdown_callback: ShutdownCallback | None = None
         self._close_accepted = False
@@ -109,6 +148,39 @@ class MainWindow(QMainWindow):
     def controller_preview(self) -> ControllerPreviewWidget:
         """Return the main-window-owned controller preview widget."""
         return self._controller_preview
+
+    @property
+    def main_toolbar(self) -> MainToolBar:
+        """Return the standard toolbar owned by this main window."""
+        return self._main_toolbar
+
+    @property
+    def status_bar(self) -> MainStatusBar:
+        """Return the standard status bar owned by this main window."""
+        return self._status_bar
+
+    @property
+    def active_settings_dialog(self) -> QDialog | None:
+        """Return the non-blocking settings dialog currently owned by the window."""
+        return self._active_settings_dialog
+
+    def bind_settings_dialog_factories(
+        self,
+        *,
+        mapping: SettingsDialogFactory,
+        connection: SettingsDialogFactory,
+        colors: SettingsDialogFactory,
+    ) -> None:
+        """Bind application-owned factories for the three editable dialogs.
+
+        Args:
+            mapping: Creates a mapping dialog for this main window.
+            connection: Creates a connection settings dialog for this main window.
+            colors: Creates a controller-colors dialog for this main window.
+        """
+        self._mapping_dialog_factory = mapping
+        self._connection_dialog_factory = connection
+        self._colors_dialog_factory = colors
 
     @property
     def input_evaluation_interval_ms(self) -> int | None:
@@ -272,6 +344,23 @@ class MainWindow(QMainWindow):
         backend = self._relative_pointer_backend
         if isinstance(backend, QtRelativePointerBackend):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
+
+    def _open_settings_dialog(self, factory: SettingsDialogFactory | None) -> None:
+        if factory is None or self._active_settings_dialog is not None:
+            return
+        dialog = factory(self)
+        if dialog is None:
+            return
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._active_settings_dialog = dialog
+        dialog.finished.connect(
+            lambda _result, closed_dialog=dialog: self._clear_active_settings_dialog(closed_dialog)
+        )
+        dialog.open()
+
+    def _clear_active_settings_dialog(self, dialog: QDialog) -> None:
+        if self._active_settings_dialog is dialog:
+            self._active_settings_dialog = None
 
     def _on_input_evaluation_timeout(self) -> None:
         if self._input_coordinator is not None:

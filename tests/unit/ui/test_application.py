@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication
 
@@ -7,6 +8,8 @@ from demi.app import ApplicationDependencies, WindowSpec
 from demi.domain.settings import WindowSettings
 from demi.ui.application import QtApplicationRunner
 from demi.ui.main_window import MainWindow
+from demi.ui.status_bar import MainStatusBar
+from demi.ui.toolbar import MainToolBar
 
 
 def test_runner_reuses_the_process_qapplication(qt_application: object) -> None:
@@ -62,6 +65,17 @@ def test_runner_creates_a_resizable_main_window(qt_application: object) -> None:
 
     assert (window.width(), window.height()) == (1024, 768)
     window.close()
+
+
+def test_main_window_uses_standard_toolbar_and_status_bar(qt_application: object) -> None:
+    assert qt_application is not None
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+
+    assert isinstance(window.main_toolbar, MainToolBar)
+    assert window.toolBarArea(window.main_toolbar) is Qt.ToolBarArea.TopToolBarArea
+    assert isinstance(window.status_bar, MainStatusBar)
+    assert window.statusBar() is window.status_bar
+    assert window.centralWidget() is window.controller_preview
 
 
 def test_main_window_restores_and_saves_window_state(qt_application: object) -> None:

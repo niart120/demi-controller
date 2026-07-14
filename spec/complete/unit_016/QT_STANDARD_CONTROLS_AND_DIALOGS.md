@@ -1,0 +1,233 @@
+# Qt 標準 control と dialog 仕様書
+
+## 1. 概要
+
+### 1.1 目的
+
+UI 再設計 milestone 4 として、接続、切断、入力capture、設定をQt Widgetsの標準controlで操作できるようにする。`QToolBar`、`QAction`、`QStatusBar`、`QDialog`、`QDialogButtonBox`、model/view control、`QColorDialog`を使用し、旧UIの座標計算、独自hit test、独自text field、独自combo boxを再実装しない。
+
+本unitはFR-002〜FR-004、FR-008、FR-010〜FR-014のGUI操作面を所有する。保存失敗、取消、重複binding、busy、adapter 0件を観測可能な状態として固定し、Tab、Shift+Tab、Enter、Space、Escとenabled stateをQt標準挙動へ委ねる。
+
+### 1.2 起点 / source
+
+| source | 内容 | path |
+|---|---|---|
+| milestone | milestone 4のtoolbar、status bar、dialog、edge、完了条件 | `spec/ui-redesign/MILESTONES.md` |
+| target UI | 標準control構成、dialog draft、model/view、keyboard操作 | `spec/ui-redesign/PYSIDE6_UI_DESIGN.md` |
+| requirements | FR-002〜004、FR-008、FR-010〜014の受入条件 | `spec/initial/requirements.md` |
+| settings / lifecycle | immutable draft、atomic save、capture neutralization、color reconnect | `spec/initial/configuration.md`, `spec/initial/lifecycle.md` |
+| completed behavior | settings editor / modal controller、runtime command、presentationの現行契約 | `spec/complete/unit_007/SETTINGS_MODAL.md`, `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md` |
+| prerequisite | Qt shell、input capture、controller preview | `spec/complete/unit_014/PYSIDE6_APPLICATION_SHELL.md`, `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md` |
+
+milestone 0とunit_013〜015の完了を着手条件とする。本unitはstandard controlとapplication actionの接続をfake runtimeで完成させ、production worker event / startup / shutdown統合はunit_017へ渡す。
+
+仕様執筆時点では上記の実装前提は未完了である。着手時に更新後の初期仕様と unit_013〜015 の完了記録を確認する。
+
+### 1.3 use case
+
+| actor / boundary | 入力または状態 | 期待する観測結果 | 制約 |
+|---|---|---|---|
+| user | toolbarから接続、切断、capture、設定を選ぶ | 現在stateでenabledなactionだけがapplication actionを1回発行する | 座標hit testを持たない |
+| user | mapping dialogでbindingを編集 | 次のkey / mouseをdraftへ取得し、反転、重複、local action競合を表示する | F12は割当不可 |
+| user | connection dialogでadapterを選択 / 再検索 | 非同期列挙結果をmodelへ反映し、0件時は接続 / pairingを無効化する | 別adapterを自動選択しない |
+| user | colors dialogで4色を編集 | draft previewを即時更新し、取消は保存値へ戻し、保存は再接続選択を提示する | 不正色を保存しない |
+| user | 保存中 / 接続中に操作 | busyな重複操作を無効にし、window event loopは動き続ける | runtime I/OをGUI threadで待たない |
+| keyboard user | Tab、Shift+Tab、Enter、Space、Esc | Qt標準のfocus移動、action実行、dialog取消が働く | controller mappingへ同じeventを流さない |
+
+## 2. 対象範囲
+
+- `QToolBar`と`QAction`でconnection、disconnect、capture start / stop、mapping、connection settings、colorsを構成する。
+- action label、check state、enabled stateをapplication / connection / capture / dialog / shutdown stateから更新する。
+- `QStatusBar`と複数の`QLabel`でadapter、connection、capture、pointer capability、preview-only、warning / errorを文字表示する。
+- mapping dialogを`QDialog`と`QTableView`または`QTreeView`で実装し、target、source、inverted、conflictをmodelとして表示する。
+- binding取得は明示操作後の次のkeyまたはmouse buttonだけを候補にし、dialog中の通常入力をcontroller mappingへ流さない。
+- duplicate sourceとlocal action conflictを表示し、保存前に確定または取消を選択できるようにする。同じtargetへの異なるsourceは既存domain契約どおり許可する。
+- mapping標準復元、gyro enabled、水平 / 垂直感度、Y反転、pitch上限を既存`SettingsEditor`のdraftへ接続する。
+- connection dialogを`QComboBox`またはmodel/view controlで構成し、adapter再検索、保存済み接続、接続設定、明示pairing確認を提供する。
+- adapter 0件、保存adapter未検出、discovery / connect / disconnect / pairing中のenabled stateを明示する。
+- controller colors dialogで4色の`#RRGGBB` field、swatch、`QColorDialog`、draft preview、保存 / 取消、再接続選択を実装する。
+- `QDialogButtonBox.Save` / `Cancel`を使い、validation / persistence失敗時はdialogとdraftを保持して該当fieldと説明を表示する。
+- dialog open前にcapture解除とneutral frame発行を要求し、dialog close後に自動captureしない。
+- 同時に開けるdialogを1つに制限し、pairing confirmationとcolor reconnect promptを明示的なstateとして扱う。
+- Qtのfocus chain、default button、shortcut context、enabled stateを利用し、独自の座標hit testや手作りtab orderを実装しない。
+
+## 3. 対象外
+
+- adapter I/OをGUI threadで実行する処理、worker eventのqueued delivery、startup reconnect、watchdog / errorのproduction wiring。unit_017が所有する。
+- settings schema、atomic repository、binding conflictのdomain意味、controller commandの意味変更。
+- custom-drawn button、独自combo box、独自text editor、座標付きtoolbar / dialog control。
+- profile import / export、Joy-Con、複数controller type、bond削除UI。
+- OS native file dialog、独自theme、QML、Qt Quick、Qt WebEngine。
+- 実displayのfont、DPI、focus、native keyboard差の最終受入。unit_018が所有する。
+- PyInstaller / standalone packaging。milestone 7の後続unitが所有する。
+
+## 4. 関連 docs
+
+- `spec/ui-redesign/PYSIDE6_UI_DESIGN.md`
+- `spec/ui-redesign/MILESTONES.md`
+- `spec/initial/requirements.md`
+- `spec/initial/ui.md`
+- `spec/initial/configuration.md`
+- `spec/initial/input.md`
+- `spec/initial/lifecycle.md`
+- `spec/complete/unit_007/SETTINGS_MODAL.md`
+- `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md`
+- `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
+- `AGENTS.md`
+
+## 5. 振る舞い仕様
+
+| 振る舞い | 入力・状態 | 期待結果 | 備考 |
+|---|---|---|---|
+| toolbarを更新する | app / connection / capture / dialog state | label、check、enabledがstateへ追従する | 色だけに依存しない |
+| connection actionを実行する | READY / CONNECTED / busy / adapter未設定 | connect / disconnect / dialog openを1回発行、busyは無効 | 重複commandを発行しない |
+| statusを表示する | adapter、connection、capture、pointer quality、warning / error | 独立した文字領域へ表示する | tracebackを表示しない |
+| mapping draftを編集する | row選択、次のkey / mouse、inverted | domain語彙のdraftを更新し、競合を表示する | Qt enum値を保存しない |
+| mappingを保存する | valid draft、重複確認済み | atomic save成功後にdialogを閉じ、live inputへ反映する | 保存失敗時は閉じない |
+| mappingを取り消す | 変更済みdraft、Cancel / Esc | 保存値を変更せずdraftを破棄する | captureを自動再開しない |
+| adapterを再検索する | connection dialog open | GUIを塞がずdiscovery actionを発行し、modelを更新する | 0件時も再検索できる |
+| adapter 0件を扱う | discovery完了、候補なし | connect / pairingを無効化し、必要機材を説明する | 先頭候補を仮定しない |
+| pairingを開始する | adapter選択、明示確認 | confirmation後だけpairing actionを1回発行する | 起動 / 保存だけでは開始しない |
+| colorsをpreviewする | valid draft color | previewをdraft色へ更新する | settings fileは未更新 |
+| colorsを取り消す | draft変更済み | previewとfieldを保存色へ戻し、repositoryを変更しない | connectionも変更しない |
+| colorsを保存する | valid draft、connected | 保存後に「後で」/「再接続」を提示する | 再接続時もcaptureを再開しない |
+| keyboard操作する | Tab / Shift+Tab / Enter / Space / Esc | Qt標準focusとdialog resultが働く | controller mappingより優先する |
+
+## 6. TDD Test List
+
+| status | item | type | layer | notes |
+|---|---|---|---|---|
+| refactor-skipped | toolbar actionのlabel、check、enabled stateがapplication / connection / capture / dialog / shutdown stateに追従する | regression | unit | `MainToolBar.refresh()`で5つの`QAction`公開stateを観測する。callback接続とdialog本体は後続itemが所有する |
+| refactor-skipped | READY / CONNECTEDのconnection actionはconnect / disconnectを1回発行し、busy中の重複操作は発行しない | regression | integration | `MainToolBar`は状態判断を持たず、enabledな`connection_action`をapplication callbackへ1回渡す。接続・切断commandの選択は既存`ApplicationSession`が所有する |
+| refactor-skipped | status barはadapter、connection、capture、pointer quality、preview-only、warning / errorを文字で区別する | regression | unit | `MainStatusBar`の独立した`QLabel`で表示する。errorはwarningより優先する |
+| refactor-skipped | mapping modelはtarget、source、inverted、conflictを公開し、標準復元とdraft編集をapplication境界へ渡す | new | unit | `MappingTableModel`が`SettingsEditor`へ更新と標準復元を委譲し、`QAbstractTableModel`のindex / dataで観測する |
+| refactor-skipped | mapping dialogの文字 / key / mouse取得はcontroller入力へ流れず、F12はcapture解除を優先する | regression | integration | `MappingDialog`は表示時に`on_dialog_opened`を発行し、明示的な取得中だけ`QApplication`のイベントフィルターで`QTableView`内のキー / マウスボタンを`SettingsEditor`へ渡す。F12は入力候補にせず`on_release_capture`へ渡す |
+| refactor-skipped | duplicate sourceとlocal action conflictを保存前に表示し、確定 / 取消を区別する | regression | integration | conflict列と非同期の`QMessageBox`で重複 / ローカル操作を表示する。取消はmapping dialogを維持し、明示的な保存だけがacceptする。保存先への反映は次の保存 / 取消itemが所有する。同一targetへの異なるsourceは許可する |
+| refactor-skipped | mapping保存失敗はdialogとdraftを保持し、取消は保存値を変更せず閉じる | edge | integration | `on_save`が`False`ならエラー表示を出してdialogを維持する。`on_cancel`がapplication層のdraftを破棄してからdialogを閉じる。永続化と現在の設定の更新はapplication層が所有する |
+| refactor-skipped | connection dialogはadapter再検索を非同期actionとして発行し、結果modelを更新する間もGUI eventを処理できる | regression | integration | `ConnectionDialog`は再検索コールバックだけを発行して待機せず、後から受け取る`AdapterOption`を`AdapterListModel`へ差し替える。再検索中はボタンを無効化し、結果反映後に再有効化する |
+| refactor-skipped | adapter 0件ではconnect / pairingを無効にして説明を表示し、再検索だけを有効にする | regression | integration | 0件結果ではアダプター選択、接続、ペアリングを無効にし、接続機器を確認する説明と再検索ボタンだけを残す。アダプターがある場合の明示選択は次のitemが所有する |
+| refactor-skipped | 保存adapter未検出時に別候補を自動選択せず、明示選択後だけ保存 / 接続できる | edge | integration | 保存済みIDがmodelにない場合は`QComboBox`を未選択にしてdraftを保持する。利用者の選択後だけ`SettingsEditor.update_connection()`を呼び、接続 / ペアリング操作を有効にする |
+| refactor-skipped | pairingは確認dialogのaccept後だけ開始し、cancel / close / busyではcommandを発行しない | regression | integration | 接続dialogのペアリング操作は確認要求callbackだけを発行する。`PairingConfirmationDialog`はOk時だけ`on_confirm`を呼び、取消 / closeは戻るcallbackのみ、busy中は確認・取消・closeを受け付けない |
+| refactor-skipped | disconnect actionはcapture neutralization後に発行され、処理中のframeと重複disconnectを抑止する | regression | integration | `ApplicationSession.connection_action()`はcapture停止によるneutral frameを先に発行し、`DISCONNECTING`へ遷移する。以後の同じ要求は`Disconnect` commandを追加しない |
+| refactor-skipped | color draftはpreviewを即時更新し、Cancelは保存色へ戻し、Saveは再接続選択へ進む | regression | integration | `ControllerColorsDialog`は`QColorDialog`と`SettingsEditor`で4色draftを更新し、preview callbackへ即時反映する。取消後は保存済み色へ戻し、接続中の保存後は非同期の再接続選択へ進む |
+| refactor-skipped | 無効な色、timeout、bond slot、mapping値は保存されず、該当controlと説明がdialogに残る | edge | integration | mapping、connection、colors dialogはdomain validation errorを説明表示へ変換し、draftを変更せずdialogを維持する。永続化前の検証失敗はapplication層の保存処理を呼ばない |
+| refactor-skipped | inverted bindingは文字またはcheck stateで明示され、保存後のdomain値を維持する | regression | integration | 選択行の`QCheckBox`とtableの「反転」文字列を`SettingsEditor`のdraftへ同期する。保存callbackは更新済みdomain bindingを受け取る |
+| refactor-skipped | Tab / Shift+Tab、Enter、Space、EscがQt標準のfocus移動、action、取消として動作する | new | integration | `QWidget.setTabOrder()`で画面順のfocus移動を定め、`MappingDialog.eventFilter()`はF12と明示入力取得中以外のkeyを消費せず、Qt標準のactionと取消に委ねる |
+| refactor-skipped | toolbarとdialogのproduction sourceに独自座標hit testが存在しない | new | package | 対象4ファイルを監査し、event座標、`contains()`、`childAt()`、独自hit testの利用がないことを固定する。`QToolBar` / model/view / layoutを利用する |
+| refactor-skipped | toolbarの割り当て、接続設定、色actionはfake application portが返す非同期dialogを一度だけ開き、close後に再操作できる | regression | integration | `MainWindow`がdialogを所有し、factory callbackへ親widgetだけを渡す。active dialog中の重複actionを抑止し、終了後に次のactionを受け付ける。worker eventやproduction compositionはunit_017が所有する |
+| refactor-skipped | connection dialogはadapter選択、ボンド、timeout、起動時再接続、診断ログ水準をdraftへ反映し、保存して接続をapplication actionへ渡す | regression | integration | Pro Controller固定表示、`QDialogButtonBox`のSave / Cancel、保存失敗時の表示を使う。adapter I/Oは行わない。cancel callbackは次のitemが所有する |
+| refactor-skipped | mapping、connection、colors dialogのEscとwindow closeはcancel callbackを一度だけ発行し、draftを破棄する | regression | integration | 3つのeditable dialogが`reject()`を一元化し、Save後のacceptやbusy中のpairing cancelとは混同しない。captureを自動再開しない |
+
+## 7. 設計メモ
+
+### 7.1 FRの所有範囲
+
+| requirement | 本unitで固定するGUI観測面 |
+|---|---|
+| FR-002 | adapter model、再検索、0件、保存ID未検出、enabled state |
+| FR-003 | saved connect、新規pairing確認、busy、失敗後の再操作 |
+| FR-004 | toolbar disconnect、neutral先行、重複抑止、capture解除 |
+| FR-008 | capture action、F12、focus / dialog時の解除、状態表示 |
+| FR-010 | mapping model、入力取得、競合、標準復元、F12保護 |
+| FR-011 | adapter、controller種別、bond slot、timeout、reconnect、diagnostic level |
+| FR-012 | 4色、`#RRGGBB`、draft preview、再接続選択 |
+| FR-013 | validation、atomic save成功、保存失敗時のdraft保持 |
+| FR-014 | binding単位のinverted表示と保存、capture外neutral |
+
+### 7.2 control境界
+
+- widget値をsettingsへ直接永続化しない。Qt dialogは既存`SettingsEditor`と`SettingsModalController`へ意味のある値を渡す。
+- adapter一覧とbinding一覧はmodelを正本とし、row widgetを手作業で並べて状態を複製しない。
+- modal event loopの多重利用を避け、controller workerの生存期間をdialogに従属させない。
+- warning / errorは短い分類済み文字列を表示し、詳細はlog / diagnostics導線へ分離する。
+
+### 7.3 unit間の引き渡し
+
+- unit_015から受け取る条件: capture / neutralizationとcontroller previewがQt shell上で成立している。
+- unit_017へ渡す条件: 全actionがfake application / runtime portで観測でき、dialog edgeと標準keyboard操作がgreenである。
+- unit_017はqueued runtime eventから同じpresentation stateを更新し、Qt widgetをworker threadから直接変更しない。
+
+## 8. 対象ファイル
+
+| path | change | 内容 |
+|---|---|---|
+| `src/demi/ui/main_window.py` | modify | toolbar、status bar、dialog ownershipとrefresh |
+| `src/demi/ui/toolbar.py` | new | `QToolBar` / `QAction`構成とstate同期 |
+| `src/demi/ui/status_bar.py` | new | `QStatusBar` / `QLabel`による状態表示 |
+| `src/demi/ui/dialogs/mapping.py` | new | mapping model/view、capture、conflict、save/cancel |
+| `src/demi/input/qt_adapter.py` | modify | Qt key / mouse eventをcanonical mapping sourceへ変換する再利用関数 |
+| `src/demi/ui/dialogs/connection.py` | new | adapter model、再検索、接続設定、pairing確認 |
+| `src/demi/ui/dialogs/colors.py` | new | 4色editor、`QColorDialog`、preview、再接続選択 |
+| `src/demi/application/dialogs.py` | verify / modify | dialog排他と意味のあるstate |
+| `src/demi/application/settings_editor.py` | verify / modify | Qt非依存draft操作の不足分 |
+| `src/demi/application/settings_modal.py` | verify / modify | save/cancel/failure/reconnect契約 |
+| `src/demi/app.py` | modify | Qt control actionとapplication sessionのcomposition |
+| `tests/unit/ui/test_toolbar.py` | new | action state |
+| `tests/unit/ui/test_status_bar.py` | new | status表示 |
+| `tests/unit/ui/dialogs/` | new | model/view、validation、keyboard |
+| `tests/integration/ui/test_mapping_dialog.py` | new | dialog入力取得、capture neutralization、F12保護 |
+| `tests/integration/ui/test_connection_dialog.py` | new | アダプター再検索と非同期結果model更新 |
+| `tests/integration/ui/test_colors_dialog.py` | new | 色draft preview、取消、再接続選択 |
+| `tests/integration/ui/test_dialog_validation.py` | new | mapping / connection / colorsの値検証表示 |
+| `tests/integration/ui/test_qt_dialogs.py` | new | action、neutral、save/cancel、edge |
+| `spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | modify | FR trace、TDD状態、検証、引き渡し記録 |
+
+## 9. 検証
+
+| command | result | notes |
+|---|---|---|
+| `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_016` | passed | 該当なし |
+| `git diff --no-index --check -- NUL spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
+| `uv run pytest tests/unit/ui/test_toolbar.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ruff check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.toolbar`未実装で収集失敗。greenではREADY / CONNECTED / CAPTURED / dialog / shutdownに対するlabel、check、enabledを確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/toolbar.py tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py` / `uv run ruff check src/demi/ui/toolbar.py tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`bind_connection_action`未実装で失敗。greenではREADYとCONNECTEDでcallbackを各1回、CONNECTING中は0回と確認した。callback接続以外のrefactorは不要 |
+| `uv run pytest tests/unit/ui/test_status_bar.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ruff check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.status_bar`未実装で収集失敗。greenでは6つの文字領域とerror優先を確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/ui/test_application.py::test_main_window_uses_standard_toolbar_and_status_bar tests/unit/ui/test_toolbar.py tests/unit/ui/test_status_bar.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/main_window.py tests/unit/ui/test_application.py src/demi/ui/toolbar.py src/demi/ui/status_bar.py` / `uv run ruff check src/demi/ui/main_window.py tests/unit/ui/test_application.py src/demi/ui/toolbar.py src/demi/ui/status_bar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MainWindow`がtoolbar / status barを所有しないため失敗。greenでは`addToolBar()`、`setStatusBar()`と中央previewの維持を確認した |
+| `uv run pytest tests/unit/ui/test_mapping_model.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/unit/ui/test_mapping_model.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/unit/ui/test_mapping_model.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.dialogs.mapping`未実装で収集失敗。greenでは28行、target / source / inverted / duplicate conflict、source更新、標準復元を確認した。Qt stubのindex型を明示したためrefactorは不要 |
+| `uv run pytest tests/unit/input/test_qt_adapter.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/input/qt_adapter.py src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/input/qt_adapter.py src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MappingDialog`未実装によるimport error。greenではcapture中に開いたdialogが`CONFIGURING`へ遷移し、`QTableView`宛てのキー / マウスボタンは明示取得中だけdraftへ反映、controller側の保持入力は空のままと確認した。F12は`KEY:F12`を保存せず解除callbackを1回発行する。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`conflict_confirmation`未実装で失敗。greenでは重複`KEY:F`とローカル操作`CTRL+C`をconflict列と確認ダイアログに表示し、取消後はdialogを維持、再確認した保存後だけacceptすることを確認した。確認は`QMessageBox.open()`で表示する。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/integration/ui/test_settings_modal.py tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`on_save`未実装で失敗。greenでは`SettingsModalController`の保存失敗後もeditor、`KEY:K`のdraft、dialogを維持し、エラー表示を出すことを確認した。取消後は保存済み設定を書き換えず、追加の保存処理を発行しない。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_presentation.py tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.dialogs.connection`未実装によるimport error。greenでは再検索コールバックを1回発行し、`QTimer`で後から渡した2件のアダプターがmodelと`QComboBox`へ反映される間にGUIイベントを処理できることを確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは0件結果でもアダプター選択が有効なことで失敗。greenでは0件結果でアダプター選択、接続、ペアリングを無効、再検索を有効とし、必要な機材を確認する説明を表示することを確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redはconnection dialogが`SettingsEditor`を受け取らないことで失敗。greenでは保存済み`usb:missing`が発見結果にない場合、先頭候補を選択せずdraftを保持することを確認した。利用者が`usb:1`を選択した後だけdraftと接続 / ペアリング操作が更新される。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_app.py tests/integration/ui/test_connection_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`PairingConfirmationDialog`未実装によるimport error。greenでは接続dialogが確認要求callbackだけを発行し、取消 / close / busyでは開始callbackを発行せず、通常のOk後だけ1回発行することを確認した。既存application testで`confirm_pairing()`後の`StartPairing`発行も確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py` / `uv run ruff check tests/unit/application/test_app.py tests/integration/ui/test_toolbar_actions.py` / `uv run ty check --no-progress` / `git diff --check` | passed | 強化した回帰テストは既存実装のままgreen。capture中の切断で最後のframeがneutralとなり、`Disconnect`が1回だけ発行され、`DISCONNECTING`中の再要求で増えないことを確認した。実装変更は不要のためrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/unit/application/test_app.py tests/integration/ui/test_colors_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/colors.py tests/integration/ui/test_colors_dialog.py` / `uv run ruff check src/demi/ui/dialogs/colors.py tests/integration/ui/test_colors_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.dialogs.colors`未実装によるimport error。greenでは`#ABCDEF`のdraftをpreviewへ即時反映し、取消で保存済み色へ戻すことを確認した。接続中の保存後は再接続確認を表示し、「再接続する」と「後で」がそれぞれ対応するcallbackを発行してacceptする。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_connection_dialog.py tests/integration/ui/test_colors_dialog.py tests/integration/ui/test_dialog_validation.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_validation.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_validation.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MappingDialog.set_source()`未実装で失敗。greenでは`KEY:F12`、不正なbond slotと0秒timeout、`#GGGGGG`をdraftへ反映せず、各dialogに説明を表示して開いたままにすることを確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/unit/application/test_settings_editor.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`inverted_checkbox`未実装で失敗。greenでは選択行のcheck stateを反転後のtable文字列「はい」と保存callbackのdomain bindingで確認した。構造上の重複はなくrefactorを省略した |
+| `uv run pytest tests/integration/ui/test_mapping_dialog.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは既定のTab先が画面順の「次の入力を取得」と異なり失敗。greenでは`QWidget.setTabOrder()`で画面順を定め、Tabで「次の入力を取得」へ移動し、Shift+Tabで反転へ戻ること、Spaceで反転、Enterで保存、Escで取消を確認した。F12と明示入力取得以外は既存のQt標準処理に委ね、追加のrefactorを省略した |
+| `uv run pytest tests/unit/ui/test_standard_control_source.py tests/unit/ui/test_toolbar.py tests/unit/ui/test_application.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/ui/test_standard_control_source.py src/demi/ui/toolbar.py src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py` / `uv run ruff check tests/unit/ui/test_standard_control_source.py src/demi/ui/toolbar.py src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py` / `uv run ty check --no-progress` / `git diff --check` | passed | 強化した監査テストは既存sourceのままgreen。`toolbar.py`、mapping、connection、colors dialogにevent座標、`contains()`、`childAt()`、独自hit testの利用がないことを確認した。source変更は不要のためrefactorを省略した |
+| `uv run pytest tests/unit/ui/test_application.py tests/integration/ui/test_main_window_dialogs.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/main_window.py tests/integration/ui/test_main_window_dialogs.py` / `uv run ruff check src/demi/ui/main_window.py tests/integration/ui/test_main_window_dialogs.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`MainWindow.bind_settings_dialog_factories()`未実装で失敗。greenでは3つのtoolbar actionがfactoryから受け取った非同期`QDialog`をwindow modalで1つだけ開き、active dialogの間は別actionを無視し、終了後に次のdialogを開けることを確認した。追加のrefactorを省略した |
+| `uv run pytest tests/integration/ui/test_connection_dialog.py tests/unit/application/test_settings_editor.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ruff check src/demi/ui/dialogs/connection.py tests/integration/ui/test_connection_dialog.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`on_save_and_connect`未実装で失敗。greenでは明示選択したadapter、bond slot、45秒timeout、起動時再接続、DEBUGをdraftへ反映し、Save操作がapplication callbackを1回だけ発行してacceptすることを確認した。callback失敗時は説明を表示してdialogを維持する。追加のrefactorを省略した |
+| `uv run pytest tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_connection_dialog.py tests/integration/ui/test_colors_dialog.py tests/integration/ui/test_dialog_cancellation.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_cancellation.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py src/demi/ui/dialogs/connection.py src/demi/ui/dialogs/colors.py tests/integration/ui/test_dialog_cancellation.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`ConnectionDialog`がcancel callbackを受け取れず失敗。greenでは3つのdialogでEscとwindow closeが各1回のcancel callbackを発行し、結果がRejectedになることを確認した。Save後のacceptとpairing確認のbusy取消は変更しないためrefactorを省略した |
+| Computer UseによるWindows実画面のスクリーンショット確認 | not run | native pipeへの接続が`os error 2`で失敗した。2026-07-15の再試行でも同じ失敗を確認した。別の自動UI操作へ置換せず、接続復旧後に同じ画面を確認する |
+| `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
+| `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
+| `uv run ty check --no-progress` | not run | Qt model / action / dialog境界は未実装 |
+| `uv run pytest tests/unit` | not run | Qt standard controls未実装のため |
+| `uv run pytest tests/integration` | not run | dialogとapplication action未実装のため |
+| `uv build` | not run | 仕様執筆だけでsource packageを変更していない。実装完了時に実行する |
+| `uv sync --dev` / `uv lock --check` | passed | 77 packageを解決し、lockの整合を確認した |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | passed | 113 filesの整形、lint、型検査が通過した |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed | 185 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed | 35 passed |
+| `uv build` / `git diff --check` | passed | 制限環境では`uv-build`取得が`os error 10013`で失敗したが、許可後の再実行でsdistとwheelを生成した。差分のwhitespace errorなし |
+
+## 10. 先送り事項
+
+| 観測 | 先送り理由 | 後続の置き場 |
+|---|---|---|
+| production adapter eventによるaction / status更新は未接続 | workerからGUI threadへのdeliveryを先に固定する必要がある | `spec/wip/unit_017/QT_RUNTIME_AND_LIFECYCLE_INTEGRATION.md` |
+| 3 OS実displayのfocus chain、font、DPI差は未検証 | 対象desktopで手動確認が必要 | `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
+| profile import / exportと複数controller type | 0.1.xのFR範囲外 | 後続roadmapで判断する |
+
+## 11. チェックリスト
+
+- [x] unit_015のinput / preview前提を確認した
+- [x] QToolBar / QAction / QStatusBarを実装した
+- [x] mapping / connection / colorsを標準dialogとmodel/viewで実装した
+- [x] FR-002〜004、FR-008、FR-010〜014のGUI観測面を確認した
+- [x] 保存失敗、取消、重複、busy、adapter 0件を確認した
+- [x] Tab、Enter、Space、Escとenabled stateを確認した
+- [x] 独自座標hit testが存在しないことを確認した
+- [x] TDD Test Listと検証結果を更新した
+- [x] unit_017への引き渡し条件を満たした
