@@ -108,7 +108,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | `ty`はPySide6境界をerror / warningなしで通し、application / domainにQt型、広域`Any`、理由のないignoreがない | regression | package | source回帰テストで`application`と`domain`の`PySide6`、`Any`、`# type: ignore`を禁止し、`ty`もgreenである。production境界は既に分離済みのため、追加refactorは不要 |
 | refactor-skipped | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | workflow contractで3 OS、Python 3.12 / 3.13、offscreen Qt、unit / integration / buildを固定し、PR #22の6 job成功をsource-level証拠として記録した。追加refactorは不要 |
 | refactor-skipped | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | `DEMI_QT_TEST_CLOSE_AFTER_MS`が有効な整数の場合だけrunnerが通常の`window.close()`を予約する。3 entry pointをoffscreen subprocessで起動してstatus 0を確認し、通常CLI引数は追加しなかったため、追加refactorは不要 |
-| todo | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | wheel contract、standaloneではない |
+| refactor-skipped | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | temporary venvへlocal wheelだけをinstallし、親sourceの`PYTHONPATH`を除外してPySide6 import、`python -m demi --version`、offscreen Qt起動 / closeを確認した。standalone artifactは対象外のため、追加refactorは不要 |
 | todo | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | OS / scale / mouse / screenを記録する |
 | todo | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 未実行を支援済みとしない |
 | todo | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | compositorを記録する |
@@ -196,6 +196,9 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run pytest tests/integration/ui/test_source_entry_points.py tests/integration/ui/test_application_lifecycle.py tests/unit/ui/test_application.py -q -p no:cacheprovider` | passed | 23 passed。source smokeと既存runner lifecycleを同時に確認した |
 | `uv run ruff format --check src/demi/ui/application.py tests/integration/ui/test_source_entry_points.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/application.py tests/integration/ui/test_source_entry_points.py` | passed | All checks passed |
+| `uv run pytest tests/integration/package/test_wheel_gui_smoke.py -q -p no:cacheprovider` | passed | 1 passed。temporary venvでwheelをinstallし、PySide6 dependency、配布version、offscreen Qt runnerの起動 / closeを確認した |
+| `uv run ruff format --check tests/integration/package/test_wheel_gui_smoke.py` | passed | 1 file already formatted |
+| `uv run ruff check tests/integration/package/test_wheel_gui_smoke.py` | passed | All checks passed |
 | `uv run pytest tests/unit` | passed | 187 passed |
 | `uv run pytest tests/integration` | passed | 54 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
