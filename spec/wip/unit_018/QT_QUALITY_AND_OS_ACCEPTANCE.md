@@ -110,7 +110,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | `DEMI_QT_TEST_CLOSE_AFTER_MS`が有効な整数の場合だけrunnerが通常の`window.close()`を予約する。3 entry pointをoffscreen subprocessで起動してstatus 0を確認し、通常CLI引数は追加しなかったため、追加refactorは不要 |
 | refactor-skipped | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | temporary venvへlocal wheelだけをinstallし、親sourceの`PYTHONPATH`を除外してPySide6 import、`python -m demi --version`、offscreen Qt起動 / closeを確認した。standalone artifactは対象外のため、追加refactorは不要 |
 | todo | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | OS / scale / mouse / screenを記録する |
-| todo | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 未実行を支援済みとしない |
+| refactor-skipped | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 現在の作業環境にmacOS host / desktop sessionがないため未実行。OS版、display scale、font、native focus、pointer capability、closeの実画面証拠は取得していない。macOS CIのoffscreen成功を実display acceptanceと扱わず、macOS desktop環境での後続受入が必要 |
 | todo | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | compositorを記録する |
 | refactor-skipped | 8ms入力評価の平均 / 95 / 99、preview最大60Hz、100ms GUI応答性、250ms watchdog誤発火を診断値で確認する | characterization | integration | `InputPublisher.timing_metrics`が最大512件の正の評価間隔から平均、nearest-rank p95 / p99を出す。fake clockの8 / 8 / 16 / 8 / 8msで平均9.6ms、p95 / p99 16msを確認し、preview 60Hz、slow runtime中の100ms未満probe、250ms未満watchdog非発火を既存統合 / unit testで再確認した。これはdesktop OSの実時間保証ではないため、追加refactorは不要 |
 | refactor-skipped | diagnosticsはOS、Python、Demi、swbt、PySide6、Qt、pointer capabilityを含み、pyglet版、bond内容、秘密値を含まない | regression | unit | UI境界の`SupportDiagnostics`が許可リストだけをsingle-line logへ整形し、起動 smokeでsupport snapshotと終了時入力統計を確認した。diagnostics収集失敗時も例外型だけを記録して起動を継続するため、追加refactorは不要 |
@@ -221,6 +221,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run ruff format --check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | 2 files already formatted |
 | `uv run ruff check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | All checks passed |
 | `rg -n -i "import[[:space:]]+pyglet|from[[:space:]]+pyglet|collect-all[[:space:]]+pyglet|pyglet[[:space:]]*[<=>]|pyglet[[:space:]]+input|pyglet.*(backend|window)" src tests pyproject.toml uv.lock packaging README.md spec/initial --glob "!tests/unit/test_legacy_ui_removal.py"` | passed | import /収集 /採用指示の該当なし。除外したfileは削除済み境界を検出する否定test |
+| macOS実display acceptance | not run | 現在の作業環境にmacOS host / desktop sessionがない。offscreen CIはsource-level証拠であり、実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | `uv run pytest tests/unit` | passed | 187 passed |
 | `uv run pytest tests/integration` | passed | 54 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
