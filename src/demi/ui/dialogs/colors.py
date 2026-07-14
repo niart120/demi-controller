@@ -72,6 +72,7 @@ class ControllerColorsDialog(QDialog):
         self._on_reconnect = on_reconnect
         self._color_dialog: QColorDialog | None = None
         self._reconnect_confirmation: QMessageBox | None = None
+        self._cancel_requested = False
 
         self.color_buttons: dict[ColorField, QPushButton] = {}
         color_form = QFormLayout()
@@ -150,10 +151,16 @@ class ControllerColorsDialog(QDialog):
 
     def request_cancel(self) -> None:
         """Discard the draft and restore the saved colors in the local preview."""
-        if not self._on_cancel():
-            return
-        self._on_preview(self._saved_colors)
         self.reject()
+
+    def reject(self) -> None:
+        """Discard the active draft before a standard cancel, Esc, or close."""
+        if not self._cancel_requested:
+            if not self._on_cancel():
+                return
+            self._cancel_requested = True
+            self._on_preview(self._saved_colors)
+        super().reject()
 
     def _open_reconnect_confirmation(self) -> None:
         if self._reconnect_confirmation is not None:

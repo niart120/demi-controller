@@ -193,6 +193,7 @@ class MappingDialog(QDialog):
         self._on_cancel = on_cancel
         self._capture_row: int | None = None
         self._updating_inverted = False
+        self._cancel_requested = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
 
@@ -327,10 +328,16 @@ class MappingDialog(QDialog):
 
     def request_reject(self) -> None:
         """Discard the draft through the application boundary before closing."""
-        on_cancel = self._on_cancel
-        if on_cancel is not None and not on_cancel():
-            return
         self.reject()
+
+    def reject(self) -> None:
+        """Discard the active draft before a standard cancel, Esc, or close."""
+        if not self._cancel_requested:
+            on_cancel = self._on_cancel
+            if on_cancel is not None and not on_cancel():
+                return
+            self._cancel_requested = True
+        super().reject()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override name.
         """Consume a requested binding input before ordinary widget handling."""

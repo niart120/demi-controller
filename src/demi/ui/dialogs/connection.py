@@ -95,6 +95,7 @@ class ConnectionDialog(QDialog):
         on_rescan: RescanAction,
         on_request_pairing: PairingAction | None = None,
         on_save_and_connect: SettingsAction | None = None,
+        on_cancel: SettingsAction | None = None,
         parent: QWidget | None = None,
     ) -> None:
         """Create a connection dialog that does not own runtime discovery.
@@ -107,6 +108,7 @@ class ConnectionDialog(QDialog):
                 dialog after an explicit adapter selection.
             on_save_and_connect: Saves the edited draft and requests a saved
                 connection through the application boundary.
+            on_cancel: Discards the active settings draft before the dialog closes.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
@@ -115,8 +117,10 @@ class ConnectionDialog(QDialog):
         self._on_rescan = on_rescan
         self._on_request_pairing = on_request_pairing
         self._on_save_and_connect = on_save_and_connect
+        self._on_cancel = on_cancel
         self._adapter_model = AdapterListModel(self)
         self._updating_adapters = False
+        self._cancel_requested = False
 
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
@@ -200,6 +204,15 @@ class ConnectionDialog(QDialog):
             return
         self.connection_error_label.clear()
         self.accept()
+
+    def reject(self) -> None:
+        """Discard the active draft before a standard cancel, Esc, or close."""
+        if not self._cancel_requested:
+            on_cancel = self._on_cancel
+            if on_cancel is not None and not on_cancel():
+                return
+            self._cancel_requested = True
+        super().reject()
 
     def apply_connection_fields(self) -> bool:
         """Validate editable connection fields without saving the draft.
