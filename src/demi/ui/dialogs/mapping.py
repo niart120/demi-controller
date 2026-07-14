@@ -220,6 +220,10 @@ class MappingDialog(QDialog):
         layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
 
+        QWidget.setTabOrder(self.table, self.inverted_checkbox)
+        QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
+        QWidget.setTabOrder(self.capture_button, self.restore_button)
+
         self.capture_button.clicked.connect(self.begin_capture)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)

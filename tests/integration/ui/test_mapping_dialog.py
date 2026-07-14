@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from PySide6.QtCore import QCoreApplication, QEvent, QPointF, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
 
@@ -270,3 +270,59 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
 
     assert saved_drafts[-1].profiles[0].bindings[0].inverted is True
     assert dialog.result() == int(QDialog.DialogCode.Accepted)
+
+
+def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved_drafts: list[AppSettings] = []
+
+    def save() -> bool:
+        saved_drafts.append(editor.draft)
+        return True
+
+    dialog = MappingDialog(editor, on_save=save)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.table.selectRow(0)
+    dialog.inverted_checkbox.setFocus()
+
+    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Tab)
+    qt_application.processEvents()
+    assert qt_application.focusWidget() is dialog.capture_button
+
+    _send_key(dialog.capture_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
+    qt_application.processEvents()
+    assert qt_application.focusWidget() is dialog.inverted_checkbox
+
+    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Space)
+    qt_application.processEvents()
+    assert editor.draft.profiles[0].bindings[0].inverted is True
+
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.setFocus()
+    _send_key(save_button, Qt.Key.Key_Return)
+    qt_application.processEvents()
+
+    assert saved_drafts[-1].profiles[0].bindings[0].inverted is True
+    assert dialog.result() == int(QDialog.DialogCode.Accepted)
+
+    escaped = MappingDialog(SettingsEditor(AppSettings.default()))
+    escaped.show()
+    qt_application.processEvents()
+    escaped.table.setFocus()
+    _send_key(escaped.table, Qt.Key.Key_Escape)
+    qt_application.processEvents()
+
+    assert escaped.result() == int(QDialog.DialogCode.Rejected)
+
+
+def _send_key(
+    target: QObject,
+    key: Qt.Key,
+    modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+) -> None:
+    QCoreApplication.sendEvent(target, QKeyEvent(QEvent.Type.KeyPress, key, modifiers))
+    QCoreApplication.sendEvent(target, QKeyEvent(QEvent.Type.KeyRelease, key, modifiers))
