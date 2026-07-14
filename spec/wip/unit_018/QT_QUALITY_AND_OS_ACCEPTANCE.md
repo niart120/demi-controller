@@ -105,7 +105,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-skipped | standard gateと対象integration testがすべて成功し、実行commandと件数がwork unitへ記録される | characterization | package | `uv sync --dev`、lock、format、lint、ty、unit 187件、integration 54件、build、diffを現行main由来の基準として記録した。production変更はなく、追加refactorは不要 |
-| todo | `ty`はPySide6境界をerror / warningなしで通し、application / domainにQt型、広域`Any`、理由のないignoreがない | regression | package | type boundary reviewを実施する |
+| refactor-skipped | `ty`はPySide6境界をerror / warningなしで通し、application / domainにQt型、広域`Any`、理由のないignoreがない | regression | package | source回帰テストで`application`と`domain`の`PySide6`、`Any`、`# type: ignore`を禁止し、`ty`もgreenである。production境界は既に分離済みのため、追加refactorは不要 |
 | todo | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | source-level証拠 |
 | todo | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | 実display smokeと自動offscreenを分ける |
 | todo | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | wheel contract、standaloneではない |
@@ -185,6 +185,9 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run ruff format --check .` | passed | 118 files already formatted |
 | `uv run ruff check .` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit/application/test_ui_state.py -q -p no:cacheprovider` | passed | 2 passed。application / domainのQt型、広域`Any`、理由のないignore残存を検出する |
+| `uv run ruff format --check tests/unit/application/test_ui_state.py` | passed | 1 file already formatted |
+| `uv run ruff check tests/unit/application/test_ui_state.py` | passed | All checks passed |
 | `uv run pytest tests/unit` | passed | 187 passed |
 | `uv run pytest tests/integration` | passed | 54 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
