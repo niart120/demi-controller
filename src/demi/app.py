@@ -615,6 +615,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
     runtime: RuntimePort | None = None
     window: WindowPort | None = None
     shutdown: ApplicationShutdownCoordinator | None = None
+    publisher: InputPublisher | None = None
     logger: logging.Logger | None = None
     ui_deactivator: Callable[[], None] | None = None
     ui_deactivated = False
@@ -679,6 +680,19 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         )
         if isinstance(window, InputCaptureSetupPort):
             window.configure_input(publisher=publisher, coordinator=coordinator)
+        if logger is not None and _is_qt_main_window(window):
+            try:
+                from demi.ui.diagnostics import collect_support_diagnostics  # noqa: PLC0415
+
+                logger.info(
+                    "%s",
+                    collect_support_diagnostics(window.relative_pointer_capability).log_message,
+                )
+            except Exception as error:  # noqa: BLE001 - diagnostics must not prevent application startup.
+                logger.error(  # noqa: TRY400 - diagnostics may expose package paths in traceback.
+                    "Support diagnostics unavailable: %s",
+                    type(error).__name__,
+                )
         session = ApplicationSession(
             settings=settings,
             paths=paths,
@@ -817,6 +831,15 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
                             type(error).__name__,
                         )
             _close_window(window, logger)
+    if logger is not None and publisher is not None:
+        timing = publisher.timing_metrics
+        logger.info(
+            "input timing samples=%d mean_ms=%s p95_ms=%s p99_ms=%s",
+            timing.sample_count,
+            timing.mean_interval_ms,
+            timing.p95_interval_ms,
+            timing.p99_interval_ms,
+        )
     if logger is not None and exit_status == 0:
         logger.info("Project_Demi stopped normally")
     return exit_status

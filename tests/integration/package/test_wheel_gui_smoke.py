@@ -84,6 +84,7 @@ def test_wheel_installs_pyside6_and_starts_the_qt_runner_in_a_clean_venv(tmp_pat
         {
             "APPDATA": str(tmp_path / "appdata"),
             "LOCALAPPDATA": str(tmp_path / "localappdata"),
+            "DEMI_TEST_PATH_ROOT": str(tmp_path),
             "QT_QPA_PLATFORM": "offscreen",
             "DEMI_QT_TEST_CLOSE_AFTER_MS": "25",
             "XDG_CONFIG_HOME": str(tmp_path / "config"),

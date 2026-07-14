@@ -113,7 +113,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | todo | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 未実行を支援済みとしない |
 | todo | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | compositorを記録する |
 | refactor-skipped | 8ms入力評価の平均 / 95 / 99、preview最大60Hz、100ms GUI応答性、250ms watchdog誤発火を診断値で確認する | characterization | integration | `InputPublisher.timing_metrics`が最大512件の正の評価間隔から平均、nearest-rank p95 / p99を出す。fake clockの8 / 8 / 16 / 8 / 8msで平均9.6ms、p95 / p99 16msを確認し、preview 60Hz、slow runtime中の100ms未満probe、250ms未満watchdog非発火を既存統合 / unit testで再確認した。これはdesktop OSの実時間保証ではないため、追加refactorは不要 |
-| todo | diagnosticsはOS、Python、Demi、swbt、PySide6、Qt、pointer capabilityを含み、pyglet版、bond内容、秘密値を含まない | regression | unit | FR-015のGUI library更新 |
+| refactor-skipped | diagnosticsはOS、Python、Demi、swbt、PySide6、Qt、pointer capabilityを含み、pyglet版、bond内容、秘密値を含まない | regression | unit | UI境界の`SupportDiagnostics`が許可リストだけをsingle-line logへ整形し、起動 smokeでsupport snapshotと終了時入力統計を確認した。diagnostics収集失敗時も例外型だけを記録して起動を継続するため、追加refactorは不要 |
 | todo | READMEとcurrent `spec/initial`がPySide6実装、source起動、支援範囲、standalone停止状態と一致する | regression | docs | docs-quality-reviewを実施する |
 | todo | source / wheel利用者がProject、PySide6、Qt、third-party license / noticeへ到達でき、欠落を検査できる | new | package | 法的判断完了とは記録しない |
 | todo | current source、test、dependency、lock、builder、README、initial specにpygletのimport /収集 /採用指示が0件である | regression | package | complete / redesign履歴は別分類 |
@@ -158,7 +158,8 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `tests/unit/test_ci.py` | modify | source CI matrixとQt gateのcontract |
 | `tests/unit/test_package.py` | modify | dependency / wheel contents / import contract |
 | `tests/integration/lifecycle/` | modify / new | source / wheel GUI startup / close smoke |
-| `src/demi/controller/diagnostics.py` | new / modify | PySide6 / Qt / pointer capability snapshot |
+| `src/demi/ui/diagnostics.py` | new | PySide6 / Qt / pointer capabilityの安全なsupport snapshot |
+| `src/demi/input/timing.py` | new | 入力評価間隔の平均、p95、p99を出すbounded metrics |
 | `src/demi/app.py` | verify / modify | safe diagnosticsとsource runner契約 |
 | `README.md` | modify | source起動、支援範囲、standalone停止、license導線 |
 | `spec/initial/README.md` | modify | 採用UIと実行model |
@@ -202,6 +203,9 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run pytest tests/unit/input/test_timing.py tests/unit/input/test_publisher.py tests/unit/ui/test_controller_preview.py tests/unit/controller/test_watchdog.py tests/integration/ui/test_application_lifecycle.py::test_qt_event_loop_stays_responsive_during_slow_runtime_operations -q -p no:cacheprovider` | passed | 13 passed。入力評価平均9.6ms、p95 / p99 16msのdeterministic sample、preview 60Hz制限、100ms未満GUI probe、250ms未満watchdog非発火を確認した |
 | `uv run ruff format --check src/demi/input/timing.py src/demi/input/publisher.py tests/unit/input/test_timing.py tests/unit/input/test_publisher.py` | passed | 4 files already formatted |
 | `uv run ruff check src/demi/input/timing.py src/demi/input/publisher.py tests/unit/input/test_timing.py tests/unit/input/test_publisher.py` | passed | All checks passed |
+| `uv run pytest tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/unit/application/test_app.py tests/unit/application/test_logging.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 38 passed。safe support snapshot、起動／終了ログ、test root、source / wheel GUI smoke、既存lifecycleを確認した |
+| `uv run ruff format --check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | 7 files already formatted |
+| `uv run ruff check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | All checks passed |
 | `uv run pytest tests/unit` | passed | 187 passed |
 | `uv run pytest tests/integration` | passed | 54 passed |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |

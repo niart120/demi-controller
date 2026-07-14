@@ -1,5 +1,6 @@
 """OS-specific settings and bond paths."""
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +48,14 @@ def resolve_paths() -> SettingsPaths:
     Returns:
         Config, data, and log directories selected for the current OS.
     """
+    test_root = os.environ.get("DEMI_TEST_PATH_ROOT")
+    if test_root:
+        root = Path(test_root)
+        return SettingsPaths(
+            config_dir=root / "config",
+            data_dir=root / "data",
+            log_dir=root / "logs",
+        )
     directories = platformdirs.PlatformDirs(appname="Project_Demi", appauthor=False)
     return SettingsPaths(
         config_dir=Path(directories.user_config_path),

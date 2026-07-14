@@ -35,6 +35,7 @@ def test_source_entry_points_start_and_close_the_qt_runner(
         {
             "APPDATA": str(tmp_path / "appdata"),
             "LOCALAPPDATA": str(tmp_path / "localappdata"),
+            "DEMI_TEST_PATH_ROOT": str(tmp_path),
             "QT_QPA_PLATFORM": "offscreen",
             "DEMI_QT_TEST_CLOSE_AFTER_MS": "25",
             "XDG_CONFIG_HOME": str(tmp_path / "config"),
@@ -54,3 +55,9 @@ def test_source_entry_points_start_and_close_the_qt_runner(
     )
 
     assert result.returncode == 0, f"{label}: {result.stderr}"
+    log_files = tuple(tmp_path.rglob("project-demi.log"))
+
+    assert len(log_files) == 1
+    log_contents = log_files[0].read_text(encoding="utf-8")
+    assert "support diagnostics os=" in log_contents
+    assert "input timing samples=" in log_contents
