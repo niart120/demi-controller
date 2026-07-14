@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QApplication
 
+from demi.controller.events import RuntimeStopped
 from demi.ui.main_window import MainWindow
 
 if TYPE_CHECKING:
@@ -86,6 +87,7 @@ class QtApplicationEventRouter:
         """
         self._window = window
         self._session: ApplicationSession | None = None
+        self._runtime_stopped_handler: Callable[[], object] | None = None
 
     def bind(self, session: ApplicationSession) -> None:
         """Bind the assembled application session and render its current state.
@@ -95,6 +97,16 @@ class QtApplicationEventRouter:
         """
         self._session = session
         self.refresh()
+
+    def set_runtime_stopped_handler(self, handler: Callable[[], object] | None) -> None:
+        """Set the application-owned completion callback for RuntimeStopped.
+
+        Args:
+            handler: Callback that completes application shutdown after the
+                session has rendered a runtime-stopped snapshot, or ``None``
+                to leave the router passive.
+        """
+        self._runtime_stopped_handler = handler
 
     def handle_runtime_event(self, event: RuntimeEvent) -> None:
         """Reduce one bridge-delivered event and refresh the main window.
@@ -107,6 +119,10 @@ class QtApplicationEventRouter:
             return
         session.handle_runtime_event(event)
         self.refresh()
+        if isinstance(event, RuntimeStopped):
+            handler = self._runtime_stopped_handler
+            if handler is not None:
+                handler()
 
     def refresh(self) -> None:
         """Render the current session snapshot when a session is bound."""

@@ -110,7 +110,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 | refactor-skipped | startup途中のsettings / runtime / window failureは開始済み資源を逆順に一度だけ閉じ、安全なstderrと非ゼロstatusを返す | edge | integration | runtime factory失敗後も作成済みwindowを閉じる。runtime start失敗ではruntime close、settings保存、window closeを各1回実行する。settings loadとwindow factoryの失敗も秘密値をstderrへ出さずstatus 1で終了するため、追加refactorは不要 |
 | refactor-skipped | main-thread未処理例外はneutral、runtime停止、settings / window cleanupを試行し非ゼロstatusを返す | regression | integration | GUI event loop中だけ安全な例外hookを設定し、通常例外ではneutral、runtime close、settings保存、window close、status 1を即時に確定する。KeyboardInterruptはcleanup後に伝播し、`os._exit`は使わないため、追加refactorは不要 |
 | refactor-skipped | worker faultはqueued error / stoppedを処理し、widgetをworkerから変更せず安全に終了またはREADYへ戻る | regression | integration | workerのControllerErrorはqueued bridge後にGUI主スレッドでだけwidgetへ反映し、retryable分類をtoolbarへ渡す。RuntimeStoppedはCaptureCoordinatorをshutdown状態にして全actionを無効化するため、追加refactorは不要 |
-| todo | close / Ctrl+Q / RuntimeStoppedの競合でもtimer、signal、runtime、settings、windowの後処理は一度だけ実行される | edge | integration | unit_012のcancellable closeを使う |
+| refactor-skipped | close / Ctrl+Q / RuntimeStoppedの競合でもtimer、signal、runtime、settings、windowの後処理は一度だけ実行される | edge | integration | RuntimeStoppedはrouterからapplication shutdown callbackへ進み、既にshutdown要求済みなら再実行しない。停止通知後にCtrl+Qとcloseを重ねてもtimer teardown、runtime close、settings保存は各1回のため、追加refactorは不要 |
 | todo | runtime停止後のqueued signal、timer timeout、dialog callbackはpresentation、widget、runtime commandを変更しない | regression | integration | receiver無効化とlifecycle generationを確認 |
 | todo | Qt objectの生成・更新・破棄はGUI主スレッドで行われ、shutdown後にtop-level windowとactive timerが残らない | new | integration | offscreen fixture teardownで確認 |
 
@@ -184,10 +184,13 @@ QtApplicationRunner
 | `uv run pytest tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 9 passed。settings load、window factory、runtime factory、runtime startの失敗でstatus 1と固定文のstderrを確認し、runtime factory失敗後のwindow closeとruntime start失敗後の逆順cleanupを確認した |
 | `uv run pytest tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 11 passed。Qt callback相当のmain-thread例外が安全なhookからneutral、runtime close、settings保存、window close、status 1へ進み、秘密値をstderrへ出さないことを確認した。KeyboardInterruptはcleanup後に伝播する |
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py tests/unit/application/test_app.py -q -p no:cacheprovider` | passed | 19 passed。worker threadのretryable / non-retryable ControllerErrorがqueued delivery後にだけGUIを更新し、RuntimeStopped後はcapture coordinatorがshutdown状態となり全actionを無効化することを確認した |
+| `uv run pytest tests/integration/ui/test_application_lifecycle.py tests/integration/ui/test_qt_runtime_events.py tests/unit/application/test_app.py -q -p no:cacheprovider` | passed | 31 passed。worker RuntimeStoppedが先にwindow closeを開始し、続くCtrl+Qとcloseでもinput timer teardown、runtime close、settings保存、native close callbackは各1回であることを確認した |
 | `uv run ruff format --check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | All checks passed |
 | `uv run ruff format --check src/demi/app.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/app.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
+| `uv run ruff format --check .` | passed | 118 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
 | `rg -n "os\._exit" src/demi` | passed | 該当なし |
 | `uv run ruff format --check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
@@ -221,7 +224,7 @@ QtApplicationRunner
 - [x] adapter / connection / pairing / watchdog / errorを表示へ反映した
 - [x] startup reconnect / adapter不在 / startup failureを確認した
 - [x] unhandled exceptionの安全な終了を確認した
-- [ ] 100ms応答性probeを実行した
+- [x] 100ms応答性probeを実行した
 - [ ] timer / signal / dialog / window / runtimeの所有権を固定した
 - [ ] runtime停止後のtimer / signal / callback無効化を確認した
 - [x] application層がQt型へ依存しないことを確認した

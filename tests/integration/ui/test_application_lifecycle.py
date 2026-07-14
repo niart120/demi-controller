@@ -25,9 +25,11 @@ from demi.controller.events import (
     ConnectionChanged,
     ControllerError,
     ControllerErrorCategory,
+    RuntimeStopped,
 )
 from demi.domain.settings import AppSettings, WindowSettings
 from demi.ui.application import QtApplicationRunner
+from demi.ui.main_window import MainWindow
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,7 +42,6 @@ if TYPE_CHECKING:
     from demi.controller.events import RuntimeEvent
     from demi.controller.watchdog import WatchdogClock
     from demi.domain.controller import ControllerFrame
-    from demi.ui.main_window import MainWindow
 
 
 @dataclass
@@ -162,6 +163,44 @@ class SlowRuntime(ShellRuntime):
         for worker in self.workers:
             worker.join()
         super().close()
+
+
+@dataclass
+class RuntimeStoppedEmitter(ShellRuntime):
+    """Runtime fake that emits a worker-owned RuntimeStopped event on demand."""
+
+    event_sink: RuntimeEventSink | None = None
+    workers: list[Thread] = field(default_factory=list)
+
+    def emit_runtime_stopped_from_worker(self) -> None:
+        """Emit one stopped event from a joined non-GUI worker thread."""
+        sink = self.event_sink
+        if sink is None:
+            raise RuntimeError
+        worker = Thread(target=lambda: sink.emit(RuntimeStopped()))
+        self.workers.append(worker)
+        worker.start()
+        worker.join()
+
+    def close(self) -> None:
+        """Join event workers before recording one application close request."""
+        for worker in self.workers:
+            worker.join()
+        super().close()
+
+
+class CountingMainWindow(MainWindow):
+    """Main window that records input teardown after native close acceptance."""
+
+    def __init__(self, spec: WindowSpec) -> None:
+        """Create a standard window with an input-teardown counter."""
+        super().__init__(spec)
+        self.input_teardown_calls = 0
+
+    def _remove_input_filters(self) -> None:
+        """Count the one input/timer cleanup before using the standard teardown."""
+        self.input_teardown_calls += 1
+        super()._remove_input_filters()
 
 
 @dataclass
@@ -629,6 +668,82 @@ def test_qt_main_thread_keyboard_interrupt_is_not_swallowed_after_cleanup() -> N
     assert sys.excepthook is original_exception_hook
     assert runtime.frames[-1].capture_active is False
     assert timeline == ["runtime.close", "repository.save", "window.close"]
+
+
+def test_qt_runtime_stopped_close_and_ctrl_q_run_cleanup_once(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    settings = AppSettings.default()
+    repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN))
+    runtime = RuntimeStoppedEmitter()
+    runner = QtApplicationRunner()
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    observed_before_competing_close: list[tuple[bool, bool]] = []
+    shutdown_callback_calls = 0
+    window_holder: list[CountingMainWindow] = []
+
+    def create_window(spec: WindowSpec) -> CountingMainWindow:
+        window = CountingMainWindow(spec)
+        window_holder.append(window)
+        return window
+
+    def create_gui(
+        *,
+        window: MainWindow,
+        on_shutdown_requested: Callable[[WindowSettings | None], bool],
+        **_kwargs: object,
+    ) -> QtApplicationRunner:
+        def count_shutdown(state: WindowSettings | None) -> bool:
+            nonlocal shutdown_callback_calls
+            shutdown_callback_calls += 1
+            return on_shutdown_requested(state)
+
+        runner.configure(window=window, on_shutdown_requested=count_shutdown)
+
+        def emit_stopped_then_request_competing_closes() -> None:
+            runtime.emit_runtime_stopped_from_worker()
+            qt_application.processEvents()
+            observed_before_competing_close.append(
+                (not window.isVisible(), window.input_evaluation_interval_ms is None)
+            )
+            window.quit_action.trigger()
+            window.close()
+
+        QTimer.singleShot(0, emit_stopped_then_request_competing_closes)
+        return runner
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, clock
+        runtime.event_sink = event_sink
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=create_window,
+        gui_factory=create_gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-runtime-stopped-race"
+        ),
+    )
+
+    assert run_application(dependencies) == 0
+
+    window = window_holder[0]
+    assert observed_before_competing_close == [(True, True)]
+    assert runtime.closed == 1
+    assert len(repository.saved) == 1
+    assert shutdown_callback_calls == 1
+    assert window.input_evaluation_interval_ms is None
+    assert window.input_teardown_calls == 1
 
 
 def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(

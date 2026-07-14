@@ -702,6 +702,17 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             shutdown.request(window_state)
             return not shutdown.failed
 
+        if event_router is not None:
+
+            def shutdown_after_runtime_stopped() -> None:
+                """Complete a worker-initiated shutdown before closing the window."""
+                if shutdown.requested:
+                    return
+                if request_shutdown(None):
+                    _close_window(window, logger)
+
+            event_router.set_runtime_stopped_handler(shutdown_after_runtime_stopped)
+
         runtime.start()
         session.begin()
         if event_router is not None:
