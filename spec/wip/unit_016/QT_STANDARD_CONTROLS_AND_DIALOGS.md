@@ -99,7 +99,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 |---|---|---|---|---|
 | refactor-skipped | toolbar actionのlabel、check、enabled stateがapplication / connection / capture / dialog / shutdown stateに追従する | regression | unit | `MainToolBar.refresh()`で5つの`QAction`公開stateを観測する。callback接続とdialog本体は後続itemが所有する |
 | refactor-skipped | READY / CONNECTEDのconnection actionはconnect / disconnectを1回発行し、busy中の重複操作は発行しない | regression | integration | `MainToolBar`は状態判断を持たず、enabledな`connection_action`をapplication callbackへ1回渡す。接続・切断commandの選択は既存`ApplicationSession`が所有する |
-| todo | status barはadapter、connection、capture、pointer quality、preview-only、warning / errorを文字で区別する | regression | unit | 色だけの表現を禁止する |
+| refactor-skipped | status barはadapter、connection、capture、pointer quality、preview-only、warning / errorを文字で区別する | regression | unit | `MainStatusBar`の独立した`QLabel`で表示する。errorはwarningより優先する |
 | todo | mapping modelはtarget、source、inverted、conflictを公開し、標準復元とdraft編集をapplication境界へ渡す | new | unit | model/viewのindexとdataを確認する |
 | todo | mapping dialogの文字 / key / mouse取得はcontroller入力へ流れず、F12はcapture解除を優先する | regression | integration | FR-008 / FR-010 |
 | todo | duplicate sourceとlocal action conflictを保存前に表示し、確定 / 取消を区別する | regression | integration | 同一targetへの異なるsourceは許可する |
@@ -172,6 +172,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | `git diff --no-index --check -- NUL spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
 | `uv run pytest tests/unit/ui/test_toolbar.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ruff check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.toolbar`未実装で収集失敗。greenではREADY / CONNECTED / CAPTURED / dialog / shutdownに対するlabel、check、enabledを確認した。構造上の重複はなくrefactorを省略した |
 | `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/toolbar.py tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py` / `uv run ruff check src/demi/ui/toolbar.py tests/unit/ui/test_toolbar.py tests/integration/ui/test_toolbar_actions.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`bind_connection_action`未実装で失敗。greenではREADYとCONNECTEDでcallbackを各1回、CONNECTING中は0回と確認した。callback接続以外のrefactorは不要 |
+| `uv run pytest tests/unit/ui/test_status_bar.py -q -p no:cacheprovider` / `uv run ruff format --check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ruff check src/demi/ui/status_bar.py tests/unit/ui/test_status_bar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.status_bar`未実装で収集失敗。greenでは6つの文字領域とerror優先を確認した。構造上の重複はなくrefactorを省略した |
 | `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ty check --no-progress` | not run | Qt model / action / dialog境界は未実装 |
