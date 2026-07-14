@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtWidgets import QApplication
 
 from demi.controller.events import RuntimeStopped
@@ -48,6 +49,9 @@ class QtApplicationRunner:
         if window is None:
             raise RuntimeError
         window.show()
+        close_after_ms = _test_auto_close_ms()
+        if close_after_ms is not None:
+            QTimer.singleShot(close_after_ms, window.close)
         try:
             return self._application.exec()
         finally:
@@ -86,6 +90,18 @@ class QtApplicationRunner:
             spec: Validated saved dimensions selected by the application layer.
         """
         return MainWindow(spec)
+
+
+def _test_auto_close_ms() -> int | None:
+    """Return the opted-in process-test close delay, if it is valid."""
+    value = os.environ.get("DEMI_QT_TEST_CLOSE_AFTER_MS")
+    if value is None:
+        return None
+    try:
+        milliseconds = int(value)
+    except ValueError:
+        return None
+    return milliseconds if milliseconds >= 0 else None
 
 
 class QtApplicationEventRouter:
