@@ -20,6 +20,7 @@ from demi.controller.events import (
     ConnectionChanged,
     ControllerError,
     ControllerErrorCategory,
+    PairingProgress,
     WatchdogNeutralized,
 )
 from demi.domain.controller import ControllerFrame
@@ -492,6 +493,21 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
     session.connection_action()
 
     assert isinstance(runtime.commands[-1], ConnectSaved)
+    session.connection_action()
+    assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 1
+    session.handle_runtime_event(PairingProgress("ペアリング処理中"))
+    assert session.presentation.model.warning == "ペアリング処理中"
+    session.handle_runtime_event(
+        ControllerError(
+            category=ControllerErrorCategory.RECONNECT_FAILED,
+            summary="接続に失敗しました",
+            retryable=True,
+            diagnostic_id="test-0001",
+        )
+    )
+    assert session.presentation.model.connection_state is ConnectionState.ERROR
+    session.connection_action()
+    assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 2
     assert session.toggle_capture() is True
     assert runtime.frames[-1].capture_active is True
     session.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))

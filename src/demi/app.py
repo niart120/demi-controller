@@ -215,6 +215,7 @@ class ApplicationSession:
         self._dialogs = DialogManager()
         self._settings_modal = SettingsModalController(repository, coordinator, self._dialogs)
         self._presentation = PresentationStore()
+        self._connection_retryable = True
         self._startup_reconnect_pending = settings.connection.reconnect_on_start and bool(
             settings.connection.adapter_id
         )
@@ -257,6 +258,7 @@ class ApplicationSession:
             warning=presentation.warning,
             error=presentation.error,
             color_reconnect_pending=presentation.color_reconnect_pending,
+            connection_retryable=self._connection_retryable,
         )
 
     def begin(self) -> None:
@@ -278,6 +280,8 @@ class ApplicationSession:
             self._presentation.set_adapters(adapters)
             self._startup_reconnect_discovery_complete = True
         elif isinstance(event, ConnectionChanged):
+            if event.state in {ConnectionState.READY, ConnectionState.CONNECTED}:
+                self._connection_retryable = True
             self._presentation.set_connection(
                 event.state,
                 adapter_id=event.adapter_id,
@@ -287,6 +291,8 @@ class ApplicationSession:
                 self._start_saved_reconnect_once()
         elif isinstance(event, ControllerError):
             self._coordinator.stop_capture()
+            self._connection_retryable = event.retryable
+            self._presentation.set_connection(ConnectionState.ERROR)
             self._presentation.set_error(_safe_error_message(event.category))
             if self._log_controller_error is not None:
                 self._log_controller_error(event.category)
@@ -347,6 +353,8 @@ class ApplicationSession:
             self._coordinator.stop_capture()
             self._presentation.set_connection(ConnectionState.DISCONNECTING)
             self._runtime.post(Disconnect())
+            return
+        if state is ConnectionState.ERROR and not self._connection_retryable:
             return
         if state not in {ConnectionState.READY, ConnectionState.ERROR}:
             return

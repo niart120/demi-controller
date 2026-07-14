@@ -174,6 +174,7 @@ class MainWindow(QMainWindow):
                 application_state=snapshot.application_state,
                 connection_state=snapshot.connection_state,
                 dialog_open=snapshot.dialog_open,
+                connection_retryable=snapshot.connection_retryable,
             )
         )
         self._status_bar.refresh(

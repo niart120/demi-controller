@@ -42,6 +42,66 @@ def test_main_window_refreshes_toolbar_and_status_bar_from_application_snapshot(
     assert window.status_bar.preview_label.text() == "プレビュー: 送信あり"
 
 
+def test_main_window_disables_busy_connection_and_reenables_a_retryable_error(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+
+    window.refresh(
+        ApplicationUiSnapshot(
+            application_state=AppState.IDLE,
+            connection_state=ConnectionState.CONNECTING,
+            adapter_label="Bluetooth adapter",
+            adapters=(),
+            dialog_open=False,
+            preview_only=True,
+            warning="ペアリング処理中",
+            error=None,
+            color_reconnect_pending=False,
+        )
+    )
+
+    assert not window.main_toolbar.connection_action.isEnabled()
+    assert window.status_bar.connection_label.text() == "接続: 接続中"
+    assert window.status_bar.notice_label.text() == "警告: ペアリング処理中"
+
+    window.refresh(
+        ApplicationUiSnapshot(
+            application_state=AppState.IDLE,
+            connection_state=ConnectionState.ERROR,
+            adapter_label="Bluetooth adapter",
+            adapters=(),
+            dialog_open=False,
+            preview_only=True,
+            warning="接続に失敗しました",
+            error="接続に失敗しました",
+            color_reconnect_pending=False,
+        )
+    )
+
+    assert window.main_toolbar.connection_action.isEnabled()
+    assert window.status_bar.connection_label.text() == "接続: エラー"
+    assert window.status_bar.notice_label.text() == "エラー: 接続に失敗しました"
+
+    window.refresh(
+        ApplicationUiSnapshot(
+            application_state=AppState.IDLE,
+            connection_state=ConnectionState.ERROR,
+            adapter_label="Bluetooth adapter",
+            adapters=(),
+            dialog_open=False,
+            preview_only=True,
+            warning="接続に失敗しました",
+            error="接続に失敗しました",
+            color_reconnect_pending=False,
+            connection_retryable=False,
+        )
+    )
+
+    assert not window.main_toolbar.connection_action.isEnabled()
+
+
 def test_main_window_refreshes_connection_candidates_without_auto_selecting(
     qt_application: QApplication,
 ) -> None:

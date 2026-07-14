@@ -20,6 +20,7 @@ class ApplicationUiSnapshot:
         warning: Current safe warning text.
         error: Current safe error text, if any.
         color_reconnect_pending: Whether the user must choose a color reconnect.
+        connection_retryable: Whether an error-state connection action is safe.
     """
 
     application_state: AppState
@@ -31,3 +32,4 @@ class ApplicationUiSnapshot:
     warning: str
     error: str | None
     color_reconnect_pending: bool
+    connection_retryable: bool = True
