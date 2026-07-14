@@ -104,7 +104,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | standard gateと対象integration testがすべて成功し、実行commandと件数がwork unitへ記録される | characterization | package | lock / format / lint / ty / unit / integration / build / diff |
+| refactor-skipped | standard gateと対象integration testがすべて成功し、実行commandと件数がwork unitへ記録される | characterization | package | `uv sync --dev`、lock、format、lint、ty、unit 187件、integration 54件、build、diffを現行main由来の基準として記録した。production変更はなく、追加refactorは不要 |
 | todo | `ty`はPySide6境界をerror / warningなしで通し、application / domainにQt型、広域`Any`、理由のないignoreがない | regression | package | type boundary reviewを実施する |
 | todo | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | source-level証拠 |
 | todo | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | 実display smokeと自動offscreenを分ける |
@@ -180,14 +180,15 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 |---|---|---|
 | `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_018` | passed | 該当なし |
 | `git diff --no-index --check -- NUL spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
-| `uv sync --dev` | not run | 仕様執筆だけでdependencyを変更していない |
-| `uv lock --check` | not run | 仕様執筆だけでlockを変更していない。実装完了時は必須 |
-| `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
-| `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
-| `uv run ty check --no-progress` | not run | PySide6境界の実装と型reviewが未完了 |
-| `uv run pytest tests/unit` | not run | UI再設計milestone 1〜5の実装前 |
-| `uv run pytest tests/integration` | not run | UI再設計milestone 1〜5の実装前 |
-| `uv build` | not run | source / wheel GUI契約の実装前。実装完了時は必須 |
+| `uv sync --dev` | passed | Resolved 77 packages、Checked 74 packages |
+| `uv lock --check` | passed | Resolved 77 packages |
+| `uv run ruff format --check .` | passed | 118 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 187 passed |
+| `uv run pytest tests/integration` | passed | 54 passed |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `git diff --check` | passed | whitespace errorなし |
 | 3 OS source CI | not run | PySide6 UI実装とworkflow更新前 |
 | Windows実display acceptance | not run | PySide6 UI実装後に対象Windows desktopで実行する |
 | macOS / Linux実display acceptance | not run | 対象desktop環境が必要。未実行時は理由と後続先を記録する |
