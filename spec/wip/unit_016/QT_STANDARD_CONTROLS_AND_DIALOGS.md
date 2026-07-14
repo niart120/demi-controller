@@ -17,7 +17,7 @@ UI 再設計 milestone 4 として、接続、切断、入力capture、設定を
 | requirements | FR-002〜004、FR-008、FR-010〜014の受入条件 | `spec/initial/requirements.md` |
 | settings / lifecycle | immutable draft、atomic save、capture neutralization、color reconnect | `spec/initial/configuration.md`, `spec/initial/lifecycle.md` |
 | completed behavior | settings editor / modal controller、runtime command、presentationの現行契約 | `spec/complete/unit_007/SETTINGS_MODAL.md`, `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md` |
-| prerequisite | Qt shell、input capture、controller preview | `spec/complete/unit_014/PYSIDE6_APPLICATION_SHELL.md`, `spec/wip/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md` |
+| prerequisite | Qt shell、input capture、controller preview | `spec/complete/unit_014/PYSIDE6_APPLICATION_SHELL.md`, `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md` |
 
 milestone 0とunit_013〜015の完了を着手条件とする。本unitはstandard controlとapplication actionの接続をfake runtimeで完成させ、production worker event / startup / shutdown統合はunit_017へ渡す。
 
@@ -72,7 +72,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 - `spec/initial/lifecycle.md`
 - `spec/complete/unit_007/SETTINGS_MODAL.md`
 - `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md`
-- `spec/wip/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
+- `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
 - `AGENTS.md`
 
 ## 5. 振る舞い仕様

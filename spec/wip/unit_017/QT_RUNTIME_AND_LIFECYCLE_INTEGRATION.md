@@ -16,7 +16,7 @@ UI 再設計 milestone 5 として、`ControllerRuntime` worker、application st
 | target UI | worker→queued signal→GUI thread→session→window refreshの目標構造 | `spec/ui-redesign/PYSIDE6_UI_DESIGN.md` |
 | initial contracts | runtime ownership、startup / shutdown、reconnect、watchdog、exception | `spec/initial/architecture.md`, `spec/initial/lifecycle.md`, `spec/initial/swbt-integration.md` |
 | completed behavior | production assembly、session action、safe logging、cancellable runtime shutdown | `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md`, `spec/complete/unit_012/CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md` |
-| prerequisites | Qt shell、input / preview、standard controls / dialogs | `spec/complete/unit_014/`, `spec/wip/unit_015/`, `spec/wip/unit_016/` |
+| prerequisites | Qt shell、input / preview、standard controls / dialogs | `spec/complete/unit_014/`, `spec/complete/unit_015/`, `spec/wip/unit_016/` |
 
 milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduction compositionとlifecycleを所有し、3 OS最終acceptanceと文書同期はunit_018へ渡す。
 
@@ -75,7 +75,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 - `spec/complete/unit_011/APPLICATION_ASSEMBLY_AND_GUI_WIRING.md`
 - `spec/complete/unit_012/CONTROLLER_RUNTIME_CANCELLABLE_SHUTDOWN.md`
 - `spec/complete/unit_014/PYSIDE6_APPLICATION_SHELL.md`
-- `spec/wip/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
+- `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
 - `spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
 - `AGENTS.md`
 
