@@ -11,6 +11,7 @@ from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
 from demi.controller.commands import (
     ConnectSaved,
     Disconnect,
+    DiscoverAdapters,
     RecreateWithColors,
     StartPairing,
 )
@@ -20,6 +21,7 @@ from demi.controller.events import (
     ConnectionChanged,
     ControllerError,
     ControllerErrorCategory,
+    PairingProgress,
     WatchdogNeutralized,
 )
 from demi.domain.controller import ControllerFrame
@@ -158,7 +160,7 @@ class FakeGui:
         return self.exit_status
 
 
-def test_application_runner_assembles_boundaries_without_starting_the_runtime() -> None:
+def test_application_runner_assembles_boundaries_and_starts_the_runtime() -> None:
     paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
     repository_result = SettingsLoadResult(AppSettings.default(), SettingsLoadStatus.FIRST_RUN)
     runtime = FakeRuntime()
@@ -184,8 +186,8 @@ def test_application_runner_assembles_boundaries_without_starting_the_runtime() 
 
     assert run_application(dependencies) == 0
 
-    assert runtime.started == 0
-    assert runtime.commands == []
+    assert runtime.started == 1
+    assert runtime.commands == [DiscoverAdapters()]
     assert gui.runs == 1
     assert runtime.closed == 1
     assert isinstance(gui_kwargs["session"], ApplicationSession)
@@ -331,6 +333,7 @@ def test_session_reconnects_once_only_when_the_saved_adapter_is_discovered() -> 
     assert len(reconnects) == 1
     assert reconnects[0].adapter_id == "usb:0"
     assert reconnects[0].bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.presentation.model.connection_state is ConnectionState.CONNECTING
     assert session.presentation.model.adapter_label == "Adapter"
 
@@ -425,15 +428,27 @@ def test_session_preserves_an_error_and_ignores_a_stale_watchdog_event() -> None
 
     session.handle_runtime_event(WatchdogNeutralized(capture_epoch=current_epoch - 1))
     assert coordinator.is_captured is True
+    assert runtime.frames[-1].capture_active is True
+
+    session.handle_runtime_event(WatchdogNeutralized(capture_epoch=current_epoch))
+    assert coordinator.is_captured is False
+    assert runtime.frames[-1].capture_active is False
+    assert session.presentation.model.warning == "入力監視タイムアウト"
+
+    assert coordinator.start_capture() is True
 
     session.handle_runtime_event(
         ControllerError(
             category=ControllerErrorCategory.RECONNECT_FAILED,
-            summary="ignored lower-level summary",
+            summary="bond=/private/secret.json",
             retryable=True,
             diagnostic_id="runtime-0001",
         )
     )
+    assert coordinator.is_captured is False
+    assert runtime.frames[-1].capture_active is False
+    assert session.presentation.model.connection_state is ConnectionState.ERROR
+    assert "secret" not in session.presentation.model.warning
     session.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
 
     assert coordinator.is_captured is False
@@ -492,6 +507,21 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
     session.connection_action()
 
     assert isinstance(runtime.commands[-1], ConnectSaved)
+    session.connection_action()
+    assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 1
+    session.handle_runtime_event(PairingProgress("ペアリング処理中"))
+    assert session.presentation.model.warning == "ペアリング処理中"
+    session.handle_runtime_event(
+        ControllerError(
+            category=ControllerErrorCategory.RECONNECT_FAILED,
+            summary="接続に失敗しました",
+            retryable=True,
+            diagnostic_id="test-0001",
+        )
+    )
+    assert session.presentation.model.connection_state is ConnectionState.ERROR
+    session.connection_action()
+    assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 2
     assert session.toggle_capture() is True
     assert runtime.frames[-1].capture_active is True
     session.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))

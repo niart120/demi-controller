@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeGuard, runtime_checkable
 
 from demi.application.coordinator import (
     CaptureCoordinator,
@@ -25,6 +25,7 @@ from demi.application.presentation import AdapterOption, PresentationStore
 from demi.application.settings_modal import SettingsModalController, settings_recovery_notice
 from demi.application.shutdown import ApplicationShutdownCoordinator
 from demi.application.state import ConnectionState
+from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.errors import SettingsPersistenceError
 from demi.config.paths import resolve_paths
 from demi.config.repository import SettingsRepository
@@ -53,6 +54,7 @@ from demi.input.publisher import InputPublisher
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
     from demi.config.paths import SettingsPaths
     from demi.config.repository import SettingsLoadResult
@@ -66,6 +68,8 @@ if TYPE_CHECKING:
     from demi.domain.mapping import InputProfile
     from demi.domain.settings import AppSettings, WindowSettings
     from demi.ui.application import QtApplicationRunner
+    from demi.ui.event_bridge import QtRuntimeEventBridge
+    from demi.ui.main_window import MainWindow
 
 
 class Clock(Protocol):
@@ -214,6 +218,7 @@ class ApplicationSession:
         self._dialogs = DialogManager()
         self._settings_modal = SettingsModalController(repository, coordinator, self._dialogs)
         self._presentation = PresentationStore()
+        self._connection_retryable = True
         self._startup_reconnect_pending = settings.connection.reconnect_on_start and bool(
             settings.connection.adapter_id
         )
@@ -242,6 +247,23 @@ class ApplicationSession:
         """Return main-thread presentation state for the GUI."""
         return self._presentation
 
+    @property
+    def ui_snapshot(self) -> ApplicationUiSnapshot:
+        """Return the current framework-independent state for the main window."""
+        presentation = self._presentation.model
+        return ApplicationUiSnapshot(
+            application_state=self._coordinator.app_state,
+            connection_state=presentation.connection_state,
+            adapter_label=presentation.adapter_label,
+            adapters=presentation.adapters,
+            dialog_open=self._dialogs.model.visible,
+            preview_only=presentation.connection_state is not ConnectionState.CONNECTED,
+            warning=presentation.warning,
+            error=presentation.error,
+            color_reconnect_pending=presentation.color_reconnect_pending,
+            connection_retryable=self._connection_retryable,
+        )
+
     def begin(self) -> None:
         """Request initial adapter discovery after the runtime has started."""
         self._presentation.set_connection(ConnectionState.STARTING)
@@ -261,6 +283,8 @@ class ApplicationSession:
             self._presentation.set_adapters(adapters)
             self._startup_reconnect_discovery_complete = True
         elif isinstance(event, ConnectionChanged):
+            if event.state in {ConnectionState.READY, ConnectionState.CONNECTED}:
+                self._connection_retryable = True
             self._presentation.set_connection(
                 event.state,
                 adapter_id=event.adapter_id,
@@ -270,6 +294,8 @@ class ApplicationSession:
                 self._start_saved_reconnect_once()
         elif isinstance(event, ControllerError):
             self._coordinator.stop_capture()
+            self._connection_retryable = event.retryable
+            self._presentation.set_connection(ConnectionState.ERROR)
             self._presentation.set_error(_safe_error_message(event.category))
             if self._log_controller_error is not None:
                 self._log_controller_error(event.category)
@@ -283,6 +309,7 @@ class ApplicationSession:
         elif isinstance(event, PairingProgress):
             self._presentation.set_warning(event.summary)
         elif isinstance(event, RuntimeStopped):
+            self._coordinator.begin_shutdown()
             self._presentation.set_connection(ConnectionState.STOPPED)
 
     def open_settings(self, kind: DialogKind) -> bool:
@@ -330,6 +357,8 @@ class ApplicationSession:
             self._coordinator.stop_capture()
             self._presentation.set_connection(ConnectionState.DISCONNECTING)
             self._runtime.post(Disconnect())
+            return
+        if state is ConnectionState.ERROR and not self._connection_retryable:
             return
         if state not in {ConnectionState.READY, ConnectionState.ERROR}:
             return
@@ -587,6 +616,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
     window: WindowPort | None = None
     shutdown: ApplicationShutdownCoordinator | None = None
     logger: logging.Logger | None = None
+    ui_deactivator: Callable[[], None] | None = None
+    ui_deactivated = False
     exit_status = 1
     try:
         paths = selected_dependencies.paths_resolver()
@@ -609,13 +640,23 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging(settings.connection.diagnostic_level)
         logger.info("Starting Project_Demi")
 
-        runtime = selected_dependencies.runtime_factory(
-            adapter_factory=SwbtControllerAdapter,
-            event_sink=DiscardRuntimeEventSink(),
-            clock=selected_dependencies.clock,
-        )
         spec = _window_spec_for(settings)
         window = selected_dependencies.window_factory(spec)
+        event_sink: RuntimeEventSink = DiscardRuntimeEventSink()
+        event_router = None
+        event_bridge: QtRuntimeEventBridge | None = None
+        if _is_qt_main_window(window):
+            from demi.ui.application import QtApplicationEventRouter  # noqa: PLC0415
+            from demi.ui.event_bridge import QtRuntimeEventBridge  # noqa: PLC0415
+
+            event_router = QtApplicationEventRouter(window)
+            event_bridge = QtRuntimeEventBridge(event_router.handle_runtime_event, parent=window)
+            event_sink = event_bridge
+        runtime = selected_dependencies.runtime_factory(
+            adapter_factory=SwbtControllerAdapter,
+            event_sink=event_sink,
+            clock=selected_dependencies.clock,
+        )
         if isinstance(window, ControllerColorPreviewPort):
             window.set_controller_colors(settings.controller_colors)
         preview = window if isinstance(window, FramePreviewPort) else None
@@ -649,6 +690,8 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )
+        if event_router is not None:
+            event_router.bind(session)
         coordinator.set_capture_failure_reporter(session.report_capture_failure)
         shutdown = ApplicationShutdownCoordinator(
             capture=coordinator,
@@ -659,10 +702,42 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             report_error=lambda stage, error: _log_shutdown_error(logger, stage, error),
         )
 
+        def deactivate_ui() -> None:
+            """Disable Qt callbacks before worker shutdown or native close."""
+            nonlocal ui_deactivated
+            if ui_deactivated:
+                return
+            ui_deactivated = True
+            if event_bridge is not None:
+                event_bridge.deactivate()
+            if event_router is not None:
+                event_router.deactivate()
+            if _is_qt_main_window(window):
+                window.begin_shutdown()
+
+        ui_deactivator = deactivate_ui
+
         def request_shutdown(window_state: WindowSettings | None) -> bool:
             """Run ordered shutdown and allow native close only after success."""
+            deactivate_ui()
             shutdown.request(window_state)
             return not shutdown.failed
+
+        if event_router is not None:
+
+            def shutdown_after_runtime_stopped() -> None:
+                """Complete a worker-initiated shutdown before closing the window."""
+                if shutdown.requested:
+                    return
+                if request_shutdown(None):
+                    _close_window(window, logger)
+
+            event_router.set_runtime_stopped_handler(shutdown_after_runtime_stopped)
+
+        runtime.start()
+        session.begin()
+        if event_router is not None:
+            event_router.refresh()
 
         gui = selected_dependencies.gui_factory(
             window=window,
@@ -681,7 +756,37 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             on_shutdown_requested=request_shutdown,
             window_maximized=settings.window.maximized,
         )
-        exit_status = gui.run()
+        main_thread_failed = False
+        original_exception_hook = sys.excepthook
+
+        def handle_main_thread_exception(
+            error_type: type[BaseException],
+            error: BaseException,
+            traceback: TracebackType | None,
+        ) -> None:
+            """Close safely after a Qt callback reports an ordinary exception."""
+            nonlocal main_thread_failed
+            if not issubclass(error_type, Exception):
+                original_exception_hook(error_type, error, traceback)
+                return
+            if main_thread_failed:
+                return
+            main_thread_failed = True
+            if logger is not None:
+                logger.error(
+                    "Project_Demi main-thread failure: %s",
+                    error_type.__name__,
+                )
+            if request_shutdown(None):
+                _close_window(window, logger)
+
+        sys.excepthook = handle_main_thread_exception
+        try:
+            exit_status = gui.run()
+        finally:
+            sys.excepthook = original_exception_hook
+        if main_thread_failed:
+            exit_status = 1
     except Exception as error:  # noqa: BLE001 - CLI boundary converts startup failures.
         if logger is not None:
             logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
@@ -692,22 +797,25 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         exit_status = 1
     finally:
         if shutdown is not None:
+            if ui_deactivator is not None:
+                ui_deactivator()
             already_requested = shutdown.requested
             shutdown.request()
             if shutdown.failed:
                 exit_status = 1
             if not already_requested:
                 _close_window(window, logger)
-        elif runtime is not None:
-            try:
-                runtime.close()
-            except Exception as error:  # noqa: BLE001 - preserve the primary exit status.
-                exit_status = 1
-                if logger is not None:
-                    logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
-                        "Project_Demi shutdown failed: %s",
-                        type(error).__name__,
-                    )
+        else:
+            if runtime is not None:
+                try:
+                    runtime.close()
+                except Exception as error:  # noqa: BLE001 - preserve the primary exit status.
+                    exit_status = 1
+                    if logger is not None:
+                        logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
+                            "Project_Demi shutdown failed: %s",
+                            type(error).__name__,
+                        )
             _close_window(window, logger)
     if logger is not None and exit_status == 0:
         logger.info("Project_Demi stopped normally")
@@ -719,6 +827,13 @@ def _window_state_for(window: WindowPort | None) -> WindowSettings | None:
     if window is None:
         return None
     return window.window_state()
+
+
+def _is_qt_main_window(window: WindowPort) -> TypeGuard[MainWindow]:
+    """Return whether a window can own Qt runtime-event delivery."""
+    from demi.ui.main_window import MainWindow  # noqa: PLC0415 - GUI起動時だけQtをimportする。
+
+    return isinstance(window, MainWindow)
 
 
 def _close_window(window: WindowPort | None, logger: logging.Logger | None) -> None:

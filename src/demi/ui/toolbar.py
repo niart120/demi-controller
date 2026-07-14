@@ -17,11 +17,13 @@ class ToolbarState:
         application_state: Current lifecycle and capture state.
         connection_state: Current connection lifecycle state.
         dialog_open: Whether one settings dialog currently owns interaction.
+        connection_retryable: Whether an error-state connection action is safe.
     """
 
     application_state: AppState
     connection_state: ConnectionState
     dialog_open: bool
+    connection_retryable: bool = True
 
 
 class MainToolBar(QToolBar):
@@ -65,10 +67,10 @@ class MainToolBar(QToolBar):
             AppState.SHUTTING_DOWN,
             AppState.STOPPED,
         }
-        connection_available = interaction_available and connection_state in {
-            ConnectionState.READY,
-            ConnectionState.CONNECTED,
-        }
+        connection_available = interaction_available and (
+            connection_state in {ConnectionState.READY, ConnectionState.CONNECTED}
+            or (connection_state is ConnectionState.ERROR and state.connection_retryable)
+        )
         capture_available = interaction_available and application_state in {
             AppState.IDLE,
             AppState.CAPTURED,

@@ -21,6 +21,7 @@ from demi.input.relative_pointer import (
 )
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
+from demi.ui.dialogs.connection import ConnectionDialog
 from demi.ui.status_bar import MainStatusBar, StatusBarState
 from demi.ui.toolbar import MainToolBar, ToolbarState
 
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 
     from demi.app import WindowSpec
     from demi.application.coordinator import CaptureCoordinator
+    from demi.application.ui_state import ApplicationUiSnapshot
     from demi.domain.controller import ControllerFrame
     from demi.domain.settings import ControllerColorSettings
     from demi.input.publisher import InputPublisher
@@ -60,6 +62,7 @@ class MainWindow(QMainWindow):
         self._connection_dialog_factory: SettingsDialogFactory | None = None
         self._colors_dialog_factory: SettingsDialogFactory | None = None
         self._active_settings_dialog: QDialog | None = None
+        self._latest_snapshot: ApplicationUiSnapshot | None = None
         self._main_toolbar.mapping_action.triggered.connect(
             lambda _checked=False: self._open_settings_dialog(self._mapping_dialog_factory)
         )
@@ -92,6 +95,7 @@ class MainWindow(QMainWindow):
         self.setMouseTracking(True)
         self._shutdown_callback: ShutdownCallback | None = None
         self._close_accepted = False
+        self._shutdown_started = False
         self._input_application: QApplication | None = None
         self._input_adapter: QtInputAdapter | None = None
         self._native_input_filter: WindowsRawInputBackend | None = None
@@ -122,6 +126,18 @@ class MainWindow(QMainWindow):
                 destroyed and returns whether native close is safe.
         """
         self._shutdown_callback = callback
+
+    def begin_shutdown(self) -> None:
+        """Stop UI-owned callbacks and close the active dialog once."""
+        if self._shutdown_started:
+            return
+        self._shutdown_started = True
+        self._remove_input_filters()
+        dialog = self._active_settings_dialog
+        self._active_settings_dialog = None
+        if dialog is not None:
+            dialog.blockSignals(True)
+            dialog.done(int(QDialog.DialogCode.Rejected))
 
     def set_pointer_capture(self, enabled: bool) -> None:
         """Apply or release foreground pointer capture for controller input.
@@ -158,6 +174,36 @@ class MainWindow(QMainWindow):
     def status_bar(self) -> MainStatusBar:
         """Return the standard status bar owned by this main window."""
         return self._status_bar
+
+    def refresh(self, snapshot: ApplicationUiSnapshot) -> None:
+        """Render a framework-independent application snapshot.
+
+        Args:
+            snapshot: Main-thread state selected by the application layer.
+        """
+        if self._shutdown_started:
+            return
+        self._latest_snapshot = snapshot
+        self._main_toolbar.refresh(
+            ToolbarState(
+                application_state=snapshot.application_state,
+                connection_state=snapshot.connection_state,
+                dialog_open=snapshot.dialog_open,
+                connection_retryable=snapshot.connection_retryable,
+            )
+        )
+        self._status_bar.refresh(
+            StatusBarState(
+                adapter_label=snapshot.adapter_label,
+                connection_state=snapshot.connection_state,
+                application_state=snapshot.application_state,
+                pointer_quality=self.relative_pointer_capability.quality,
+                preview_only=snapshot.preview_only,
+                warning=snapshot.warning,
+                error=snapshot.error,
+            )
+        )
+        self._refresh_connection_dialog(snapshot)
 
     @property
     def active_settings_dialog(self) -> QDialog | None:
@@ -335,7 +381,7 @@ class MainWindow(QMainWindow):
             return
         if callback(self.window_state()):
             self._close_accepted = True
-            self._remove_input_filters()
+            self.begin_shutdown()
             event.accept()
             return
         event.ignore()
@@ -346,13 +392,16 @@ class MainWindow(QMainWindow):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
 
     def _open_settings_dialog(self, factory: SettingsDialogFactory | None) -> None:
-        if factory is None or self._active_settings_dialog is not None:
+        if self._shutdown_started or factory is None or self._active_settings_dialog is not None:
             return
         dialog = factory(self)
         if dialog is None:
             return
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self._active_settings_dialog = dialog
+        snapshot = self._latest_snapshot
+        if snapshot is not None:
+            self._refresh_connection_dialog(snapshot)
         dialog.finished.connect(
             lambda _result, closed_dialog=dialog: self._clear_active_settings_dialog(closed_dialog)
         )
@@ -362,8 +411,13 @@ class MainWindow(QMainWindow):
         if self._active_settings_dialog is dialog:
             self._active_settings_dialog = None
 
+    def _refresh_connection_dialog(self, snapshot: ApplicationUiSnapshot) -> None:
+        dialog = self._active_settings_dialog
+        if isinstance(dialog, ConnectionDialog):
+            dialog.set_adapters(snapshot.adapters)
+
     def _on_input_evaluation_timeout(self) -> None:
-        if self._input_coordinator is not None:
+        if not self._shutdown_started and self._input_coordinator is not None:
             self.evaluate_input()
 
     def _require_relative_pointer_backend(self) -> RelativePointerBackend:
