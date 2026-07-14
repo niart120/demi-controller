@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QApplication, QMainWindow
 
+from demi.application.state import AppState, ConnectionState
 from demi.domain.errors import DomainValueError
 from demi.domain.settings import WindowSettings
 from demi.input.qt_adapter import QtInputAdapter
@@ -20,6 +21,8 @@ from demi.input.relative_pointer import (
 )
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
+from demi.ui.status_bar import MainStatusBar, StatusBarState
+from demi.ui.toolbar import MainToolBar, ToolbarState
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
@@ -50,6 +53,28 @@ class MainWindow(QMainWindow):
         self.resize(max(spec.width, self.minimumWidth()), max(spec.height, self.minimumHeight()))
         self._controller_preview = ControllerPreviewWidget(parent=self)
         self.setCentralWidget(self._controller_preview)
+        self._main_toolbar = MainToolBar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._main_toolbar)
+        self._status_bar = MainStatusBar(self)
+        self.setStatusBar(self._status_bar)
+        self._main_toolbar.refresh(
+            ToolbarState(
+                application_state=AppState.IDLE,
+                connection_state=ConnectionState.STOPPED,
+                dialog_open=False,
+            )
+        )
+        self._status_bar.refresh(
+            StatusBarState(
+                adapter_label="なし",
+                connection_state=ConnectionState.STOPPED,
+                application_state=AppState.IDLE,
+                pointer_quality=RelativePointerQuality.UNAVAILABLE,
+                preview_only=True,
+                warning="",
+                error=None,
+            )
+        )
         self.setMouseTracking(True)
         self._shutdown_callback: ShutdownCallback | None = None
         self._close_accepted = False
@@ -109,6 +134,16 @@ class MainWindow(QMainWindow):
     def controller_preview(self) -> ControllerPreviewWidget:
         """Return the main-window-owned controller preview widget."""
         return self._controller_preview
+
+    @property
+    def main_toolbar(self) -> MainToolBar:
+        """Return the standard toolbar owned by this main window."""
+        return self._main_toolbar
+
+    @property
+    def status_bar(self) -> MainStatusBar:
+        """Return the standard status bar owned by this main window."""
+        return self._status_bar
 
     @property
     def input_evaluation_interval_ms(self) -> int | None:
