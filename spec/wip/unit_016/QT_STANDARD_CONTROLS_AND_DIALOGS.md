@@ -97,7 +97,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | toolbar actionのlabel、check、enabled stateがapplication / connection / capture / dialog / shutdown stateに追従する | regression | unit | `QAction`公開stateを観測する |
+| refactor-skipped | toolbar actionのlabel、check、enabled stateがapplication / connection / capture / dialog / shutdown stateに追従する | regression | unit | `MainToolBar.refresh()`で5つの`QAction`公開stateを観測する。callback接続とdialog本体は後続itemが所有する |
 | todo | READY / CONNECTEDのconnection actionはconnect / disconnectを1回発行し、busy中の重複操作は発行しない | regression | integration | fake application actionsで確認する |
 | todo | status barはadapter、connection、capture、pointer quality、preview-only、warning / errorを文字で区別する | regression | unit | 色だけの表現を禁止する |
 | todo | mapping modelはtarget、source、inverted、conflictを公開し、標準復元とdraft編集をapplication境界へ渡す | new | unit | model/viewのindexとdataを確認する |
@@ -170,6 +170,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 |---|---|---|
 | `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_016` | passed | 該当なし |
 | `git diff --no-index --check -- NUL spec/wip/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
+| `uv run pytest tests/unit/ui/test_toolbar.py -q -p no:cacheprovider` / `uv run ruff format --check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ruff check tests/unit/ui/test_toolbar.py src/demi/ui/toolbar.py` / `uv run ty check --no-progress` / `git diff --check` | passed | redは`demi.ui.toolbar`未実装で収集失敗。greenではREADY / CONNECTED / CAPTURED / dialog / shutdownに対するlabel、check、enabledを確認した。構造上の重複はなくrefactorを省略した |
 | `uv run ruff format --check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ruff check .` | not run | 仕様執筆だけでPython sourceを変更していない |
 | `uv run ty check --no-progress` | not run | Qt model / action / dialog境界は未実装 |
