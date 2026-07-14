@@ -617,6 +617,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
     shutdown: ApplicationShutdownCoordinator | None = None
     logger: logging.Logger | None = None
     ui_deactivator: Callable[[], None] | None = None
+    ui_deactivated = False
     exit_status = 1
     try:
         paths = selected_dependencies.paths_resolver()
@@ -703,6 +704,10 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
 
         def deactivate_ui() -> None:
             """Disable Qt callbacks before worker shutdown or native close."""
+            nonlocal ui_deactivated
+            if ui_deactivated:
+                return
+            ui_deactivated = True
             if event_bridge is not None:
                 event_bridge.deactivate()
             if event_router is not None:

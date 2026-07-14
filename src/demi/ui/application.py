@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication
 
 from demi.controller.events import RuntimeStopped
@@ -47,7 +48,18 @@ class QtApplicationRunner:
         if window is None:
             raise RuntimeError
         window.show()
-        return self._application.exec()
+        try:
+            return self._application.exec()
+        finally:
+            self._dispose_window(window)
+
+    def _dispose_window(self, window: MainWindow) -> None:
+        """Delete the runner-owned top-level window on the GUI thread."""
+        if window.isVisible():
+            window.close()
+        window.deleteLater()
+        QCoreApplication.sendPostedEvents(window, QEvent.Type.DeferredDelete)
+        self._window = None
 
     def configure(
         self,

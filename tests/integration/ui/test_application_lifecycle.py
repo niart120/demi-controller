@@ -6,11 +6,11 @@ import time
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
-from threading import Thread
+from threading import Thread, get_ident
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QThread, QTimer
 from PySide6.QtGui import QCloseEvent
 
 from demi.app import ApplicationDependencies, SystemClock, WindowSpec, run_application
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QApplication
 
     from demi.app import ApplicationSession, RuntimePort
+    from demi.application.ui_state import ApplicationUiSnapshot
     from demi.controller.adapter import ControllerAdapterFactory, RuntimeEventSink
     from demi.controller.commands import ControllerCommand
     from demi.controller.events import RuntimeEvent
@@ -201,6 +202,52 @@ class CountingMainWindow(MainWindow):
         """Count the one input/timer cleanup before using the standard teardown."""
         self.input_teardown_calls += 1
         super()._remove_input_filters()
+
+
+class ThreadTrackingMainWindow(MainWindow):
+    """Main window that records its Qt lifecycle thread ownership."""
+
+    def __init__(
+        self,
+        spec: WindowSpec,
+        *,
+        lifecycle_observations: list[tuple[str, int, bool]],
+        destruction_observations: list[tuple[str, int]],
+        timer_inactive_after_teardown: list[bool],
+    ) -> None:
+        """Create a window and retain only primitive lifecycle observations."""
+        self._lifecycle_observations = lifecycle_observations
+        self._timer_inactive_after_teardown = timer_inactive_after_teardown
+        super().__init__(spec)
+        self.destroyed.connect(
+            lambda _object: destruction_observations.append(("window", get_ident()))
+        )
+        self._input_evaluation_timer.destroyed.connect(
+            lambda _object: destruction_observations.append(("timer", get_ident()))
+        )
+        self._record_lifecycle("create")
+
+    def refresh(self, snapshot: ApplicationUiSnapshot) -> None:
+        """Record the caller thread before applying the standard refresh."""
+        self._record_lifecycle("refresh")
+        super().refresh(snapshot)
+
+    def begin_shutdown(self) -> None:
+        """Record shutdown ownership before stopping UI callbacks."""
+        self._record_lifecycle("shutdown")
+        super().begin_shutdown()
+
+    def _remove_input_filters(self) -> None:
+        """Record timer teardown ownership and the resulting inactive timer."""
+        self._record_lifecycle("input-teardown")
+        super()._remove_input_filters()
+        self._timer_inactive_after_teardown.append(not self._input_evaluation_timer.isActive())
+
+    def _record_lifecycle(self, phase: str) -> None:
+        """Append the current Python and Qt thread ownership for one phase."""
+        self._lifecycle_observations.append(
+            (phase, get_ident(), QThread.currentThread() == self.thread())
+        )
 
 
 @dataclass
@@ -744,6 +791,83 @@ def test_qt_runtime_stopped_close_and_ctrl_q_run_cleanup_once(
     assert shutdown_callback_calls == 1
     assert window.input_evaluation_interval_ms is None
     assert window.input_teardown_calls == 1
+
+
+def test_qt_shutdown_releases_gui_objects_on_the_main_thread(
+    qt_application: QApplication,
+) -> None:
+    settings = AppSettings.default()
+    repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN))
+    runtime = RuntimeStoppedEmitter()
+    runner = QtApplicationRunner()
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    main_thread = get_ident()
+    lifecycle_observations: list[tuple[str, int, bool]] = []
+    destruction_observations: list[tuple[str, int]] = []
+    timer_inactive_after_teardown: list[bool] = []
+    windows: list[ThreadTrackingMainWindow] = []
+
+    def create_window(spec: WindowSpec) -> ThreadTrackingMainWindow:
+        window = ThreadTrackingMainWindow(
+            spec,
+            lifecycle_observations=lifecycle_observations,
+            destruction_observations=destruction_observations,
+            timer_inactive_after_teardown=timer_inactive_after_teardown,
+        )
+        windows.append(window)
+        return window
+
+    def create_gui(
+        *,
+        window: MainWindow,
+        on_shutdown_requested: Callable[[WindowSettings | None], bool],
+        **_kwargs: object,
+    ) -> QtApplicationRunner:
+        runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
+        QTimer.singleShot(0, runtime.emit_runtime_stopped_from_worker)
+        return runner
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, clock
+        runtime.event_sink = event_sink
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=create_window,
+        gui_factory=create_gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger(
+            "demi-test-gui-thread-ownership"
+        ),
+    )
+
+    assert run_application(dependencies) == 0
+
+    qt_application.processEvents()
+
+    assert windows
+    assert {phase for phase, _, _ in lifecycle_observations} >= {
+        "create",
+        "refresh",
+        "shutdown",
+        "input-teardown",
+    }
+    assert {thread_id for _, thread_id, _ in lifecycle_observations} == {main_thread}
+    assert all(is_gui_thread for _, _, is_gui_thread in lifecycle_observations)
+    assert timer_inactive_after_teardown == [True]
+    assert set(destruction_observations) == {
+        ("window", main_thread),
+        ("timer", main_thread),
+    }
+    assert qt_application.topLevelWidgets() == []
 
 
 def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(

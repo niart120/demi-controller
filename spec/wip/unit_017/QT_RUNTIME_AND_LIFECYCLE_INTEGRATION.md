@@ -112,7 +112,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 | refactor-skipped | worker faultはqueued error / stoppedを処理し、widgetをworkerから変更せず安全に終了またはREADYへ戻る | regression | integration | workerのControllerErrorはqueued bridge後にGUI主スレッドでだけwidgetへ反映し、retryable分類をtoolbarへ渡す。RuntimeStoppedはCaptureCoordinatorをshutdown状態にして全actionを無効化するため、追加refactorは不要 |
 | refactor-skipped | close / Ctrl+Q / RuntimeStoppedの競合でもtimer、signal、runtime、settings、windowの後処理は一度だけ実行される | edge | integration | RuntimeStoppedはrouterからapplication shutdown callbackへ進み、既にshutdown要求済みなら再実行しない。停止通知後にCtrl+Qとcloseを重ねてもtimer teardown、runtime close、settings保存は各1回のため、追加refactorは不要 |
 | refactor-skipped | runtime停止後のqueued signal、timer timeout、dialog callbackはpresentation、widget、runtime commandを変更しない | regression | integration | bridgeとrouterをdeactivateし、MainWindow.begin_shutdown()でinput timerとdialog signalを停止する。停止前にqueueしたworker event、後着timer timeout、dialog finished callbackでもstate、widget、runtime commandは不変のため、追加refactorは不要 |
-| todo | Qt objectの生成・更新・破棄はGUI主スレッドで行われ、shutdown後にtop-level windowとactive timerが残らない | new | integration | offscreen fixture teardownで確認 |
+| refactor-skipped | Qt objectの生成・更新・破棄はGUI主スレッドで行われ、shutdown後にtop-level windowとactive timerが残らない | new | integration | QtApplicationRunnerがevent loop終了後にrunner所有windowを`deleteLater()`し、GUI主スレッドでDeferredDeleteを処理する。ApplicationのUI無効化は一回だけ実行して破棄済みwindowを再操作しない。生成、refresh、shutdown、input timer teardown、window / timerの破棄通知、top-level widget不在をoffscreenで固定したため、追加refactorは不要 |
 
 ## 7. 設計メモ
 
@@ -186,6 +186,10 @@ QtApplicationRunner
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py tests/unit/application/test_app.py -q -p no:cacheprovider` | passed | 19 passed。worker threadのretryable / non-retryable ControllerErrorがqueued delivery後にだけGUIを更新し、RuntimeStopped後はcapture coordinatorがshutdown状態となり全actionを無効化することを確認した |
 | `uv run pytest tests/integration/ui/test_application_lifecycle.py tests/integration/ui/test_qt_runtime_events.py tests/unit/application/test_app.py -q -p no:cacheprovider` | passed | 31 passed。worker RuntimeStoppedが先にwindow closeを開始し、続くCtrl+Qとcloseでもinput timer teardown、runtime close、settings保存、native close callbackは各1回であることを確認した |
 | `uv run pytest tests/integration/ui tests/unit/application/test_app.py tests/unit/ui/test_application.py -q -p no:cacheprovider` | passed | 67 passed。停止前にqueueしたworker event、後着timer timeout、dialog finished callbackがpresentation、widget、runtime commandを変更せず、既存のdialog / input / lifecycle契約も維持することを確認した |
+| `uv run pytest tests/integration/ui tests/unit/application/test_app.py tests/unit/ui/test_application.py -q -p no:cacheprovider` | passed | 68 passed。worker RuntimeStoppedによる終了でQt objectの生成、refresh、shutdown、input timer teardown、window / timer破棄が主スレッドで行われ、event loop復帰後にtop-level widgetとactive timerが残らないことを確認した |
+| `uv run ruff format --check src/demi/app.py src/demi/ui/application.py tests/integration/ui/test_application_lifecycle.py` | passed | 3 files already formatted |
+| `uv run ruff check src/demi/app.py src/demi/ui/application.py tests/integration/ui/test_application_lifecycle.py` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed。runner所有windowの破棄境界とテスト補助型を確認した |
 | `uv run ruff format --check src/demi/app.py src/demi/ui/application.py src/demi/ui/event_bridge.py src/demi/ui/main_window.py tests/integration/ui/test_qt_runtime_events.py` | passed | 5 files already formatted |
 | `uv run ruff format --check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/app.py tests/integration/ui/test_application_lifecycle.py` | passed | All checks passed |
@@ -231,5 +235,5 @@ QtApplicationRunner
 - [x] timer / signal / dialog / window / runtimeの所有権を固定した
 - [x] runtime停止後のtimer / signal / callback無効化を確認した
 - [x] application層がQt型へ依存しないことを確認した
-- [ ] TDD Test Listと検証結果を更新した
+- [x] TDD Test Listと検証結果を更新した
 - [ ] unit_018への引き渡し条件を満たした
