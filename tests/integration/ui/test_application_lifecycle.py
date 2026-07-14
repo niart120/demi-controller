@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from pathlib import Path
+from threading import Thread
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QTimer
@@ -13,7 +16,7 @@ from demi.application.shutdown import ApplicationShutdownCoordinator
 from demi.application.state import ConnectionState
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.commands import ConnectSaved, DiscoverAdapters, StartPairing
+from demi.controller.commands import ConnectSaved, Disconnect, DiscoverAdapters, StartPairing
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -29,7 +32,7 @@ if TYPE_CHECKING:
 
     from PySide6.QtWidgets import QApplication
 
-    from demi.app import RuntimePort
+    from demi.app import ApplicationSession, RuntimePort
     from demi.controller.adapter import ControllerAdapterFactory, RuntimeEventSink
     from demi.controller.commands import ControllerCommand
     from demi.controller.events import RuntimeEvent
@@ -118,6 +121,44 @@ class StartupEventRuntime(ShellRuntime):
             raise RuntimeError
         for event in self.startup_events:
             sink.emit(event)
+
+
+@dataclass
+class SlowRuntime(ShellRuntime):
+    """Runtime fake that performs each command on a separate delayed worker."""
+
+    delay_seconds: float = 0.03
+    event_sink: RuntimeEventSink | None = None
+    workers: list[Thread] = field(default_factory=list)
+
+    def post(self, command: ControllerCommand) -> None:
+        """Record one command and deliver its result after worker delay."""
+        super().post(command)
+        sink = self.event_sink
+        if sink is None:
+            raise RuntimeError
+
+        def emit_result() -> None:
+            time.sleep(self.delay_seconds)
+            if isinstance(command, DiscoverAdapters):
+                sink.emit(AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)))
+                sink.emit(ConnectionChanged(ConnectionState.READY))
+            elif isinstance(command, ConnectSaved):
+                sink.emit(
+                    ConnectionChanged(ConnectionState.CONNECTED, adapter_id=command.adapter_id)
+                )
+            elif isinstance(command, Disconnect):
+                sink.emit(ConnectionChanged(ConnectionState.READY))
+
+        worker = Thread(target=emit_result)
+        self.workers.append(worker)
+        worker.start()
+
+    def close(self) -> None:
+        """Join all delayed workers before recording shutdown."""
+        for worker in self.workers:
+            worker.join()
+        super().close()
 
 
 @dataclass
@@ -360,3 +401,86 @@ def test_qt_reconnect_failure_keeps_window_interactive_and_safe(
     assert [command for command in runtime.commands if isinstance(command, ConnectSaved)]
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert observed == [(True, True, "エラー: 保存済み接続に失敗しました")]
+
+
+def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    settings = replace(
+        AppSettings.default(),
+        connection=replace(AppSettings.default().connection, adapter_id="usb:0"),
+    )
+    repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED))
+    runtime = SlowRuntime()
+    runner = QtApplicationRunner()
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    tick_times: list[float] = []
+    completed: list[bool] = []
+
+    def create_gui(
+        *,
+        window: MainWindow,
+        session: ApplicationSession,
+        on_shutdown_requested: Callable[[WindowSettings | None], bool],
+        **_kwargs: object,
+    ) -> QtApplicationRunner:
+        runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
+        timer = QTimer(window)
+        timer.setInterval(10)
+        phase = 0
+
+        def advance() -> None:
+            nonlocal phase
+            tick_times.append(time.monotonic())
+            connection_state = session.presentation.model.connection_state
+            if phase == 0 and connection_state is ConnectionState.READY:
+                session.connection_action()
+                phase = 1
+            elif phase == 1 and connection_state is ConnectionState.CONNECTED:
+                session.connection_action()
+                phase = 2
+            elif phase == 2 and connection_state is ConnectionState.READY:
+                timer.stop()
+                completed.append(True)
+                window.close()
+
+        def fail_safe_close() -> None:
+            if not completed:
+                timer.stop()
+                window.close()
+
+        timer.timeout.connect(advance)
+        timer.start()
+        QTimer.singleShot(1000, fail_safe_close)
+        return runner
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, clock
+        runtime.event_sink = event_sink
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=runner.create_main_window,
+        gui_factory=create_gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-qt-slow-runtime"),
+    )
+
+    assert run_application(dependencies) == 0
+    assert completed == [True]
+    assert [type(command) for command in runtime.commands] == [
+        DiscoverAdapters,
+        ConnectSaved,
+        Disconnect,
+    ]
+    assert len(tick_times) >= 4
+    assert max(later - earlier for earlier, later in pairwise(tick_times)) < 0.1
