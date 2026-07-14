@@ -308,6 +308,7 @@ class ApplicationSession:
         elif isinstance(event, PairingProgress):
             self._presentation.set_warning(event.summary)
         elif isinstance(event, RuntimeStopped):
+            self._coordinator.begin_shutdown()
             self._presentation.set_connection(ConnectionState.STOPPED)
 
     def open_settings(self, kind: DialogKind) -> bool:
