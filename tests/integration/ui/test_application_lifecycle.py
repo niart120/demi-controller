@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
@@ -8,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 from typing import TYPE_CHECKING
 
+import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 
@@ -30,7 +32,6 @@ from demi.ui.application import QtApplicationRunner
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import pytest
     from PySide6.QtWidgets import QApplication
 
     from demi.app import ApplicationSession, RuntimePort
@@ -88,6 +89,7 @@ class ShellRuntime:
     started: int = 0
     closed: int = 0
     commands: list[ControllerCommand] = field(default_factory=list)
+    frames: list[ControllerFrame] = field(default_factory=list)
 
     def start(self) -> None:
         """Record worker startup."""
@@ -99,7 +101,7 @@ class ShellRuntime:
 
     def offer_frame(self, frame: ControllerFrame) -> bool:
         """Accept an initial neutral frame without a real worker."""
-        del frame
+        self.frames.append(frame)
         return True
 
     def close(self) -> None:
@@ -247,6 +249,46 @@ class FailingSettingsRepository:
     def save(self, settings: AppSettings) -> None:
         """Satisfy the outer persistence boundary without saving."""
         del settings
+
+
+@dataclass
+class ClosingRuntime(ShellRuntime):
+    """Runtime fake that records normal shutdown after an application fault."""
+
+    timeline: list[str] = field(default_factory=list)
+
+    def close(self) -> None:
+        """Record the ordered runtime close request."""
+        super().close()
+        self.timeline.append("runtime.close")
+
+
+@dataclass
+class UnhandledMainThreadGui:
+    """GUI fake that invokes the process exception hook like a Qt callback."""
+
+    error: Exception
+    after_exception_hook: Callable[[], None]
+    runs: int = 0
+
+    def run(self) -> int:
+        """Report an unhandled callback error and return the loop status."""
+        self.runs += 1
+        sys.excepthook(type(self.error), self.error, None)
+        self.after_exception_hook()
+        return 0
+
+
+@dataclass
+class InterruptingGui:
+    """GUI fake that interrupts the main thread without using the exception hook."""
+
+    runs: int = 0
+
+    def run(self) -> int:
+        """Raise a process-control exception from the main event-loop boundary."""
+        self.runs += 1
+        raise KeyboardInterrupt
 
 
 def test_qt_quit_runs_ordered_shutdown_once(qt_application: object) -> None:
@@ -493,6 +535,100 @@ def test_qt_window_factory_failure_returns_a_safe_nonzero_status(
     assert captured.out == ""
     assert captured.err == "Project_Demi の起動に失敗しました。\n"
     assert secret not in captured.err
+
+
+def test_qt_main_thread_exception_hook_neutralizes_and_closes_without_leaking_secret(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    secret = "callback=private-main-thread-token"  # noqa: S105 - test value must not reach stderr.
+    timeline: list[str] = []
+    settings = AppSettings.default()
+    repository = StartupFailureRepository(
+        loaded=SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN),
+        timeline=timeline,
+    )
+    runtime = ClosingRuntime(timeline=timeline)
+    window = StartupFailureWindow(timeline)
+    observed_cleanup: list[tuple[int, int, tuple[str, ...]]] = []
+    gui = UnhandledMainThreadGui(
+        error=RuntimeError(secret),
+        after_exception_hook=lambda: observed_cleanup.append(
+            (runtime.closed, len(repository.saved), tuple(timeline))
+        ),
+    )
+    original_exception_hook = sys.excepthook
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, event_sink, clock
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-main-thread-failure"),
+    )
+
+    assert run_application(dependencies) == 1
+
+    captured = capsys.readouterr()
+    assert gui.runs == 1
+    assert sys.excepthook is original_exception_hook
+    assert runtime.frames[-1].capture_active is False
+    assert observed_cleanup == [(1, 1, ("runtime.close", "repository.save", "window.close"))]
+    assert captured.out == ""
+    assert captured.err == ""
+    assert secret not in captured.err
+
+
+def test_qt_main_thread_keyboard_interrupt_is_not_swallowed_after_cleanup() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    timeline: list[str] = []
+    settings = AppSettings.default()
+    repository = StartupFailureRepository(
+        loaded=SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN),
+        timeline=timeline,
+    )
+    runtime = ClosingRuntime(timeline=timeline)
+    window = StartupFailureWindow(timeline)
+    gui = InterruptingGui()
+    original_exception_hook = sys.excepthook
+
+    def create_runtime(
+        *,
+        adapter_factory: ControllerAdapterFactory,
+        event_sink: RuntimeEventSink,
+        clock: WatchdogClock,
+    ) -> RuntimePort:
+        del adapter_factory, event_sink, clock
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: repository,
+        runtime_factory=create_runtime,
+        window_factory=lambda _spec: window,
+        gui_factory=lambda **_kwargs: gui,
+        clock=SystemClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-keyboard-interrupt"),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_application(dependencies)
+
+    assert gui.runs == 1
+    assert sys.excepthook is original_exception_hook
+    assert runtime.frames[-1].capture_active is False
+    assert timeline == ["runtime.close", "repository.save", "window.close"]
 
 
 def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(

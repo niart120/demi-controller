@@ -54,6 +54,7 @@ from demi.input.publisher import InputPublisher
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
     from demi.config.paths import SettingsPaths
     from demi.config.repository import SettingsLoadResult
@@ -722,7 +723,38 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             on_shutdown_requested=request_shutdown,
             window_maximized=settings.window.maximized,
         )
-        exit_status = gui.run()
+        active_shutdown = shutdown
+        main_thread_failed = False
+        original_exception_hook = sys.excepthook
+
+        def handle_main_thread_exception(
+            error_type: type[BaseException],
+            error: BaseException,
+            traceback: TracebackType | None,
+        ) -> None:
+            """Close safely after a Qt callback reports an ordinary exception."""
+            nonlocal main_thread_failed
+            if not issubclass(error_type, Exception):
+                original_exception_hook(error_type, error, traceback)
+                return
+            if main_thread_failed:
+                return
+            main_thread_failed = True
+            if logger is not None:
+                logger.error(
+                    "Project_Demi main-thread failure: %s",
+                    error_type.__name__,
+                )
+            active_shutdown.request()
+            _close_window(window, logger)
+
+        sys.excepthook = handle_main_thread_exception
+        try:
+            exit_status = gui.run()
+        finally:
+            sys.excepthook = original_exception_hook
+        if main_thread_failed:
+            exit_status = 1
     except Exception as error:  # noqa: BLE001 - CLI boundary converts startup failures.
         if logger is not None:
             logger.error(  # noqa: TRY400 - exception text may contain private paths or bond data.
