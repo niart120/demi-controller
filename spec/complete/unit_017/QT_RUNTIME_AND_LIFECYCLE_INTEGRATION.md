@@ -209,12 +209,16 @@ QtApplicationRunner
 | `uv run ruff check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py src/demi/ui/toolbar.py tests/unit/application/test_app.py tests/integration/ui/test_main_window_snapshot.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed。QObjectの既存`emit` signatureとRuntimeEvent sinkをoverloadで両立し、snapshot型はQt importなしで公開した |
 | `git diff --cached --check` | passed | first TDD itemのstaged diffにwhitespace errorなし |
-| `uv run ruff format --check .` | not run | 全体gateはunit完了時に実行する。bridge対象2ファイルは検査済み |
-| `uv run ruff check .` | not run | 全体gateはunit完了時に実行する。bridge対象2ファイルは検査済み |
-| `uv run pytest tests/unit` | not run | このitemはintegration testだけを追加した。unit suiteはunit完了時に実行する |
-| `uv run pytest tests/integration` | not run | 新規bridge対象testだけを実行した。suite全体はunit完了時に実行する |
-| `uv build` | not run | source packageを変更した。buildはunit完了時の全体gateで実行する |
-| GUI 100ms応答性probe | not run | slow fake adapterとQt event loop統合が未実装 |
+| `uv sync --dev` | passed | Resolved 77 packages、Checked 74 packages |
+| `uv lock --check` | passed | Resolved 77 packages |
+| `uv run ruff format --check .` | passed | 118 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit` | passed | 187 passed |
+| `uv run pytest tests/integration` | passed | 54 passed |
+| `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
+| `git diff --check` | passed | whitespace errorなし |
+| GUI 100ms応答性probe | passed | 30ms遅延worker fakeによるdiscovery / connect / disconnect中、10ms GUI timerの隣接tick間隔が100ms未満 |
 
 ## 10. 先送り事項
 
@@ -236,4 +240,4 @@ QtApplicationRunner
 - [x] runtime停止後のtimer / signal / callback無効化を確認した
 - [x] application層がQt型へ依存しないことを確認した
 - [x] TDD Test Listと検証結果を更新した
-- [ ] unit_018への引き渡し条件を満たした
+- [x] unit_018への引き渡し条件を満たした
