@@ -1,12 +1,12 @@
 from dataclasses import replace
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox
 
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
 from demi.domain.settings import AppSettings, ConnectionSettings
-from demi.ui.dialogs.connection import ConnectionDialog
+from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 
 
 def test_connection_dialog_requests_rescan_and_updates_adapters_without_blocking(
@@ -97,3 +97,96 @@ def test_connection_dialog_requires_explicit_selection_when_saved_adapter_is_mis
     assert editor.draft.connection.adapter_id == "usb:1"
     assert dialog.connect_button.isEnabled()
     assert dialog.pairing_button.isEnabled()
+
+
+def test_pairing_confirmation_starts_only_after_accept_and_not_while_busy(
+    qt_application: QApplication,
+) -> None:
+    pairing_commands: list[str] = []
+    pairing_requests: list[str] = []
+    cancellations: list[str] = []
+
+    def confirm_pairing() -> bool:
+        pairing_commands.append("start")
+        return True
+
+    def cancel_pairing() -> None:
+        cancellations.append("cancel")
+
+    def request_pairing() -> bool:
+        pairing_requests.append("confirm")
+        return True
+
+    editor = SettingsEditor(AppSettings.default())
+    connection_dialog = ConnectionDialog(
+        editor,
+        on_rescan=lambda: None,
+        on_request_pairing=request_pairing,
+    )
+    connection_dialog.set_adapters((AdapterOption("usb:0", "USB Adapter 0"),))
+    connection_dialog.adapter_combo.setCurrentIndex(0)
+    connection_dialog.pairing_button.click()
+
+    assert pairing_requests == ["confirm"]
+    assert pairing_commands == []
+
+    cancelled = PairingConfirmationDialog(
+        on_confirm=confirm_pairing,
+        on_cancel=cancel_pairing,
+    )
+    cancelled.show()
+    qt_application.processEvents()
+    cancel_button = cancelled.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+
+    assert pairing_commands == []
+    assert cancellations == ["cancel"]
+    assert cancelled.result() == int(QDialog.DialogCode.Rejected)
+
+    closed = PairingConfirmationDialog(
+        on_confirm=confirm_pairing,
+        on_cancel=cancel_pairing,
+    )
+    closed.show()
+    qt_application.processEvents()
+    closed.close()
+    qt_application.processEvents()
+
+    assert pairing_commands == []
+    assert cancellations == ["cancel", "cancel"]
+
+    busy = PairingConfirmationDialog(
+        on_confirm=confirm_pairing,
+        on_cancel=cancel_pairing,
+        busy=True,
+    )
+    busy.show()
+    qt_application.processEvents()
+    confirm_button = busy.button_box.button(QDialogButtonBox.StandardButton.Ok)
+    assert confirm_button is not None
+    assert not confirm_button.isEnabled()
+    busy.close()
+    qt_application.processEvents()
+
+    assert pairing_commands == []
+    assert busy.isVisible()
+
+    busy.set_busy(False)
+    busy.reject()
+    qt_application.processEvents()
+
+    accepted = PairingConfirmationDialog(
+        on_confirm=confirm_pairing,
+        on_cancel=cancel_pairing,
+    )
+    accepted.show()
+    qt_application.processEvents()
+    accept_button = accepted.button_box.button(QDialogButtonBox.StandardButton.Ok)
+    assert accept_button is not None
+    accept_button.click()
+    qt_application.processEvents()
+
+    assert pairing_commands == ["start"]
+    assert accepted.result() == int(QDialog.DialogCode.Accepted)

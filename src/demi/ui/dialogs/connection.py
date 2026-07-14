@@ -4,7 +4,16 @@ from collections.abc import Callable
 from typing import Any, override
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QPersistentModelIndex, Qt
-from PySide6.QtWidgets import QComboBox, QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
@@ -12,6 +21,8 @@ from demi.application.settings_editor import SettingsEditor
 _ROOT_INDEX = QModelIndex()
 
 type RescanAction = Callable[[], object]
+type PairingAction = Callable[[], bool]
+type PairingCancellation = Callable[[], object]
 
 
 class AdapterListModel(QAbstractListModel):
@@ -76,6 +87,7 @@ class ConnectionDialog(QDialog):
         editor: SettingsEditor,
         *,
         on_rescan: RescanAction,
+        on_request_pairing: PairingAction | None = None,
         parent: QWidget | None = None,
     ) -> None:
         """Create a connection dialog that does not own runtime discovery.
@@ -84,12 +96,15 @@ class ConnectionDialog(QDialog):
             editor: Application-owned connection settings draft editor.
             on_rescan: Posts an adapter-discovery request at the application
                 boundary without returning a result synchronously.
+            on_request_pairing: Requests replacement by a pairing confirmation
+                dialog after an explicit adapter selection.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
         self.setWindowTitle("接続設定")
         self._editor = editor
         self._on_rescan = on_rescan
+        self._on_request_pairing = on_request_pairing
         self._adapter_model = AdapterListModel(self)
         self._updating_adapters = False
 
@@ -111,6 +126,7 @@ class ConnectionDialog(QDialog):
 
         self.rescan_button.clicked.connect(self.request_rescan)
         self.adapter_combo.currentIndexChanged.connect(self.select_adapter)
+        self.pairing_button.clicked.connect(self.request_pairing)
 
     @property
     def adapter_model(self) -> AdapterListModel:
@@ -124,6 +140,12 @@ class ConnectionDialog(QDialog):
         self.rescan_button.setEnabled(False)
         self.discovery_label.setText("USBアダプターを検索中です")
         self._on_rescan()
+
+    def request_pairing(self) -> None:
+        """Request the application-owned pairing confirmation dialog."""
+        on_request_pairing = self._on_request_pairing
+        if self.pairing_button.isEnabled() and on_request_pairing is not None:
+            on_request_pairing()
 
     def set_adapters(self, adapters: tuple[AdapterOption, ...]) -> None:
         """Present one asynchronously delivered discovery result.
@@ -181,3 +203,79 @@ class ConnectionDialog(QDialog):
     def _set_connection_actions_enabled(self, enabled: bool) -> None:
         self.connect_button.setEnabled(enabled)
         self.pairing_button.setEnabled(enabled)
+
+
+class PairingConfirmationDialog(QDialog):
+    """Require explicit confirmation before a pairing command is requested."""
+
+    def __init__(
+        self,
+        *,
+        on_confirm: PairingAction,
+        on_cancel: PairingCancellation,
+        busy: bool = False,
+        parent: QWidget | None = None,
+    ) -> None:
+        """Create one pairing confirmation without owning connection state.
+
+        Args:
+            on_confirm: Starts pairing after a user explicitly accepts.
+            on_cancel: Returns from confirmation without posting a pairing command.
+            busy: Whether an existing pairing transition prevents interaction.
+            parent: Optional Qt parent for dialog ownership.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("新規ペアリングの確認")
+        self._on_confirm = on_confirm
+        self._on_cancel = on_cancel
+        self._busy = False
+        self.message_label = QLabel(self)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.message_label)
+        layout.addWidget(self.button_box)
+
+        self.button_box.accepted.connect(self.confirm)
+        self.button_box.rejected.connect(self.reject)
+        self.set_busy(busy)
+
+    def set_busy(self, busy: bool) -> None:
+        """Enable or disable pairing confirmation controls.
+
+        Args:
+            busy: Whether a current pairing transition owns the dialog state.
+        """
+        self._busy = busy
+        self.message_label.setText(
+            "ペアリング処理中です" if busy else "新規ペアリングを開始しますか?"
+        )
+        for button in (
+            self.button_box.button(QDialogButtonBox.StandardButton.Ok),
+            self.button_box.button(QDialogButtonBox.StandardButton.Cancel),
+        ):
+            if button is not None:
+                button.setEnabled(not busy)
+
+    def confirm(self) -> None:
+        """Start pairing only after a non-busy confirmation."""
+        if not self._busy and self._on_confirm():
+            self.accept()
+
+    def reject(self) -> None:
+        """Return to editable connection settings without starting pairing."""
+        if self._busy:
+            return
+        self._on_cancel()
+        super().reject()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - Qt override name.
+        """Treat a window close as cancellation unless pairing is busy."""
+        if self._busy:
+            event.ignore()
+            return
+        self.reject()
+        event.accept()
