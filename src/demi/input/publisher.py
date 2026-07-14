@@ -9,6 +9,7 @@ from demi.domain.physical_input import PhysicalInputState
 from demi.domain.settings import MouseSettings
 
 from .mapper import aggregate_buttons, synthesize_stick
+from .timing import InputEvaluationMetrics, InputTimingSnapshot
 from .yaw_pitch_model import YawPitchModel
 
 
@@ -70,6 +71,7 @@ class InputPublisher:
         self._sequence = 0
         self._last_monotonic_ns: int | None = None
         self._capture_epoch: int | None = None
+        self._timing_metrics = InputEvaluationMetrics()
 
     @property
     def state(self) -> PhysicalInputState:
@@ -80,6 +82,11 @@ class InputPublisher:
     def evaluation_interval_ms(self) -> int:
         """Return the configured input evaluation interval in milliseconds."""
         return self._evaluation_interval_ms
+
+    @property
+    def timing_metrics(self) -> InputTimingSnapshot:
+        """Return recent input evaluation interval metrics."""
+        return self._timing_metrics.snapshot
 
     def reconfigure(
         self,
@@ -116,6 +123,7 @@ class InputPublisher:
             The same frame offered to the configured sink.
         """
         now_ns = self._clock.monotonic_ns()
+        self._timing_metrics.note_evaluation(now_ns)
         epoch_changed = self._capture_epoch is not None and capture_epoch != self._capture_epoch
         first_evaluation = self._last_monotonic_ns is None
         if epoch_changed:
