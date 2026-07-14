@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from demi.application.settings_editor import BindingConflict, SettingsEditor
+from demi.domain.errors import DomainValueError
 from demi.domain.mapping import Binding
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 
@@ -225,6 +226,25 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self.capture_label.setText("標準設定に戻しました")
 
+    def set_source(self, row: int, source: str) -> bool:
+        """Update one mapping source while keeping invalid input visible.
+
+        Args:
+            row: Selected binding row in the active profile.
+            source: Canonical source candidate received by the dialog.
+
+        Returns:
+            Whether the draft accepted the candidate source.
+        """
+        try:
+            self._mapping_model.update_source(row, source)
+        except DomainValueError:
+            self.capture_label.setText("入力を割り当てられません")
+            return False
+        self.table.selectRow(row)
+        self.capture_label.setText(f"入力: {source}")
+        return True
+
     def request_accept(self) -> None:
         """Accept immediately or ask for explicit confirmation of conflicts."""
         conflict_summary = self._mapping_model.conflict_summary()
@@ -288,10 +308,8 @@ class MappingDialog(QDialog):
             return False
         if source is None:
             return True
-        self._mapping_model.update_source(row, source)
-        self.table.selectRow(row)
-        self._capture_row = None
-        self.capture_label.setText(f"入力: {source}")
+        if self.set_source(row, source):
+            self._capture_row = None
         return True
 
     def _handle_conflict_confirmation(self, button: QAbstractButton) -> None:

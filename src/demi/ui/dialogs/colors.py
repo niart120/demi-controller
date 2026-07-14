@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from demi.application.settings_editor import ColorField, SettingsEditor
+from demi.domain.errors import DomainValueError
 from demi.domain.settings import ControllerColorSettings
 
 type PreviewAction = Callable[[ControllerColorSettings], object]
@@ -101,17 +102,23 @@ class ControllerColorsDialog(QDialog):
         """Return the visible reconnect choice after a successful save, if any."""
         return self._reconnect_confirmation
 
-    def set_color(self, field: ColorField, value: str) -> None:
+    def set_color(self, field: ColorField, value: str) -> bool:
         """Update one draft color and immediately refresh the local preview.
 
         Args:
             field: One editable controller color field.
             value: Candidate `#RRGGBB` color accepted by the domain editor.
         """
-        self._editor.update_color(field, value)
+        try:
+            self._editor.update_color(field, value)
+        except DomainValueError:
+            self.save_error_label.setText("色の形式が正しくありません")
+            return False
         colors = self._editor.draft.controller_colors
         self._refresh_color_buttons(colors)
+        self.save_error_label.clear()
         self._on_preview(colors)
+        return True
 
     def open_color_dialog(self, field: ColorField) -> None:
         """Open the standard non-blocking color picker for one field.

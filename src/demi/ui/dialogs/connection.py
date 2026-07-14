@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -17,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
+from demi.domain.errors import DomainValueError
 
 _ROOT_INDEX = QModelIndex()
 
@@ -114,11 +117,19 @@ class ConnectionDialog(QDialog):
         self.connect_button = QPushButton("保存して接続", self)
         self.pairing_button = QPushButton("新規ペアリング", self)
         self.discovery_label = QLabel("USBアダプターを検索してください", self)
+        self.bond_slot_edit = QLineEdit(editor.draft.connection.bond_slot, self)
+        self.timeout_edit = QLineEdit(str(editor.draft.connection.timeout_seconds), self)
+        self.connection_error_label = QLabel("", self)
         self.connect_button.setEnabled(False)
         self.pairing_button.setEnabled(False)
 
+        connection_form = QFormLayout()
+        connection_form.addRow("ボンドスロット", self.bond_slot_edit)
+        connection_form.addRow("接続タイムアウト (秒)", self.timeout_edit)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self.adapter_combo)
+        layout.addLayout(connection_form)
         layout.addWidget(self.rescan_button)
         layout.addWidget(self.connect_button)
         layout.addWidget(self.pairing_button)
@@ -146,6 +157,23 @@ class ConnectionDialog(QDialog):
         on_request_pairing = self._on_request_pairing
         if self.pairing_button.isEnabled() and on_request_pairing is not None:
             on_request_pairing()
+
+    def apply_connection_fields(self) -> bool:
+        """Validate editable connection fields without saving the draft.
+
+        Returns:
+            Whether both controls updated the application-owned draft.
+        """
+        try:
+            self._editor.update_connection(
+                bond_slot=self.bond_slot_edit.text(),
+                timeout_seconds=float(self.timeout_edit.text()),
+            )
+        except (DomainValueError, ValueError):
+            self.connection_error_label.setText("接続設定の値が正しくありません")
+            return False
+        self.connection_error_label.clear()
+        return True
 
     def set_adapters(self, adapters: tuple[AdapterOption, ...]) -> None:
         """Present one asynchronously delivered discovery result.
