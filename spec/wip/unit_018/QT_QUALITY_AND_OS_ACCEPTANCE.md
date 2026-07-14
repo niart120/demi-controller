@@ -16,7 +16,7 @@ PyInstaller / standalone artifactのbuild、Qt plugin収集、署名、clean env
 | redesign package | 採用判断、未検証事項、license / portability、standalone分離 | `spec/ui-redesign/README.md`, `spec/ui-redesign/PYSIDE6_UI_DESIGN.md` |
 | initial quality | 標準gate、CI、OS / hardware証拠の分離 | `spec/initial/QUALITY_GATES.md`, `spec/initial/testing.md` |
 | previous OS / packaging | source CIとstandalone履歴、未検証display | `spec/complete/unit_009/OS_PORTABILITY.md`, `spec/complete/unit_010/PACKAGING.md` |
-| prerequisites | UI再設計milestone 1〜5の作業仕様と検証結果 | `spec/complete/unit_013/`、`spec/complete/unit_014/`、`spec/wip/unit_015/`〜`spec/wip/unit_017/` |
+| prerequisites | UI再設計milestone 1〜5の作業仕様と検証結果 | `spec/complete/unit_013/`〜`spec/complete/unit_015/`、`spec/wip/unit_016/`〜`spec/wip/unit_017/` |
 
 milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存behaviorを再設計せず、品質gate、OS evidence、public text、source / wheel契約の不足を修正して受入結果を記録する。
 
@@ -79,7 +79,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 - `spec/initial/risks.md`
 - `spec/complete/unit_009/OS_PORTABILITY.md`
 - `spec/complete/unit_010/PACKAGING.md`
-- `spec/complete/unit_013/`、`spec/complete/unit_014/`、`spec/wip/unit_015/`〜`spec/wip/unit_017/`
+- `spec/complete/unit_013/`〜`spec/complete/unit_015/`、`spec/wip/unit_016/`〜`spec/wip/unit_017/`
 - `README.md`
 - `packaging/LICENSES.md`
 - `AGENTS.md`
@@ -170,7 +170,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `spec/initial/testing.md` | modify | offscreen、3 OS、manual acceptance |
 | `spec/initial/risks.md` | modify | PySide6 / Qt / pointer / license / packaging risk |
 | `packaging/LICENSES.md` | modify | source / wheel noticeとmilestone 7境界 |
-| `spec/complete/unit_013/`、`spec/complete/unit_014/`、`spec/wip/unit_015/`〜`spec/wip/unit_018/` | modify | 最終TDD、検証、checklist、handoff結果 |
+| `spec/complete/unit_013/`〜`spec/complete/unit_015/`、`spec/wip/unit_016/`〜`spec/wip/unit_018/` | modify | 最終TDD、検証、checklist、handoff結果 |
 
 `spec/complete`の過去記録は変更しない。`pyproject.toml`または`uv.lock`へ実装結果の修正が必要になった場合は対象へ追加し、`uv lock --check`と`uv build`を再実行する。
 
