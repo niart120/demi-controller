@@ -426,15 +426,27 @@ def test_session_preserves_an_error_and_ignores_a_stale_watchdog_event() -> None
 
     session.handle_runtime_event(WatchdogNeutralized(capture_epoch=current_epoch - 1))
     assert coordinator.is_captured is True
+    assert runtime.frames[-1].capture_active is True
+
+    session.handle_runtime_event(WatchdogNeutralized(capture_epoch=current_epoch))
+    assert coordinator.is_captured is False
+    assert runtime.frames[-1].capture_active is False
+    assert session.presentation.model.warning == "入力監視タイムアウト"
+
+    assert coordinator.start_capture() is True
 
     session.handle_runtime_event(
         ControllerError(
             category=ControllerErrorCategory.RECONNECT_FAILED,
-            summary="ignored lower-level summary",
+            summary="bond=/private/secret.json",
             retryable=True,
             diagnostic_id="runtime-0001",
         )
     )
+    assert coordinator.is_captured is False
+    assert runtime.frames[-1].capture_active is False
+    assert session.presentation.model.connection_state is ConnectionState.ERROR
+    assert "secret" not in session.presentation.model.warning
     session.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
 
     assert coordinator.is_captured is False
