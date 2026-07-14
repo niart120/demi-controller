@@ -104,7 +104,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| refactor-skipped | standard gateと対象integration testがすべて成功し、実行commandと件数がwork unitへ記録される | characterization | package | `uv sync --dev`、lock、format、lint、ty、unit 187件、integration 54件、build、diffを現行main由来の基準として記録した。production変更はなく、追加refactorは不要 |
+| refactor-skipped | standard gateと対象integration testがすべて成功し、実行commandと件数がwork unitへ記録される | characterization | package | `uv sync --dev`、lock、format、lint、ty、unit 197件、integration 59件、build、diffを実行した。実行基盤の`.pytest_cache` ACLが終了時のcache保存だけを拒否するため、同一収集・実行範囲を`-p no:cacheprovider`で確認した。production変更はなく、追加refactorは不要 |
 | refactor-skipped | `ty`はPySide6境界をerror / warningなしで通し、application / domainにQt型、広域`Any`、理由のないignoreがない | regression | package | source回帰テストで`application`と`domain`の`PySide6`、`Any`、`# type: ignore`を禁止し、`ty`もgreenである。production境界は既に分離済みのため、追加refactorは不要 |
 | refactor-skipped | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | workflow contractで3 OS、Python 3.12 / 3.13、offscreen Qt、unit / integration / buildを固定し、PR #22の6 job成功をsource-level証拠として記録した。追加refactorは不要 |
 | refactor-skipped | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | `DEMI_QT_TEST_CLOSE_AFTER_MS`が有効な整数の場合だけrunnerが通常の`window.close()`を予約する。3 entry pointをoffscreen subprocessで起動してstatus 0を確認し、通常CLI引数は追加しなかったため、追加refactorは不要 |
@@ -117,7 +117,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | READMEとcurrent `spec/initial`がPySide6実装、source起動、支援範囲、standalone停止状態と一致する | regression | docs | 文書回帰テストで3 entry point、PySide6 / Qt Widgets、旧未実装説明の撤去、source / wheel、単体配布停止を確認した。README、FR-001、roadmap、hardware test logを現行実装へ合わせ、追加refactorは不要 |
 | refactor-skipped | source / wheel利用者がProject、PySide6、Qt、third-party license / noticeへ到達でき、欠落を検査できる | new | package | `THIRD_PARTY_NOTICES.md`をmodule rootへ置き、source inventoryとREADMEから導線を設けた。新規wheel生成testでProject licenseとnotice fileのarchive同梱を確認した。法的判断は完了と記録せず、追加refactorは不要 |
 | refactor-skipped | current source、test、dependency、lock、builder、README、initial specにpygletのimport /収集 /採用指示が0件である | regression | package | AST回帰testで`src` / `tests`のlegacy import・型参照を禁止し、metadata、lock、builder、license inventory、README、initial specも検査する。語が残るのは削除済み境界を検出する否定testだけであり、scoped searchでimport /収集 /採用指示0件を確認した。追加refactorは不要 |
-| todo | unit_013〜018のTDD、verification、checklist、deferred handoffに重複・抜け・誤った完了表現がない | new | docs | milestone 1〜6を1対1で確認する |
+| refactor-skipped | unit_013〜018のTDD、verification、checklist、deferred handoffに重複・抜け・誤った完了表現がない | new | docs | unit_013〜017のTDDにtodo / deferredがなく、checklistに未完了がないことを回帰検査した。handoffはunit_013→014、014→015 / 016 / 017、015→016 / 017、016→017 / 018、017→018へ接続する。unit_016の初期not runは後続passed記録で置き換わる時系列証拠であり、unit_018の未完了はWindows実display、先送りはmilestone 7 standaloneだけに限定した。追加refactorは不要 |
 | deferred | standalone artifactがQt pluginとlicenseを含み、3 OS clean環境でGUI起動する | regression | package | milestone 7の後続unit |
 
 ## 7. 設計メモ
@@ -165,6 +165,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `src/demi/app.py` | verify / modify | safe diagnosticsとsource runner契約 |
 | `README.md` | modify | source起動、支援範囲、standalone停止、license導線 |
 | `tests/unit/test_documentation.py` | new | READMEと初期仕様の現在向け実行・配布説明を回帰検査 |
+| `tests/unit/test_work_unit_records.py` | new | unit_013〜018のTDD、checklist、未完了表記を回帰検査 |
 | `spec/hardware-test-log.md` | modify | 実機記録で収集するGUI runtime版をPySide6 / Qtへ更新 |
 | `spec/initial/README.md` | modify | 採用UIと実行model |
 | `spec/initial/requirements.md` | modify | PySide6 / Qt、診断、応答性のcurrent契約 |
@@ -188,7 +189,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `git diff --no-index --check -- NUL spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` | passed | whitespace errorなし。LF / CRLF変換予告のみ |
 | `uv sync --dev` | passed | Resolved 77 packages、Checked 74 packages |
 | `uv lock --check` | passed | Resolved 77 packages |
-| `uv run ruff format --check .` | passed | 118 files already formatted |
+| `uv run ruff format --check .` | passed | 127 files already formatted |
 | `uv run ruff check .` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed |
 | `uv run pytest tests/unit/application/test_ui_state.py -q -p no:cacheprovider` | passed | 2 passed。application / domainのQt型、広域`Any`、理由のないignore残存を検出する |
@@ -221,15 +222,14 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run ruff format --check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | 2 files already formatted |
 | `uv run ruff check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | All checks passed |
 | `rg -n -i "import[[:space:]]+pyglet|from[[:space:]]+pyglet|collect-all[[:space:]]+pyglet|pyglet[[:space:]]*[<=>]|pyglet[[:space:]]+input|pyglet.*(backend|window)" src tests pyproject.toml uv.lock packaging README.md spec/initial --glob "!tests/unit/test_legacy_ui_removal.py"` | passed | import /収集 /採用指示の該当なし。除外したfileは削除済み境界を検出する否定test |
+| `uv run pytest tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | unit_013〜017のTDDにtodo / deferredがなく、checklistが完了していること、unit_018の未完了がWindows実displayだけ、先送りがmilestone 7 standaloneだけであることを確認した |
 | macOS実display acceptance | not run | 現在の作業環境にmacOS host / desktop sessionがない。offscreen CIはsource-level証拠であり、実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | Linux実display acceptance | not run | 現在の作業環境にLinux host / desktop sessionがない。X11 / Wayland、compositorを含む実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
-| `uv run pytest tests/unit` | passed | 187 passed |
-| `uv run pytest tests/integration` | passed | 54 passed |
+| `uv run pytest tests/unit -p no:cacheprovider` | passed | 197 passed。実行基盤では`.pytest_cache`のACLが終了時のcache保存だけを拒否するため、収集・実行範囲を変えずcache providerを無効化した |
+| `uv run pytest tests/integration -p no:cacheprovider` | passed | 59 passed。同じcache ACL制約下で、source / wheel GUI smokeを含むintegration全体を確認した |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
 | `git diff --check` | passed | whitespace errorなし |
-| 3 OS source CI | not run | PySide6 UI実装とworkflow更新前 |
 | Windows実display acceptance | not run | PySide6 UI実装後に対象Windows desktopで実行する |
-| macOS / Linux実display acceptance | not run | 対象desktop環境が必要。未実行時は理由と後続先を記録する |
 | `uv run python packaging/build.py` / standalone smoke | not run | 本unitの対象外。milestone 7で実行する |
 
 ## 10. 先送り事項
@@ -243,15 +243,15 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 
 ## 11. チェックリスト
 
-- [ ] milestone 0とunit_013〜017の完了を確認した
-- [ ] 標準gateと対象integration testをすべて実行した
-- [ ] `ty`でPySide6 / application / domainの型境界を確認した
-- [ ] Windows、macOS、Linux source CIを確認した
+- [x] milestone 0とunit_013〜017の完了を確認した
+- [x] 標準gateと対象integration testをすべて実行した
+- [x] `ty`でPySide6 / application / domainの型境界を確認した
+- [x] Windows、macOS、Linux source CIを確認した
 - [ ] Windows実display / DPI / font / focus / pointer captureを確認した
-- [ ] macOS / Linuxの実行結果または未実行理由を記録した
-- [ ] README、initial spec、diagnostics、license noticeを実装結果へ同期した
-- [ ] current pyglet残存検索を実行した
-- [ ] source checkoutとwheelのGUI起動契約を確認した
-- [ ] PyInstaller / standaloneを対象外としてmilestone 7へ送った
-- [ ] unit_013〜018のTDD、検証、checklist、handoffを横断確認した
-- [ ] TDD Test Listと検証結果を更新した
+- [x] macOS / Linuxの実行結果または未実行理由を記録した
+- [x] README、initial spec、diagnostics、license noticeを実装結果へ同期した
+- [x] current pyglet残存検索を実行した
+- [x] source checkoutとwheelのGUI起動契約を確認した
+- [x] PyInstaller / standaloneを対象外としてmilestone 7へ送った
+- [x] unit_013〜018のTDD、検証、checklist、handoffを横断確認した
+- [x] TDD Test Listと検証結果を更新した
