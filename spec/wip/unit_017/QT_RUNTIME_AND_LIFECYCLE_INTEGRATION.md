@@ -99,7 +99,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-skipped | worker eventはqueued delivery前にpresentationを変更せず、delivery後だけGUI thread上で更新する | regression | integration | worker / GUI thread idを記録し、`QtRuntimeEventBridge`自身の明示的な`QueuedConnection`でdeliveryする。`QObject.emit`の既存signatureをoverloadで保ちつつbridgeが`RuntimeEventSink`を実装するため、追加refactorは不要 |
-| todo | queued bridgeはadapter、connection、pairing、status、watchdog、error、runtime stoppedを順序どおりapplication sessionへ渡す | regression | integration | immutable `RuntimeEvent`だけを渡す |
+| refactor-skipped | queued bridgeはadapter、connection、pairing、status、watchdog、error、runtime stoppedを順序どおりapplication sessionへ渡す | regression | integration | application session receiverのtest doubleへ7種のimmutable `RuntimeEvent`をFIFOで渡す。最初のitemでunion全体を検証するbridgeを実装済みのため、本itemでproduction code変更は不要 |
 | todo | `ApplicationSession`とapplication packageはPySide6型をimportせず、framework非依存snapshotでmain windowを更新する | new | package | source import boundaryを確認する |
 | todo | adapter discoveryはdialog候補とtoolbar stateを更新し、0件 / 保存ID未検出では別adapterを自動選択しない | regression | integration | unit_016 controlへ接続する |
 | todo | connection / pairing eventはbusyとaction enabledを更新し、完了 / 失敗後に再操作可能stateへ戻す | regression | integration | 重複commandを抑止する |
@@ -173,7 +173,7 @@ QtApplicationRunner
 | command | result | notes |
 |---|---|---|
 | `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_017` | passed | 該当なし |
-| `uv run pytest tests/integration/ui/test_qt_runtime_events.py -q -p no:cacheprovider` | passed | 1 passed。bridge自身がQObjectであり、worker emit直後はpresentation未変更、event処理後だけ主スレッドでreceiverを呼ぶ |
+| `uv run pytest tests/integration/ui/test_qt_runtime_events.py -q -p no:cacheprovider` | passed | 2 passed。bridge自身がQObjectであり、worker emit直後はpresentation未変更、event処理後だけ主スレッドでreceiverを呼ぶ。7種のimmutable RuntimeEventはapplication session receiverへFIFOで到達する |
 | `uv run ruff format --check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed。QObjectの既存`emit` signatureとRuntimeEvent sinkをoverloadで両立した |
