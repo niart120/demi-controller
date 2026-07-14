@@ -83,7 +83,7 @@ class FakeWindow:
 
 
 def make_session() -> ApplicationSession:
-    """Create an application session without pyglet or a controller worker."""
+    """Create an application session without a GUI boundary or controller worker."""
     publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
     capture = CaptureCoordinator(publisher=publisher, pointer_capture=FakeWindow())
     return ApplicationSession(
