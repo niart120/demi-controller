@@ -3,6 +3,7 @@ from pathlib import Path
 
 from demi.app import ApplicationSession
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.presentation import AdapterOption
 from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
@@ -134,6 +135,7 @@ def test_session_returns_a_framework_independent_ui_snapshot() -> None:
         application_state=AppState.IDLE,
         connection_state=ConnectionState.READY,
         adapter_label="Bluetooth adapter",
+        adapters=(AdapterOption("usb:0", "Bluetooth adapter"),),
         dialog_open=False,
         preview_only=True,
         warning="",

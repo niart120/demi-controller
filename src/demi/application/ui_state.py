@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from demi.application.presentation import AdapterOption
 from demi.application.state import AppState, ConnectionState
 
 
@@ -13,6 +14,7 @@ class ApplicationUiSnapshot:
         application_state: Capture and application lifecycle state.
         connection_state: Current controller connection lifecycle state.
         adapter_label: Safe label for the selected adapter.
+        adapters: Safe discovered adapter choices for connection controls.
         dialog_open: Whether an application-owned settings dialog is active.
         preview_only: Whether frames are displayed without controller output.
         warning: Current safe warning text.
@@ -23,6 +25,7 @@ class ApplicationUiSnapshot:
     application_state: AppState
     connection_state: ConnectionState
     adapter_label: str
+    adapters: tuple[AdapterOption, ...]
     dialog_open: bool
     preview_only: bool
     warning: str

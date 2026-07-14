@@ -251,6 +251,7 @@ class ApplicationSession:
             application_state=self._coordinator.app_state,
             connection_state=presentation.connection_state,
             adapter_label=presentation.adapter_label,
+            adapters=presentation.adapters,
             dialog_open=self._dialogs.model.visible,
             preview_only=presentation.connection_state is not ConnectionState.CONNECTED,
             warning=presentation.warning,

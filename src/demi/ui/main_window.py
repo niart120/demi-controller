@@ -21,6 +21,7 @@ from demi.input.relative_pointer import (
 )
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
+from demi.ui.dialogs.connection import ConnectionDialog
 from demi.ui.status_bar import MainStatusBar, StatusBarState
 from demi.ui.toolbar import MainToolBar, ToolbarState
 
@@ -61,6 +62,7 @@ class MainWindow(QMainWindow):
         self._connection_dialog_factory: SettingsDialogFactory | None = None
         self._colors_dialog_factory: SettingsDialogFactory | None = None
         self._active_settings_dialog: QDialog | None = None
+        self._latest_snapshot: ApplicationUiSnapshot | None = None
         self._main_toolbar.mapping_action.triggered.connect(
             lambda _checked=False: self._open_settings_dialog(self._mapping_dialog_factory)
         )
@@ -166,6 +168,7 @@ class MainWindow(QMainWindow):
         Args:
             snapshot: Main-thread state selected by the application layer.
         """
+        self._latest_snapshot = snapshot
         self._main_toolbar.refresh(
             ToolbarState(
                 application_state=snapshot.application_state,
@@ -184,6 +187,7 @@ class MainWindow(QMainWindow):
                 error=snapshot.error,
             )
         )
+        self._refresh_connection_dialog(snapshot)
 
     @property
     def active_settings_dialog(self) -> QDialog | None:
@@ -379,6 +383,9 @@ class MainWindow(QMainWindow):
             return
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self._active_settings_dialog = dialog
+        snapshot = self._latest_snapshot
+        if snapshot is not None:
+            self._refresh_connection_dialog(snapshot)
         dialog.finished.connect(
             lambda _result, closed_dialog=dialog: self._clear_active_settings_dialog(closed_dialog)
         )
@@ -387,6 +394,11 @@ class MainWindow(QMainWindow):
     def _clear_active_settings_dialog(self, dialog: QDialog) -> None:
         if self._active_settings_dialog is dialog:
             self._active_settings_dialog = None
+
+    def _refresh_connection_dialog(self, snapshot: ApplicationUiSnapshot) -> None:
+        dialog = self._active_settings_dialog
+        if isinstance(dialog, ConnectionDialog):
+            dialog.set_adapters(snapshot.adapters)
 
     def _on_input_evaluation_timeout(self) -> None:
         if self._input_coordinator is not None:

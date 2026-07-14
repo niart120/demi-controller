@@ -101,7 +101,7 @@ milestone 0とunit_013〜016の完了を着手条件とする。本unitはproduc
 | refactor-skipped | worker eventはqueued delivery前にpresentationを変更せず、delivery後だけGUI thread上で更新する | regression | integration | worker / GUI thread idを記録し、`QtRuntimeEventBridge`自身の明示的な`QueuedConnection`でdeliveryする。`QObject.emit`の既存signatureをoverloadで保ちつつbridgeが`RuntimeEventSink`を実装するため、追加refactorは不要 |
 | refactor-skipped | queued bridgeはadapter、connection、pairing、status、watchdog、error、runtime stoppedを順序どおりapplication sessionへ渡す | regression | integration | application session receiverのtest doubleへ7種のimmutable `RuntimeEvent`をFIFOで渡す。最初のitemでunion全体を検証するbridgeを実装済みのため、本itemでproduction code変更は不要 |
 | refactor-skipped | `ApplicationSession`とapplication packageはPySide6型をimportせず、framework非依存snapshotでmain windowを更新する | new | package | frozen `ApplicationUiSnapshot`がcapture、presentation、dialog状態を表し、application sourceとsession sourceのPySide6 import不在を確認する。`MainWindow.refresh()`だけがQt標準部品へ変換するため、追加refactorは不要 |
-| todo | adapter discoveryはdialog候補とtoolbar stateを更新し、0件 / 保存ID未検出では別adapterを自動選択しない | regression | integration | unit_016 controlへ接続する |
+| refactor-skipped | adapter discoveryはdialog候補とtoolbar stateを更新し、0件 / 保存ID未検出では別adapterを自動選択しない | regression | integration | `ApplicationUiSnapshot.adapters`がsafe adapter候補を保持し、`MainWindow.refresh()`はactiveな`ConnectionDialog`だけへ同期する。0件と保存ID未検出の選択禁止はdialog自身の既存責務であり、追加refactorは不要 |
 | todo | connection / pairing eventはbusyとaction enabledを更新し、完了 / 失敗後に再操作可能stateへ戻す | regression | integration | 重複commandを抑止する |
 | todo | watchdog / error eventはcaptureを解除してneutral previewと安全な表示へ戻し、stale eventは新stateを上書きしない | regression | integration | traceback非表示 |
 | todo | startup reconnectは検出済みの保存adapterだけへ`ConnectSaved`を1回発行し、新規pairingを開始しない | regression | integration | disabled / missing / mismatchも確認 |
@@ -175,10 +175,13 @@ QtApplicationRunner
 | `rg -n "T[O]DO|T[B]D|x[x]x|前[回]|今[回]|一[旦]|上[述]|適[宜]|必要に応じ[て]" spec/wip/unit_017` | passed | 該当なし |
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py -q -p no:cacheprovider` | passed | 2 passed。bridge自身がQObjectであり、worker emit直後はpresentation未変更、event処理後だけ主スレッドでreceiverを呼ぶ。7種のimmutable RuntimeEventはapplication session receiverへFIFOで到達する |
 | `uv run pytest tests/unit/application/test_application_session.py tests/unit/application/test_ui_state.py tests/integration/ui/test_main_window_snapshot.py -q -p no:cacheprovider` | passed | 4 passed。Qt非依存source境界、session snapshot、MainWindowのtoolbar / status bar反映を確認した |
+| `uv run pytest tests/unit/application/test_application_session.py tests/integration/ui/test_main_window_snapshot.py -q -p no:cacheprovider` | passed | 4 passed。adapter discoveryのsnapshot候補がConnectionDialogへ届き、0件と保存ID未検出で別adapterを自動選択しないことを確認した |
 | `uv run ruff format --check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | 2 files already formatted |
 | `uv run ruff check src/demi/ui/event_bridge.py tests/integration/ui/test_qt_runtime_events.py` | passed | All checks passed |
 | `uv run ruff format --check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py tests/unit/application/test_application_session.py tests/unit/application/test_ui_state.py tests/integration/ui/test_main_window_snapshot.py` | passed | 6 files already formatted |
 | `uv run ruff check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py tests/unit/application/test_application_session.py tests/unit/application/test_ui_state.py tests/integration/ui/test_main_window_snapshot.py` | passed | All checks passed |
+| `uv run ruff format --check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py tests/unit/application/test_application_session.py tests/integration/ui/test_main_window_snapshot.py` | passed | 5 files already formatted |
+| `uv run ruff check src/demi/application/ui_state.py src/demi/app.py src/demi/ui/main_window.py tests/unit/application/test_application_session.py tests/integration/ui/test_main_window_snapshot.py` | passed | All checks passed |
 | `uv run ty check --no-progress` | passed | All checks passed。QObjectの既存`emit` signatureとRuntimeEvent sinkをoverloadで両立し、snapshot型はQt importなしで公開した |
 | `git diff --cached --check` | passed | first TDD itemのstaged diffにwhitespace errorなし |
 | `uv run ruff format --check .` | not run | 全体gateはunit完了時に実行する。bridge対象2ファイルは検査済み |
