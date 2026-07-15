@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.dialogs import DialogKind
 from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
@@ -29,6 +30,9 @@ from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
 from demi.ui.application import QtApplicationEventRouter
+from demi.ui.dialogs.colors import ControllerColorsDialog
+from demi.ui.dialogs.connection import ConnectionDialog
+from demi.ui.dialogs.mapping import MappingDialog
 from demi.ui.event_bridge import QtRuntimeEventBridge
 from demi.ui.main_window import MainWindow
 
@@ -112,6 +116,58 @@ class _RecordingMainWindow(MainWindow):
         """Record the GUI thread before applying the standard refresh."""
         self.refresh_threads.append(get_ident())
         super().refresh(snapshot)
+
+
+@pytest.mark.parametrize(
+    ("action_name", "dialog_type", "dialog_kind"),
+    [
+        ("mapping_action", MappingDialog, DialogKind.MAPPING),
+        ("connection_settings_action", ConnectionDialog, DialogKind.CONNECTION),
+        ("colors_action", ControllerColorsDialog, DialogKind.COLORS),
+    ],
+)
+def test_router_binds_each_settings_action_to_a_session_owned_dialog(
+    qt_application: QApplication,
+    action_name: str,
+    dialog_type: type[MappingDialog | ConnectionDialog | ControllerColorsDialog],
+    dialog_kind: DialogKind,
+) -> None:
+    """Drive the normal GUI router path used by production composition."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+
+    action = getattr(window.main_toolbar, action_name)
+    action.trigger()
+    qt_application.processEvents()
+
+    dialog = window.active_settings_dialog
+    assert isinstance(dialog, dialog_type)
+    assert dialog.isVisible()
+    assert dialog.parentWidget() is window
+    assert session.dialogs.model.kind is dialog_kind
+    assert session.settings_modal.editor is not None
+
+    dialog.reject()
+    qt_application.processEvents()
+
+    assert window.active_settings_dialog is None
+    assert session.dialogs.model.kind is DialogKind.NONE
+    assert session.settings_modal.editor is None
+    assert action.isEnabled()
 
 
 def test_worker_event_changes_presentation_only_after_queued_gui_delivery(
