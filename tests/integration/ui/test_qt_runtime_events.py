@@ -13,7 +13,7 @@ from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.commands import ControllerCommand, DiscoverAdapters
+from demi.controller.commands import ConnectSaved, ControllerCommand, DiscoverAdapters
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -31,7 +31,7 @@ from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
 from demi.ui.application import QtApplicationEventRouter
 from demi.ui.dialogs.colors import ControllerColorsDialog
-from demi.ui.dialogs.connection import ConnectionDialog
+from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 from demi.ui.dialogs.mapping import MappingDialog
 from demi.ui.event_bridge import QtRuntimeEventBridge
 from demi.ui.main_window import MainWindow
@@ -168,6 +168,61 @@ def test_router_binds_each_settings_action_to_a_session_owned_dialog(
     assert session.dialogs.model.kind is DialogKind.NONE
     assert session.settings_modal.editor is None
     assert action.isEnabled()
+
+
+def test_router_routes_connection_dialog_actions_through_the_application_session(
+    qt_application: QApplication,
+) -> None:
+    """Keep connection discovery, pairing, and saved connect outside widgets."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    adapters = (AdapterDescriptor("usb:0", "Test Adapter", "usb"),)
+    router.handle_runtime_event(AdaptersDiscovered(adapters))
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
+
+    window.main_toolbar.connection_settings_action.trigger()
+    qt_application.processEvents()
+    dialog = window.active_settings_dialog
+    assert isinstance(dialog, ConnectionDialog)
+    dialog.select_adapter(0)
+
+    dialog.request_rescan()
+    assert runtime.commands == [DiscoverAdapters()]
+    router.handle_runtime_event(AdaptersDiscovered(adapters))
+    assert dialog.rescan_button.isEnabled()
+
+    dialog.request_pairing()
+    qt_application.processEvents()
+    confirmation = window.active_settings_dialog
+    assert isinstance(confirmation, PairingConfirmationDialog)
+    assert session.dialogs.model.kind is DialogKind.PAIRING_CONFIRMATION
+
+    confirmation.reject()
+    qt_application.processEvents()
+    restored_dialog = window.active_settings_dialog
+    assert isinstance(restored_dialog, ConnectionDialog)
+    assert session.dialogs.model.kind is DialogKind.CONNECTION
+
+    restored_dialog.request_connect()
+    qt_application.processEvents()
+
+    assert window.active_settings_dialog is None
+    assert session.dialogs.model.kind is DialogKind.NONE
+    assert isinstance(runtime.commands[-1], ConnectSaved)
 
 
 def test_worker_event_changes_presentation_only_after_queued_gui_delivery(
