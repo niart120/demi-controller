@@ -69,7 +69,7 @@
 |---|---|---|
 | `src/demi/ui/dialogs/mapping.py` | modify | 可視列を確保する標準headerとdialog sizeを設定する |
 | `tests/integration/ui/test_mapping_dialog.py` | modify | 既定表示の列幅を回帰検査する |
-| `spec/wip/unit_020/MAPPING_DIALOG_VISIBLE_COLUMNS.md` | new | TDD、監査、検証結果を記録する |
+| `spec/complete/unit_020/MAPPING_DIALOG_VISIBLE_COLUMNS.md` | new | TDD、監査、検証結果を記録する |
 
 ## 9. 検証
 
@@ -79,7 +79,7 @@
 | `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` | passed | formatting、lint、型検査が通過 |
 | `DEMI_QT_TEST_CLOSE_AFTER_MS=250; uv run demi` | passed | Windows displayでsource GUIを起動し、250ms後の通常closeでstatus 0 |
 | Windows Qt widget screenshot audit | passed | `tmp/ui-audit`のgit管理外画像で960 x 640 main window、mapping、connection、colors dialogを確認。source compositionではproductionの`ApplicationDependencies.default()`とfake runtimeを使い、main windowとmapping dialogの画像を再取得した。Computer Use native pipeは2回とも`os error 2`で未接続 |
-| standard gate | not run | 実装後に実行する |
+| `uv sync --dev` / `uv lock --check` / `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` / `uv run pytest tests/unit -q -p no:cacheprovider` / `uv run pytest tests/integration -q -p no:cacheprovider` / `uv build` / `git diff --check` | passed | 77 packages resolved、127 files formatted、unit 197 passed、integration 67 passed、sdistとwheelを生成、whitespace errorなし |
 
 ## 10. 先送り事項
 
@@ -90,5 +90,5 @@
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を更新した
-- [ ] 検証結果または未実行理由を記録した
+- [x] 検証結果または未実行理由を記録した
 - [x] package / release / public API に触れないことを確認した
