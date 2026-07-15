@@ -62,3 +62,19 @@ Pinned sources:
 
 - unit_015では既存のfocus loss時neutralizeを維持する。
 - click抑止の可否とUI上の操作方針は未決定である。必要になった時点で独立したwork unitとして、capture中の終了操作、dialog操作、accessibility、Windows入力制約を含めて設計する。
+
+## 2026-07-15: 設定画面の視覚設計とY軸反転
+
+### 現状
+
+- Windows source GUIで、割り当て、接続設定、色のdialogが表示・取消できることを確認した。
+
+### 観察
+
+- dialogの表示可否だけでは、画面の情報構造、操作順、各controlの見つけやすさが妥当かは判断できない。
+- 利用者からY軸反転の機能が不足している可能性を指摘された。現在の設定がbutton mappingの`inverted`だけを指すのか、mouse-to-stickまたはgyro pitchの符号反転まで対象にするのかは未調査である。
+
+### 方針
+
+- 完了したunit_019の配線修正へ、視覚設計またはY軸反転を混在させない。
+- 後続unitでは、対象入力、反転の意味、保存先、preview、keyboard操作、既存profileとの互換性を先に仕様化し、UI評価基準と回帰試験を定める。

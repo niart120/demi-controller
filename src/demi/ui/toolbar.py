@@ -96,3 +96,12 @@ class MainToolBar(QToolBar):
                 application layer.
         """
         self.connection_action.triggered.connect(lambda _checked=False: callback())
+
+    def bind_capture_action(self, callback: Callable[[], object]) -> None:
+        """Route enabled capture action requests to the application layer.
+
+        Args:
+            callback: Semantic capture-toggle request owned by the application
+                layer.
+        """
+        self.capture_action.triggered.connect(lambda _checked=False: callback())

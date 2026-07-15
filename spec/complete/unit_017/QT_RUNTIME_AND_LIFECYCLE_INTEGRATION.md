@@ -224,7 +224,7 @@ QtApplicationRunner
 
 | 観測 | 先送り理由 | 後続の置き場 |
 |---|---|---|
-| 3 OS source CIと実display挙動は未確認 | production composition完成後に同じ契約を各OSで検証する | `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
+| 3 OS source CIと実display挙動は未確認 | production composition完成後に同じ契約を各OSで検証する | `spec/complete/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
 | 実Bluetooth operation中の100ms応答性は未測定 | hardwareと対象deviceが必要 | hardware acceptance / test log |
 | PySide6 standaloneは未検証 | Qt plugin / license / clean環境を別artifact unitで扱う | milestone 7の後続unit |
 

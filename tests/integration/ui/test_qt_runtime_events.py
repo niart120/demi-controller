@@ -1,18 +1,25 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import Thread, get_ident
 
 import pytest
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication, QDialog, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.dialogs import DialogKind
 from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.commands import ControllerCommand, DiscoverAdapters
+from demi.controller.commands import (
+    ConnectSaved,
+    ControllerCommand,
+    Disconnect,
+    DiscoverAdapters,
+    RecreateWithColors,
+)
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -29,6 +36,9 @@ from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
 from demi.ui.application import QtApplicationEventRouter
+from demi.ui.dialogs.colors import ControllerColorsDialog
+from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
+from demi.ui.dialogs.mapping import MappingDialog
 from demi.ui.event_bridge import QtRuntimeEventBridge
 from demi.ui.main_window import MainWindow
 
@@ -112,6 +122,275 @@ class _RecordingMainWindow(MainWindow):
         """Record the GUI thread before applying the standard refresh."""
         self.refresh_threads.append(get_ident())
         super().refresh(snapshot)
+
+
+@pytest.mark.parametrize(
+    ("action_name", "dialog_type", "dialog_kind"),
+    [
+        ("mapping_action", MappingDialog, DialogKind.MAPPING),
+        ("connection_settings_action", ConnectionDialog, DialogKind.CONNECTION),
+        ("colors_action", ControllerColorsDialog, DialogKind.COLORS),
+    ],
+)
+def test_router_binds_each_settings_action_to_a_session_owned_dialog(
+    qt_application: QApplication,
+    action_name: str,
+    dialog_type: type[MappingDialog | ConnectionDialog | ControllerColorsDialog],
+    dialog_kind: DialogKind,
+) -> None:
+    """Drive the normal GUI router path used by production composition."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+
+    action = getattr(window.main_toolbar, action_name)
+    action.trigger()
+    qt_application.processEvents()
+
+    dialog = window.active_settings_dialog
+    assert isinstance(dialog, dialog_type)
+    assert dialog.isVisible()
+    assert dialog.parentWidget() is window
+    assert session.dialogs.model.kind is dialog_kind
+    assert session.settings_modal.editor is not None
+
+    dialog.reject()
+    qt_application.processEvents()
+
+    assert window.active_settings_dialog is None
+    assert session.dialogs.model.kind is DialogKind.NONE
+    assert session.settings_modal.editor is None
+    assert action.isEnabled()
+
+
+def test_router_routes_connection_dialog_actions_through_the_application_session(
+    qt_application: QApplication,
+) -> None:
+    """Keep connection discovery, pairing, and saved connect outside widgets."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    adapters = (AdapterDescriptor("usb:0", "Test Adapter", "usb"),)
+    router.handle_runtime_event(AdaptersDiscovered(adapters))
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
+
+    window.main_toolbar.connection_settings_action.trigger()
+    qt_application.processEvents()
+    dialog = window.active_settings_dialog
+    assert isinstance(dialog, ConnectionDialog)
+    dialog.select_adapter(0)
+
+    dialog.request_rescan()
+    assert runtime.commands == [DiscoverAdapters()]
+    router.handle_runtime_event(AdaptersDiscovered(adapters))
+    assert dialog.rescan_button.isEnabled()
+
+    dialog.request_pairing()
+    qt_application.processEvents()
+    confirmation = window.active_settings_dialog
+    assert isinstance(confirmation, PairingConfirmationDialog)
+    assert session.dialogs.model.kind is DialogKind.PAIRING_CONFIRMATION
+
+    confirmation.reject()
+    qt_application.processEvents()
+    restored_dialog = window.active_settings_dialog
+    assert isinstance(restored_dialog, ConnectionDialog)
+    assert session.dialogs.model.kind is DialogKind.CONNECTION
+
+    restored_dialog.request_connect()
+    qt_application.processEvents()
+
+    assert window.active_settings_dialog is None
+    assert session.dialogs.model.kind is DialogKind.NONE
+    assert isinstance(runtime.commands[-1], ConnectSaved)
+
+
+def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
+    qt_application: QApplication,
+) -> None:
+    """Keep preview and connected-color actions in the session-owned flow."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    assert coordinator.start_capture()
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    window.set_frame(runtime.frames[-1])
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED))
+    original_colors = settings.controller_colors
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    cancelled = window.active_settings_dialog
+    assert isinstance(cancelled, ControllerColorsDialog)
+    assert cancelled.set_color("body", "#ABCDEF")
+    assert window.controller_preview.model is not None
+    assert window.controller_preview.model.body_color == "#ABCDEF"
+
+    cancelled.reject()
+    qt_application.processEvents()
+    assert window.controller_preview.model is not None
+    assert window.controller_preview.model.body_color == original_colors.body
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    deferred = window.active_settings_dialog
+    assert isinstance(deferred, ControllerColorsDialog)
+    assert deferred.set_color("buttons", "#123456")
+    deferred.request_save()
+    qt_application.processEvents()
+    deferred_confirmation = deferred.reconnect_confirmation
+    assert deferred_confirmation is not None
+    defer_button = deferred_confirmation.button(QMessageBox.StandardButton.No)
+    assert defer_button is not None
+    defer_button.click()
+    qt_application.processEvents()
+    assert session.settings.controller_colors.buttons == "#123456"
+    assert session.ui_snapshot.color_reconnect_pending is False
+    assert window.active_settings_dialog is None
+    assert not any(isinstance(command, RecreateWithColors) for command in runtime.commands)
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    reconnecting = window.active_settings_dialog
+    assert isinstance(reconnecting, ControllerColorsDialog)
+    assert reconnecting.set_color("left_grip", "#654321")
+    reconnecting.request_save()
+    qt_application.processEvents()
+    reconnect_confirmation = reconnecting.reconnect_confirmation
+    assert reconnect_confirmation is not None
+    reconnect_button = reconnect_confirmation.button(QMessageBox.StandardButton.Yes)
+    assert reconnect_button is not None
+    reconnect_button.click()
+    qt_application.processEvents()
+
+    assert session.settings.controller_colors.left_grip == "#654321"
+    assert isinstance(runtime.commands[-1], RecreateWithColors)
+    assert window.active_settings_dialog is None
+
+
+def test_router_binds_connection_and_capture_toolbar_actions_to_the_session(
+    qt_application: QApplication,
+) -> None:
+    """Use the session state machine for normal toolbar operations."""
+    settings = replace(
+        AppSettings.default(),
+        connection=replace(AppSettings.default().connection, adapter_id="usb:0"),
+    )
+    runtime = _Runtime()
+    pointer_capture = _PointerCapture()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=pointer_capture,
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    router.handle_runtime_event(
+        AdaptersDiscovered((AdapterDescriptor("usb:0", "Test Adapter", "usb"),))
+    )
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.READY, adapter_id="usb:0"))
+
+    window.main_toolbar.capture_action.trigger()
+    assert coordinator.is_captured
+    assert runtime.frames[-1].capture_active
+    assert window.main_toolbar.capture_action.isChecked()
+
+    window.main_toolbar.capture_action.trigger()
+    assert not coordinator.is_captured
+    assert not runtime.frames[-1].capture_active
+    assert not window.main_toolbar.capture_action.isChecked()
+
+    window.main_toolbar.connection_action.trigger()
+    assert isinstance(runtime.commands[-1], ConnectSaved)
+    assert session.ui_snapshot.connection_state is ConnectionState.CONNECTING
+
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))
+    window.main_toolbar.connection_action.trigger()
+    assert isinstance(runtime.commands[-1], Disconnect)
+    assert session.ui_snapshot.connection_state is ConnectionState.DISCONNECTING
+    assert qt_application is not None
+
+
+def test_router_opens_connection_settings_when_connection_is_not_configured(
+    qt_application: QApplication,
+) -> None:
+    """Show configuration rather than silently ignoring an unconfigured connect."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
+
+    window.main_toolbar.connection_action.trigger()
+    qt_application.processEvents()
+
+    dialog = window.active_settings_dialog
+    assert isinstance(dialog, ConnectionDialog)
+    assert session.dialogs.model.kind is DialogKind.CONNECTION
+
+    dialog.reject()
+    qt_application.processEvents()
+
+    assert window.active_settings_dialog is None
+    assert session.dialogs.model.kind is DialogKind.NONE
+    assert window.main_toolbar.connection_action.isEnabled()
 
 
 def test_worker_event_changes_presentation_only_after_queued_gui_delivery(

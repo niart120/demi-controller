@@ -64,9 +64,9 @@ uv run python -m demi --version
 - 仮想pitchと整合する静的1G生成
 - 捕捉外はジャイロ0・加速度+1Gのニュートラル
 
-## Unit 004: pygletウィンドウと可視化
+## Unit 004: 旧UIウィンドウと可視化（履歴）
 
-> 履歴注記: このunitは完了時のpyglet実装を示す。現行UIの採用判断と後続計画は `spec/ui-redesign/` およびunit_013以降を正本とする。
+> 履歴注記: このunitは置き換え済みのUI実装を示す。現行UIの採用判断と後続計画はunit_013以降を正本とする。
 
 成果:
 
@@ -74,7 +74,7 @@ uv run python -m demi --version
 - ツールバー
 - 状態バー
 - ControllerView
-- PygletInputBackend
+- 旧入力バックエンド
 - 入力開始・F12解除
 - フォーカス喪失
 
@@ -177,7 +177,7 @@ uv run python -m demi --version
 
 - 起動
 - 設定
-- pyglet入力
+- Qt入力とOS別相対ポインター
 - 排他マウス
 - アダプター列挙
 - 可能な範囲の実機接続

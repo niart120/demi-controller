@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
             ToolbarState(
                 application_state=snapshot.application_state,
                 connection_state=snapshot.connection_state,
-                dialog_open=snapshot.dialog_open,
+                dialog_open=snapshot.dialog_open or self._active_settings_dialog is not None,
                 connection_retryable=snapshot.connection_retryable,
             )
         )
@@ -227,6 +227,36 @@ class MainWindow(QMainWindow):
         self._mapping_dialog_factory = mapping
         self._connection_dialog_factory = connection
         self._colors_dialog_factory = colors
+
+    def open_settings_dialog(self, factory: SettingsDialogFactory) -> None:
+        """Open a dialog from an application-owned settings factory.
+
+        Args:
+            factory: Creates the dialog for the already-selected settings flow.
+        """
+        self._open_settings_dialog(factory)
+
+    def replace_active_settings_dialog(self, factory: SettingsDialogFactory) -> bool:
+        """Replace the active settings dialog without discarding its draft.
+
+        Args:
+            factory: Creates the dialog that supersedes the active dialog.
+
+        Returns:
+            Whether a replacement dialog was created and opened.
+        """
+        if self._shutdown_started:
+            return False
+        previous_dialog = self._active_settings_dialog
+        if previous_dialog is None:
+            return False
+        dialog = factory(self)
+        if dialog is None:
+            return False
+        previous_dialog.hide()
+        self._activate_settings_dialog(dialog)
+        previous_dialog.deleteLater()
+        return True
 
     @property
     def input_evaluation_interval_ms(self) -> int | None:
@@ -397,6 +427,10 @@ class MainWindow(QMainWindow):
         dialog = factory(self)
         if dialog is None:
             return
+        self._activate_settings_dialog(dialog)
+
+    def _activate_settings_dialog(self, dialog: QDialog) -> None:
+        """Show one application-owned settings dialog and track its lifetime."""
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self._active_settings_dialog = dialog
         snapshot = self._latest_snapshot
@@ -410,6 +444,9 @@ class MainWindow(QMainWindow):
     def _clear_active_settings_dialog(self, dialog: QDialog) -> None:
         if self._active_settings_dialog is dialog:
             self._active_settings_dialog = None
+            snapshot = self._latest_snapshot
+            if snapshot is not None:
+                self.refresh(snapshot)
 
     def _refresh_connection_dialog(self, snapshot: ApplicationUiSnapshot) -> None:
         dialog = self._active_settings_dialog

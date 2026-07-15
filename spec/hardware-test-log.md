@@ -9,7 +9,7 @@ Every future entry must record:
 - Python version
 - swbt-python version
 - Bumble version
-- pyglet version
+- PySide6版、Qt版
 - Operating system and version
 - USB Bluetooth adapter model and VID/PID
 - Driver
@@ -31,7 +31,7 @@ This record intentionally does not claim a hardware acceptance result. The user-
 | execution status | not run |
 | reason | current delivery scope excludes Bluetooth dongle and Switch hardware verification |
 | hardware command | not run |
-| Python / swbt-python / Bumble / pyglet | not collected for a hardware run |
+| Python / swbt-python / Bumble / PySide6 / Qt | not collected for a hardware run |
 | operating system | not collected for a hardware run |
 | USB adapter, VID/PID, driver, adapter identifier | not run — no adapter was used |
 | target device and firmware | not run — no Switch device was used |

@@ -88,6 +88,23 @@ def test_publisher_exposes_the_eight_millisecond_evaluation_contract() -> None:
     assert publisher.evaluation_interval_ms == 8
 
 
+def test_publisher_exposes_recent_input_evaluation_metrics() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+
+    publisher.publish(capture_active=False, capture_epoch=1)
+    for interval_ms in (8, 8, 16, 8, 8):
+        clock.now_ns += interval_ms * 1_000_000
+        publisher.publish(capture_active=False, capture_epoch=1)
+
+    metrics = publisher.timing_metrics
+
+    assert metrics.sample_count == 5
+    assert metrics.mean_interval_ms == 9.6
+    assert metrics.p95_interval_ms == 16.0
+    assert metrics.p99_interval_ms == 16.0
+
+
 def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
     clock = FakeClock()
     publisher = InputPublisher(clock=clock, sink=FakeSink())
