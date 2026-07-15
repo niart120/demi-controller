@@ -24,6 +24,16 @@ def test_ci_workflow_runs_the_repository_quality_gates() -> None:
     assert "pull_request:" in workflow
 
 
+def test_ci_workflow_caches_dependencies_per_python_version() -> None:
+    workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "enable-cache: true" in workflow
+    assert "cache-suffix: python-${{ matrix.python-version }}" in workflow
+    assert "cache-dependency-glob: |\n            pyproject.toml\n            uv.lock" in workflow
+
+
 def test_ci_workflow_runs_source_gates_on_all_supported_os() -> None:
     workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"

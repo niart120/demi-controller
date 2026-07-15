@@ -36,6 +36,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.3.0
         with:
           enable-cache: true
+          cache-suffix: python-${{ matrix.python-version }}
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
