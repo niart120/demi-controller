@@ -76,7 +76,7 @@ CI の応答性 probe で、GUI スレッドが command ごとに新しい worke
 | path | change | 内容 |
 |---|---|---|
 | `tests/integration/ui/test_application_lifecycle.py` | modify | `SlowRuntime` の持続 worker と worker数の回帰確認 |
-| `spec/wip/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` | new | 対象範囲、TDD状態、検証、先送り事項 |
+| `spec/complete/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` | new | 対象範囲、TDD状態、検証、先送り事項 |
 
 ## 9. 検証
 
