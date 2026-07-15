@@ -69,7 +69,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | refactor-skipped | 既定の router bind 後、割り当て・接続設定・色の各 action は session-owned draft を開き、Cancel 後に次の action を開ける | regression | integration | redでは3 caseとも`active_settings_dialog is None`で失敗。greenではrouterが3 factoryを設定し、`MainWindow`がactive dialogを保持して取消後にsnapshotからtoolbarを復帰する。共通のsession-to-dialog配線以外に、このitem内で分ける構造変更はない |
 | refactor-skipped | connection dialog の再検索、保存接続、pairing 確認 / 取消は既存 session action を通り、画面状態を更新する | regression | integration | `DiscoverAdapters`、pairing confirmationから編集dialogへの復帰、`ConnectSaved`をrouter bind経路で確認した。dialog factoryとsession callbackの構造は前itemで確定しており、追加refactorは不要 |
 | refactor-skipped | colors dialog の preview、取消、保存後の再接続選択は session と preview widget を同期する | regression | integration | previewへ`#ABCDEF`を反映し、取消で保存色へ戻す。接続中の保存後に「後で」はreconnect保留を解除し、「再接続する」は`RecreateWithColors`を発行する。前itemのfactory callbackで完結しており、追加refactorは不要 |
-| todo | 接続と入力開始の toolbar action は既定の router bind から session action を呼び、snapshot を更新する | regression | integration | 設定 dialog と別の未接続 callback を固定する |
+| refactor-skipped | 接続と入力開始の toolbar action は既定の router bind から session action を呼び、snapshot を更新する | regression | integration | 接続済み設定では`ConnectSaved` / `Disconnect`、入力開始ではcapture stateとtoolbar checked stateを確認した。未設定の接続操作ではsessionが作ったconnection draftを既存factoryが再利用してdialogを表示し、Cancel後に状態を閉じる。callback配線以外の構造変更は不要 |
 | todo | 修正後の source GUI で設定 dialog を実 Windows display から開閉し、Tab / Enter / Space / Esc を記録する | manual | manual | unit_018 の未完了 acceptance を再実行する |
 
 ## 7. 設計メモ
@@ -105,6 +105,9 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py::test_router_routes_connection_dialog_actions_through_the_application_session -q -p no:cacheprovider` | passed | 1 passed。再検索、pairing取消、保存接続がruntime commandをwidgetではなくsession経由で発行することを確認した |
 | `uv run ruff format --check tests/integration/ui/test_qt_runtime_events.py` / `uv run ruff check tests/integration/ui/test_qt_runtime_events.py` / `uv run ty check --no-progress` | passed | 1 file already formatted、All checks passed、All checks passed |
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py::test_router_routes_colors_preview_cancel_and_reconnect_through_the_session -q -p no:cacheprovider` | passed | 1 passed。preview、取消、保存後の「後で」と「再接続する」がsessionと`RecreateWithColors`へ到達することを確認した |
+| `uv run pytest tests/integration/ui/test_qt_runtime_events.py::test_router_binds_connection_and_capture_toolbar_actions_to_the_session tests/integration/ui/test_qt_runtime_events.py::test_router_opens_connection_settings_when_connection_is_not_configured -q -p no:cacheprovider` | passed | 2 passed。設定済み接続 / 切断、入力開始 / 解除、未設定接続時のconnection dialog表示とCancel後の状態復帰を確認した |
+| `uv run ruff format --check src/demi/ui/application.py src/demi/ui/main_window.py src/demi/ui/toolbar.py tests/integration/ui/test_qt_runtime_events.py` / `uv run ruff check src/demi/ui/application.py src/demi/ui/main_window.py src/demi/ui/toolbar.py tests/integration/ui/test_qt_runtime_events.py` / `uv run ty check --no-progress` | passed | 4 files already formatted、All checks passed、All checks passed |
+| `uv run pytest tests/integration/ui -q -p no:cacheprovider --basetemp .tmp-pytest` | passed | 56 passed。既定のWindows一時ディレクトリはアクセス拒否になるため、作業領域内の一時ディレクトリを明示した |
 | standard gate | not run | 実装完了後に実行する |
 | Windows実 display acceptance | not run | 修正後に利用者と再実行する |
 
@@ -120,6 +123,6 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 - [x] 対象範囲と対象外を確認した
 - [x] 既定起動構成で未表示を再現した
 - [x] TDD Test List を更新した
-- [ ] 全設定 action と通常 toolbar action の本番配線を確認した
+- [x] 全設定 action と通常 toolbar action の本番配線を確認した
 - [ ] targeted test と standard gate を記録した
 - [ ] Windows実 display acceptance を再実行した

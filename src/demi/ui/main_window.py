@@ -228,6 +228,14 @@ class MainWindow(QMainWindow):
         self._connection_dialog_factory = connection
         self._colors_dialog_factory = colors
 
+    def open_settings_dialog(self, factory: SettingsDialogFactory) -> None:
+        """Open a dialog from an application-owned settings factory.
+
+        Args:
+            factory: Creates the dialog for the already-selected settings flow.
+        """
+        self._open_settings_dialog(factory)
+
     def replace_active_settings_dialog(self, factory: SettingsDialogFactory) -> bool:
         """Replace the active settings dialog without discarding its draft.
 

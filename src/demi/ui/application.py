@@ -135,6 +135,8 @@ class QtApplicationEventRouter:
         if not self._active:
             return
         self._session = session
+        self._window.main_toolbar.bind_connection_action(self._run_connection_action)
+        self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
             mapping=self._create_mapping_dialog,
             connection=self._create_connection_dialog,
@@ -185,6 +187,25 @@ class QtApplicationEventRouter:
         if session is not None:
             self._window.refresh(session.ui_snapshot)
 
+    def _run_connection_action(self) -> None:
+        """Run one state-dependent connection action and refresh the window."""
+        session = self._session
+        if session is not None:
+            session.connection_action()
+            if (
+                session.dialogs.model.kind is DialogKind.CONNECTION
+                and self._window.active_settings_dialog is None
+            ):
+                self._window.open_settings_dialog(self._create_connection_dialog)
+            self.refresh()
+
+    def _toggle_capture(self) -> None:
+        """Toggle input capture through the session and refresh the window."""
+        session = self._session
+        if session is not None:
+            session.toggle_capture()
+            self.refresh()
+
     def _open_settings_editor(self, kind: DialogKind) -> SettingsEditor | None:
         """Open one session-owned draft and return its editor for a Qt dialog."""
         session = self._session
@@ -213,7 +234,14 @@ class QtApplicationEventRouter:
 
     def _create_connection_dialog(self, parent: QWidget) -> ConnectionDialog | None:
         """Create the connection dialog after opening its application-owned draft."""
-        editor = self._open_settings_editor(DialogKind.CONNECTION)
+        session = self._session
+        if session is None:
+            return None
+        editor = (
+            session.settings_modal.editor
+            if session.dialogs.model.kind is DialogKind.CONNECTION
+            else self._open_settings_editor(DialogKind.CONNECTION)
+        )
         if editor is None:
             return None
         return self._connection_dialog(editor, parent)
