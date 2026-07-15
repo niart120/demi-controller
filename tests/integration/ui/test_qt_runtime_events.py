@@ -4,7 +4,7 @@ from threading import Thread, get_ident
 
 import pytest
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication, QDialog, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
 from demi.application.coordinator import CaptureCoordinator
@@ -13,7 +13,12 @@ from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.commands import ConnectSaved, ControllerCommand, DiscoverAdapters
+from demi.controller.commands import (
+    ConnectSaved,
+    ControllerCommand,
+    DiscoverAdapters,
+    RecreateWithColors,
+)
 from demi.controller.events import (
     AdapterDescriptor,
     AdaptersDiscovered,
@@ -223,6 +228,81 @@ def test_router_routes_connection_dialog_actions_through_the_application_session
     assert window.active_settings_dialog is None
     assert session.dialogs.model.kind is DialogKind.NONE
     assert isinstance(runtime.commands[-1], ConnectSaved)
+
+
+def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
+    qt_application: QApplication,
+) -> None:
+    """Keep preview and connected-color actions in the session-owned flow."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    assert coordinator.start_capture()
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    window.set_frame(runtime.frames[-1])
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED))
+    original_colors = settings.controller_colors
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    cancelled = window.active_settings_dialog
+    assert isinstance(cancelled, ControllerColorsDialog)
+    assert cancelled.set_color("body", "#ABCDEF")
+    assert window.controller_preview.model is not None
+    assert window.controller_preview.model.body_color == "#ABCDEF"
+
+    cancelled.reject()
+    qt_application.processEvents()
+    assert window.controller_preview.model is not None
+    assert window.controller_preview.model.body_color == original_colors.body
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    deferred = window.active_settings_dialog
+    assert isinstance(deferred, ControllerColorsDialog)
+    assert deferred.set_color("buttons", "#123456")
+    deferred.request_save()
+    qt_application.processEvents()
+    deferred_confirmation = deferred.reconnect_confirmation
+    assert deferred_confirmation is not None
+    defer_button = deferred_confirmation.button(QMessageBox.StandardButton.No)
+    assert defer_button is not None
+    defer_button.click()
+    qt_application.processEvents()
+    assert session.settings.controller_colors.buttons == "#123456"
+    assert session.ui_snapshot.color_reconnect_pending is False
+    assert window.active_settings_dialog is None
+    assert not any(isinstance(command, RecreateWithColors) for command in runtime.commands)
+
+    window.main_toolbar.colors_action.trigger()
+    qt_application.processEvents()
+    reconnecting = window.active_settings_dialog
+    assert isinstance(reconnecting, ControllerColorsDialog)
+    assert reconnecting.set_color("left_grip", "#654321")
+    reconnecting.request_save()
+    qt_application.processEvents()
+    reconnect_confirmation = reconnecting.reconnect_confirmation
+    assert reconnect_confirmation is not None
+    reconnect_button = reconnect_confirmation.button(QMessageBox.StandardButton.Yes)
+    assert reconnect_button is not None
+    reconnect_button.click()
+    qt_application.processEvents()
+
+    assert session.settings.controller_colors.left_grip == "#654321"
+    assert isinstance(runtime.commands[-1], RecreateWithColors)
+    assert window.active_settings_dialog is None
 
 
 def test_worker_event_changes_presentation_only_after_queued_gui_delivery(
