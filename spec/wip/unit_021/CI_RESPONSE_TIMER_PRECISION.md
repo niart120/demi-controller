@@ -4,7 +4,7 @@
 
 ### 1.1 目的
 
-`NFR-001` の「接続、列挙、切断でQtのGUIスレッドを100ミリ秒以上連続して塞がない」という契約を維持したまま、CI の応答性 probe が既定の `CoarseTimer` による観測遅延を原因として失敗する可能性を先に減らす。
+`NFR-001` の「接続、列挙、切断でQtのGUIスレッドを100ミリ秒以上連続して塞がない」という契約を維持したまま、macOS CI の応答性 probe で100ミリ秒を超えた経路を時刻付きで特定する。
 
 ### 1.2 起点 / source
 
@@ -19,11 +19,12 @@
 | actor / boundary | 入力または状態 | 期待する観測結果 | 制約 |
 |---|---|---|---|
 | CI maintainer | macOS上で遅延runtimeの応答性 probe を実行する | 100ミリ秒の応答性契約を同じ閾値で検査する | 観測用timerの精度だけを変更する |
-| maintainer | 第1段のCI結果を確認する | 成功時も失敗時も、次の調査対象をtimer精度に限定できる | runtime fake、bridge、production UIを同時に変更しない |
+| maintainer | 精密timer化後のCI結果を確認する | 失敗時にworker、bridge、GUIのどの境界で待機したかを取得する | runtime fake、bridge、production UIを同時に変更しない |
 
 ## 2. 対象範囲
 
 - `test_qt_event_loop_stays_responsive_during_slow_runtime_operations` の観測用 `QTimer` を `Qt.TimerType.PreciseTimer` に設定する。
+- 同テストでworker開始・起床・イベント送出、GUI timer tick・接続要求・window refreshの単調時刻を記録する。
 - 既存の10ミリ秒 interval、100ミリ秒の最大間隔判定、接続状態遷移の確認を維持する。
 - 対象テスト、静的検査、macOS CI の結果を記録する。
 
@@ -48,23 +49,23 @@
 |---|---|---|---|
 | precise response probe | 遅延runtimeの接続、切断をQt event loopで処理する | 観測timerが `PreciseTimer` として起動する | 10ミリ秒 intervalを維持する |
 | unchanged responsiveness contract | 隣接した観測tickを比較する | 最大間隔は100ミリ秒未満でなければ失敗する | 閾値を変更しない |
-| staged diagnosis | macOS CI がなお失敗する | 次段でworker送出、bridge配送、GUI更新を個別に計測する | この段では原因を断定しない |
+| staged diagnosis | macOS CI がなお失敗する | assertion messageにworker、GUI操作、refreshの時刻順を出力する | この段では原因を断定しない |
 
 ## 6. TDD Test List
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| green | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | redでは既定timerで109.6msと115.0msを検出。greenでは`PreciseTimer`を明示し、Windows offscreenで20回連続成功 |
-| todo | macOS CIは精密timer化後も応答性 probe を通過する | regression | integration | remote CIで確認する |
+| partial | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | Windows offscreenで20回連続成功。macOS 3.12では2回成功後、`PreciseTimer`設定済みで187.0msに再発したため、timer種別だけでは不十分 |
+| todo | macOS CIの失敗時にworker送出、GUI操作、refreshの時刻順を出力する | diagnostic regression | integration | productionの実行経路は変えず、assertion messageだけに観測結果を載せる |
 
 ## 7. 設計メモ
 
-Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-to-GUI配送の速度を直接改善しない。第1段では観測器に明示的な精度要求を与え、100ミリ秒契約を保持する。CIがなお失敗した場合は、timer種別以外の遅延を測定してから次の変更を選ぶ。
+Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-to-GUI配送の速度を直接改善しない。実際に `PreciseTimer` 設定済みで187.0msの失敗が再発したため、timer種別を原因とは断定できない。次段はproductionの挙動を変えず、workerとGUI境界の時刻を失敗ログに出して待機箇所を特定する。
 
 | Test Desiderata | 判断 | 根拠 |
 |---|---|---|
 | precise | 維持 | 最大100ミリ秒というNFR-001の判定を残す |
-| deterministic | 改善を試行 | 既定の粗いtimerではなく精密timerを明示する。macOSでの効果は未検証 |
+| deterministic | 未達 | 精密timer化後もmacOS 3.12で187.0msを検出。次段は失敗時の時刻列を取得する |
 | representative | 未解決 | `SlowRuntime` の短命workerはproductionの持続workerと一致しない。第1段では同時に変えない |
 | fast | 維持 | 対象テストはWindows offscreenで約0.3秒、20回反復も短時間で完了する |
 
@@ -84,11 +85,11 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 | `uv sync --dev` / `uv lock --check` / `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | passed | 77 packages、127 files、全静的検査が通過 |
 | `uv run pytest tests/unit` / `$env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/integration` | passed | unit 197 passed、integration 67 passed |
 | `uv build` / `git diff --check` | passed | sdistとwheelを生成、whitespace errorなし |
-| macOS / Python 3.12 CI | not run | branchを公開していないため未実行 |
+| GitHub Actions run 29425872544 の macOS / Python 3.12 | failed | 精密timer化後の1回目と2回目は成功、3回目は最大187.0msで失敗 |
 
 ## 10. 先送り事項
 
-- 精密timer化後もmacOS CIが失敗する場合は、worker開始・worker送出・bridge配送・GUI更新の時刻を収集する。後続の作業仕様またはこの仕様書へ記録する。
+- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。
 - 実Bluetooth接続中の100ミリ秒応答性はhardware acceptanceで扱う。
 
 ## 11. チェックリスト
