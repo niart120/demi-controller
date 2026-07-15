@@ -9,6 +9,8 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
+WHEEL_INSTALL_TIMEOUT_SECONDS = 120
+
 
 def _venv_python(environment: Path) -> Path:
     if sys.platform == "win32":
@@ -68,6 +70,7 @@ def test_wheel_installs_pyside6_and_starts_the_qt_runner_in_a_clean_venv(tmp_pat
         (uv, "pip", "install", "--python", str(python), str(wheels[0])),
         cwd=tmp_path,
         environment=environment,
+        timeout=WHEEL_INSTALL_TIMEOUT_SECONDS,
     )
 
     version_result = _run(

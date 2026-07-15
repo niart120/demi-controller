@@ -20,6 +20,7 @@ def test_ci_workflow_runs_the_repository_quality_gates() -> None:
 
     for python_version in ('"3.12"', '"3.13"'):
         assert python_version in workflow
+    assert "UV_PYTHON: ${{ matrix.python-version }}" in workflow
     assert "pull_request:" in workflow
 
 
