@@ -319,6 +319,32 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     assert escaped.result() == int(QDialog.DialogCode.Rejected)
 
 
+def test_mapping_dialog_shows_default_columns_without_text_clipping(
+    qt_application: QApplication,
+) -> None:
+    """Keep the default mapping columns readable without horizontal scrolling."""
+    dialog = MappingDialog(SettingsEditor(AppSettings.default()))
+    dialog.show()
+    qt_application.processEvents()
+    model = dialog.table.model()
+    assert model is not None
+    header = dialog.table.horizontalHeader()
+    font_metrics = dialog.table.fontMetrics()
+
+    for column in range(model.columnCount()):
+        visible_text = [
+            str(model.headerData(column, Qt.Orientation.Horizontal)),
+            *(str(model.data(model.index(row, column))) for row in range(model.rowCount())),
+        ]
+        required_width = max(font_metrics.horizontalAdvance(text) for text in visible_text)
+
+        assert header.sectionSize(column) >= required_width
+
+    assert dialog.table.horizontalScrollBar().maximum() == 0
+    dialog.close()
+    qt_application.processEvents()
+
+
 def _send_key(
     target: QObject,
     key: Qt.Key,
