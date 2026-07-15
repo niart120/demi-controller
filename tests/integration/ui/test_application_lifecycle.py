@@ -10,7 +10,7 @@ from threading import Thread, get_ident
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6.QtCore import QThread, QTimer
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QCloseEvent
 
 from demi.app import ApplicationDependencies, SystemClock, WindowSpec, run_application
@@ -1034,6 +1034,8 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
     ) -> QtApplicationRunner:
         runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
         timer = QTimer(window)
+        timer.setTimerType(Qt.TimerType.PreciseTimer)
+        assert timer.timerType() is Qt.TimerType.PreciseTimer
         timer.setInterval(10)
         phase = 0
 
