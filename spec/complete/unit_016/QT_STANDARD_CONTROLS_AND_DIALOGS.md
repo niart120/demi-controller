@@ -217,7 +217,7 @@ milestone 0とunit_013〜015の完了を着手条件とする。本unitはstanda
 | 観測 | 先送り理由 | 後続の置き場 |
 |---|---|---|
 | production adapter eventによるaction / status更新は未接続 | workerからGUI threadへのdeliveryを先に固定する必要がある | `spec/wip/unit_017/QT_RUNTIME_AND_LIFECYCLE_INTEGRATION.md` |
-| 3 OS実displayのfocus chain、font、DPI差は未検証 | 対象desktopで手動確認が必要 | `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
+| 3 OS実displayのfocus chain、font、DPI差は未検証 | 対象desktopで手動確認が必要 | `spec/complete/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
 | profile import / exportと複数controller type | 0.1.xのFR範囲外 | 後続roadmapで判断する |
 
 ## 11. チェックリスト

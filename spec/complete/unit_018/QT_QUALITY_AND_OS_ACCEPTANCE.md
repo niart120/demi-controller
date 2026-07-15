@@ -109,7 +109,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | workflow contractで3 OS、Python 3.12 / 3.13、offscreen Qt、unit / integration / buildを固定し、PR #22の6 job成功をsource-level証拠として記録した。追加refactorは不要 |
 | refactor-skipped | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | `DEMI_QT_TEST_CLOSE_AFTER_MS`が有効な整数の場合だけrunnerが通常の`window.close()`を予約する。3 entry pointをoffscreen subprocessで起動してstatus 0を確認し、通常CLI引数は追加しなかったため、追加refactorは不要 |
 | refactor-skipped | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | temporary venvへlocal wheelだけをinstallし、親sourceの`PYTHONPATH`を除外してPySide6 import、`python -m demi --version`、offscreen Qt起動 / closeを確認した。standalone artifactは対象外のため、追加refactorは不要 |
-| todo | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | 2026-07-15にAW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hzで、capture、F12、画面端、focus loss、3設定dialogとkeyboard操作を確認した。main windowの通常close結果はこの受入記録では未報告のため、itemは継続する |
+| refactor-skipped | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | 2026-07-15にAW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hzで、capture、F12、画面端、focus loss、3設定dialogとkeyboard操作を確認した。main windowの通常closeも利用者が確認した。開始・終了時刻とpacket数は未記録であり、後続の詳細計測時に扱う。追加refactorは不要 |
 | refactor-skipped | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 現在の作業環境にmacOS host / desktop sessionがないため未実行。OS版、display scale、font、native focus、pointer capability、closeの実画面証拠は取得していない。macOS CIのoffscreen成功を実display acceptanceと扱わず、macOS desktop環境での後続受入が必要 |
 | refactor-skipped | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | 現在の作業環境にLinux host / desktop sessionがないため未実行。X11 / Wayland、compositor、OS版、display scale、font、native focus、pointer capability、closeを取得していない。Linux CIのoffscreen成功を実display acceptanceと扱わず、対象desktopでの後続受入が必要 |
 | refactor-skipped | 8ms入力評価の平均 / 95 / 99、preview最大60Hz、100ms GUI応答性、250ms watchdog誤発火を診断値で確認する | characterization | integration | `InputPublisher.timing_metrics`が最大512件の正の評価間隔から平均、nearest-rank p95 / p99を出す。fake clockの8 / 8 / 16 / 8 / 8msで平均9.6ms、p95 / p99 16msを確認し、preview 60Hz、slow runtime中の100ms未満probe、250ms未満watchdog非発火を既存統合 / unit testで再確認した。これはdesktop OSの実時間保証ではないため、追加refactorは不要 |
@@ -117,7 +117,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | READMEとcurrent `spec/initial`がPySide6実装、source起動、支援範囲、standalone停止状態と一致する | regression | docs | 文書回帰テストで3 entry point、PySide6 / Qt Widgets、旧未実装説明の撤去、source / wheel、単体配布停止を確認した。README、FR-001、roadmap、hardware test logを現行実装へ合わせ、追加refactorは不要 |
 | refactor-skipped | source / wheel利用者がProject、PySide6、Qt、third-party license / noticeへ到達でき、欠落を検査できる | new | package | `THIRD_PARTY_NOTICES.md`をmodule rootへ置き、source inventoryとREADMEから導線を設けた。新規wheel生成testでProject licenseとnotice fileのarchive同梱を確認した。法的判断は完了と記録せず、追加refactorは不要 |
 | refactor-skipped | current source、test、dependency、lock、builder、README、initial specにpygletのimport /収集 /採用指示が0件である | regression | package | AST回帰testで`src` / `tests`のlegacy import・型参照を禁止し、metadata、lock、builder、license inventory、README、initial specも検査する。語が残るのは削除済み境界を検出する否定testだけであり、scoped searchでimport /収集 /採用指示0件を確認した。追加refactorは不要 |
-| refactor-skipped | unit_013〜018のTDD、verification、checklist、deferred handoffに重複・抜け・誤った完了表現がない | new | docs | unit_013〜017のTDDにtodo / deferredがなく、checklistに未完了がないことを回帰検査した。handoffはunit_013→014、014→015 / 016 / 017、015→016 / 017、016→017 / 018、017→018へ接続する。unit_016の初期not runは後続passed記録で置き換わる時系列証拠であり、unit_018の未完了はWindows実display、先送りはmilestone 7 standaloneだけに限定した。追加refactorは不要 |
+| refactor-skipped | unit_013〜019のTDD、verification、checklist、deferred handoffに重複・抜け・誤った完了表現がない | new | docs | unit_013〜019のcomplete recordにtodoと未完了checklistがなく、unit_018のTDD上のdeferredはmilestone 7 standaloneだけであることを回帰検査した。handoffはunit_013→014、014→015 / 016 / 017、015→016 / 017、016→017 / 018、017→018、018→019へ接続する。unit_016の初期not runは後続passed記録で置き換わる時系列証拠であり、追加refactorは不要 |
 | deferred | standalone artifactがQt pluginとlicenseを含み、3 OS clean環境でGUI起動する | regression | package | milestone 7の後続unit |
 
 ## 7. 設計メモ
@@ -177,7 +177,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `spec/initial/risks.md` | modify | PySide6 / Qt / pointer / license / packaging risk |
 | `packaging/LICENSES.md` | modify | source / wheel noticeとmilestone 7境界 |
 | `tests/integration/package/test_wheel_license_notices.py` | new | source / wheel noticeとProject licenseのarchive同梱を検査 |
-| `spec/complete/unit_013/`〜`spec/complete/unit_015/`、`spec/wip/unit_016/`〜`spec/wip/unit_018/` | modify | 最終TDD、検証、checklist、handoff結果 |
+| `spec/complete/unit_013/`〜`spec/complete/unit_018/` | modify | 最終TDD、検証、checklist、handoff結果 |
 
 `spec/complete`の過去記録は変更しない。`pyproject.toml`または`uv.lock`へ実装結果の修正が必要になった場合は対象へ追加し、`uv lock --check`と`uv build`を再実行する。
 
@@ -222,14 +222,15 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run ruff format --check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | 2 files already formatted |
 | `uv run ruff check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | All checks passed |
 | `rg -n -i "import[[:space:]]+pyglet|from[[:space:]]+pyglet|collect-all[[:space:]]+pyglet|pyglet[[:space:]]*[<=>]|pyglet[[:space:]]+input|pyglet.*(backend|window)" src tests pyproject.toml uv.lock packaging README.md spec/initial --glob "!tests/unit/test_legacy_ui_removal.py"` | passed | import /収集 /採用指示の該当なし。除外したfileは削除済み境界を検出する否定test |
-| `uv run pytest tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | unit_013〜017のTDDにtodo / deferredがなく、checklistが完了していること、unit_018の未完了がWindows実displayだけ、先送りがmilestone 7 standaloneだけであることを確認した |
+| `uv run pytest tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | 2 passed。unit_013〜019のcomplete recordにtodoと未完了checklistがなく、unit_018のTDD上のdeferredがmilestone 7 standaloneだけであることを確認した |
 | macOS実display acceptance | not run | 現在の作業環境にmacOS host / desktop sessionがない。offscreen CIはsource-level証拠であり、実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | Linux実display acceptance | not run | 現在の作業環境にLinux host / desktop sessionがない。X11 / Wayland、compositorを含む実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | `uv run pytest tests/unit -p no:cacheprovider` | passed | 197 passed。実行基盤では`.pytest_cache`のACLが終了時のcache保存だけを拒否するため、収集・実行範囲を変えずcache providerを無効化した |
 | `uv run pytest tests/integration -p no:cacheprovider` | passed | 59 passed。同じcache ACL制約下で、source / wheel GUI smokeを含むintegration全体を確認した |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
 | `git diff --check` | passed | whitespace errorなし |
-| Windows実display acceptance | partial | 2026-07-15のsource GUI。AW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hz。最大観測入力間隔は93ms、delta記録は画面上で確認できたように見えたとの利用者報告、画面端でもcapture継続、read failureなし、入力停止後にpreview停止、F12で停止、focus lossでneutralizeを確認した。割り当てはTabからCancelを選びSpace、接続設定はTabからCancelを選びEnter、色はTab後Escで閉じ、3 dialogとも表示を確認した。開始・終了時刻とpacket数、main windowの通常close結果は未記録 |
+| final completion gate | passed | `uv sync --dev`、`uv lock --check`、ruff format / lint、`ty`、unit 197件、offscreen integration 66件、`uv build`、`git diff --check`を2026-07-15に再実行した。integrationではWindowsのUTF-8出力とdisplay-free Qt実行のため`PYTHONUTF8=1`、`QT_QPA_PLATFORM=offscreen`を指定した |
+| Windows実display acceptance | passed | 2026-07-15のsource GUI。AW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hz。最大観測入力間隔は93ms、delta記録は画面上で確認できたように見えたとの利用者報告、画面端でもcapture継続、read failureなし、入力停止後にpreview停止、F12で停止、focus lossでneutralizeを確認した。割り当てはTabからCancelを選びSpace、接続設定はTabからCancelを選びEnter、色はTab後Escで閉じ、3 dialogとも表示を確認した。main windowの通常closeも利用者が確認した。開始・終了時刻とpacket数は未記録 |
 | `uv run python packaging/build.py` / standalone smoke | not run | 本unitの対象外。milestone 7で実行する |
 
 ## 10. 先送り事項
@@ -247,7 +248,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 - [x] 標準gateと対象integration testをすべて実行した
 - [x] `ty`でPySide6 / application / domainの型境界を確認した
 - [x] Windows、macOS、Linux source CIを確認した
-- [ ] Windows実display / DPI / font / focus / pointer captureを確認した
+- [x] Windows実display / DPI / font / focus / pointer captureを確認した
 - [x] macOS / Linuxの実行結果または未実行理由を記録した
 - [x] README、initial spec、diagnostics、license noticeを実装結果へ同期した
 - [x] current pyglet残存検索を実行した

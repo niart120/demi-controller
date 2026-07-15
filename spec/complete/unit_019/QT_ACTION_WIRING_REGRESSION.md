@@ -50,7 +50,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 - `spec/initial/testing.md`
 - `spec/complete/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
 - `spec/complete/unit_017/QT_RUNTIME_AND_LIFECYCLE_INTEGRATION.md`
-- `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md`
+- `spec/complete/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md`
 
 ## 5. 振る舞い仕様
 
@@ -88,8 +88,8 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | `src/demi/ui/toolbar.py` | modify | capture action の application callback 境界 |
 | `tests/integration/ui/test_qt_runtime_events.py` | modify | 既定 router bind の action-to-dialog 回帰試験 |
 | `tests/integration/ui/test_application_lifecycle.py` | modify / verify | Qt event-loop と shutdown の既存契約を回帰確認 |
-| `spec/wip/unit_019/QT_ACTION_WIRING_REGRESSION.md` | new / modify | TDD 状態、検証、Windows受入結果 |
-| `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` | modify | 修正後の Windows manual acceptance を記録 |
+| `spec/complete/unit_019/QT_ACTION_WIRING_REGRESSION.md` | new / modify | TDD 状態、検証、Windows受入結果 |
+| `spec/complete/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` | modify | 修正後の Windows manual acceptance を記録 |
 
 ## 9. 検証
 
@@ -119,7 +119,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 
 | 観測 | 先送り理由 | 後続の置き場 |
 |---|---|---|
-| macOS / Linux の実 display acceptance | この環境では対象 desktop がない | `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
+| macOS / Linux の実 display acceptance | この環境では対象 desktop がない | `spec/complete/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
 | standalone artifact の Qt plugin / license / clean-environment smoke | source UI action 配線とは別の artifact 課題 | milestone 7 standalone packaging unit |
 | 設定画面を含む視覚設計の妥当性とY軸反転の要件 | dialog表示の受入では、画面設計と入力意味論の要件を評価していない | `spec/dev-journal.md` の2026-07-15記録。次のwork unitで範囲を確定する |
 

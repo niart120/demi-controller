@@ -8,7 +8,10 @@ COMPLETED_UI_UNITS = (
     "unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md",
     "unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md",
     "unit_017/QT_RUNTIME_AND_LIFECYCLE_INTEGRATION.md",
+    "unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md",
+    "unit_019/QT_ACTION_WIRING_REGRESSION.md",
 )
+UNITS_WITH_DEFERRED_TDD = frozenset({"unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md"})
 
 
 def test_completed_ui_units_have_closed_tdd_lists_and_checklists() -> None:
@@ -21,20 +24,20 @@ def test_completed_ui_units_have_closed_tdd_lists_and_checklists() -> None:
         checklist = _section(record, "## 11. チェックリスト", None)
 
         assert "| todo |" not in tdd_list
-        assert "| deferred |" not in tdd_list
+        if relative_path not in UNITS_WITH_DEFERRED_TDD:
+            assert "| deferred |" not in tdd_list
         assert "- [ ]" not in checklist
 
 
-def test_unit_018_keeps_only_windows_manual_and_standalone_work_open() -> None:
-    """Avoid stale acceptance status after the source-level work is complete."""
+def test_unit_018_defers_only_standalone_packaging_work() -> None:
+    """Keep only the explicitly scoped standalone work deferred after acceptance."""
     root = Path(__file__).parents[2]
-    record = (root / "spec" / "wip" / "unit_018" / "QT_QUALITY_AND_OS_ACCEPTANCE.md").read_text(
-        encoding="utf-8"
-    )
+    record = (
+        root / "spec" / "complete" / "unit_018" / "QT_QUALITY_AND_OS_ACCEPTANCE.md"
+    ).read_text(encoding="utf-8")
     tdd_list = _section(record, "## 6. TDD Test List", "## 7.")
 
-    assert tdd_list.count("| todo |") == 1
-    assert "| todo | Windows実display" in tdd_list
+    assert "| todo |" not in tdd_list
     assert tdd_list.count("| deferred |") == 1
     assert "| deferred | standalone artifact" in tdd_list
     assert "| 3 OS source CI | not run |" not in record
