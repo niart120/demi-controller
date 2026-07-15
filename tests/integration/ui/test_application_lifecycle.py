@@ -6,11 +6,12 @@ import time
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
+from queue import Queue
 from threading import Thread, get_ident
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6.QtCore import QThread, QTimer
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QCloseEvent
 
 from demi.app import ApplicationDependencies, SystemClock, WindowSpec, run_application
@@ -84,6 +85,35 @@ class FakeRepository:
         self.saved.append(settings)
 
 
+@dataclass(frozen=True)
+class TimingEvent:
+    """One monotonic timestamp captured by the responsiveness probe."""
+
+    timestamp: float
+    stage: str
+    detail: str
+
+
+def _record_timing_event(
+    events: list[TimingEvent],
+    *,
+    stage: str,
+    detail: str,
+) -> None:
+    events.append(TimingEvent(time.monotonic(), stage, detail))
+
+
+def _format_timing_events(events: list[TimingEvent]) -> str:
+    if not events:
+        return "responsiveness timing trace: no events recorded"
+    origin = min(event.timestamp for event in events)
+    trace = "\n".join(
+        f"{event.timestamp - origin:.6f}s {event.stage}: {event.detail}"
+        for event in sorted(events, key=lambda event: event.timestamp)
+    )
+    return f"responsiveness timing trace:\n{trace}"
+
+
 @dataclass
 class ShellRuntime:
     """Runtime fake sufficient for a first empty Qt shell."""
@@ -130,37 +160,90 @@ class StartupEventRuntime(ShellRuntime):
 
 @dataclass
 class SlowRuntime(ShellRuntime):
-    """Runtime fake that performs each command on a separate delayed worker."""
+    """Runtime fake that processes delayed commands on one worker."""
 
     delay_seconds: float = 0.03
     event_sink: RuntimeEventSink | None = None
     workers: list[Thread] = field(default_factory=list)
+    timing_events: list[TimingEvent] = field(default_factory=list)
+    command_queue: Queue[ControllerCommand | None] = field(default_factory=Queue)
+
+    def start(self) -> None:
+        """Start the single delayed-command worker before accepting commands."""
+        if self.workers:
+            return
+        super().start()
+        worker = Thread(target=self._run_commands)
+        self.workers.append(worker)
+        worker.start()
 
     def post(self, command: ControllerCommand) -> None:
-        """Record one command and deliver its result after worker delay."""
+        """Record one command and enqueue it for the existing worker."""
         super().post(command)
         sink = self.event_sink
         if sink is None:
             raise RuntimeError
+        command_name = type(command).__name__
+        _record_timing_event(
+            self.timing_events,
+            stage="gui.runtime.post",
+            detail=command_name,
+        )
+        self.command_queue.put(command)
 
-        def emit_result() -> None:
+    def _run_commands(self) -> None:
+        """Process queued commands in order until shutdown."""
+        _record_timing_event(
+            self.timing_events,
+            stage="worker.start",
+            detail="SlowRuntime",
+        )
+        while (command := self.command_queue.get()) is not None:
+            sink = self.event_sink
+            if sink is None:
+                raise RuntimeError
+            command_name = type(command).__name__
+            _record_timing_event(
+                self.timing_events,
+                stage="worker.command.begin",
+                detail=command_name,
+            )
             time.sleep(self.delay_seconds)
+            _record_timing_event(
+                self.timing_events,
+                stage="worker.woke",
+                detail=command_name,
+            )
             if isinstance(command, DiscoverAdapters):
-                sink.emit(AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)))
-                sink.emit(ConnectionChanged(ConnectionState.READY))
+                self._emit_event(
+                    sink,
+                    AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)),
+                    "AdaptersDiscovered",
+                )
+                self._emit_event(
+                    sink, ConnectionChanged(ConnectionState.READY), "ConnectionChanged(READY)"
+                )
             elif isinstance(command, ConnectSaved):
-                sink.emit(
-                    ConnectionChanged(ConnectionState.CONNECTED, adapter_id=command.adapter_id)
+                self._emit_event(
+                    sink,
+                    ConnectionChanged(ConnectionState.CONNECTED, adapter_id=command.adapter_id),
+                    "ConnectionChanged(CONNECTED)",
                 )
             elif isinstance(command, Disconnect):
-                sink.emit(ConnectionChanged(ConnectionState.READY))
+                self._emit_event(
+                    sink, ConnectionChanged(ConnectionState.READY), "ConnectionChanged(READY)"
+                )
 
-        worker = Thread(target=emit_result)
-        self.workers.append(worker)
-        worker.start()
+    def _emit_event(self, sink: RuntimeEventSink, event: RuntimeEvent, detail: str) -> None:
+        """Send one result and record its worker-side queue boundary."""
+        _record_timing_event(self.timing_events, stage="worker.emit.begin", detail=detail)
+        sink.emit(event)
+        _record_timing_event(self.timing_events, stage="worker.emit.end", detail=detail)
 
     def close(self) -> None:
         """Join all delayed workers before recording shutdown."""
+        if self.workers:
+            self.command_queue.put(None)
         for worker in self.workers:
             worker.join()
         super().close()
@@ -202,6 +285,27 @@ class CountingMainWindow(MainWindow):
         """Count the one input/timer cleanup before using the standard teardown."""
         self.input_teardown_calls += 1
         super()._remove_input_filters()
+
+
+class TimingMainWindow(MainWindow):
+    """Main window that timestamps each refresh in the responsiveness probe."""
+
+    def __init__(self, spec: WindowSpec, *, timing_events: list[TimingEvent]) -> None:
+        """Create a window that records refresh timing.
+
+        Args:
+            spec: Window dimensions used by the application composition root.
+            timing_events: Shared ordered observations for the responsiveness probe.
+        """
+        self._timing_events = timing_events
+        super().__init__(spec)
+
+    def refresh(self, snapshot: ApplicationUiSnapshot) -> None:
+        """Record refresh bounds before applying the standard rendering path."""
+        detail = snapshot.connection_state.name
+        _record_timing_event(self._timing_events, stage="gui.refresh.begin", detail=detail)
+        super().refresh(snapshot)
+        _record_timing_event(self._timing_events, stage="gui.refresh.end", detail=detail)
 
 
 class ThreadTrackingMainWindow(MainWindow):
@@ -1019,7 +1123,8 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
         connection=replace(AppSettings.default().connection, adapter_id="usb:0"),
     )
     repository = ShellRepository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED))
-    runtime = SlowRuntime()
+    timing_events: list[TimingEvent] = []
+    runtime = SlowRuntime(timing_events=timing_events)
     runner = QtApplicationRunner()
     paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
     tick_times: list[float] = []
@@ -1034,6 +1139,8 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
     ) -> QtApplicationRunner:
         runner.configure(window=window, on_shutdown_requested=on_shutdown_requested)
         timer = QTimer(window)
+        timer.setTimerType(Qt.TimerType.PreciseTimer)
+        assert timer.timerType() is Qt.TimerType.PreciseTimer
         timer.setInterval(10)
         phase = 0
 
@@ -1041,11 +1148,36 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
             nonlocal phase
             tick_times.append(time.monotonic())
             connection_state = session.presentation.model.connection_state
+            _record_timing_event(
+                timing_events,
+                stage="gui.timer.tick",
+                detail=f"phase={phase}, state={connection_state.name}",
+            )
             if phase == 0 and connection_state is ConnectionState.READY:
+                _record_timing_event(
+                    timing_events,
+                    stage="gui.connection_action.begin",
+                    detail="connect",
+                )
                 session.connection_action()
+                _record_timing_event(
+                    timing_events,
+                    stage="gui.connection_action.end",
+                    detail="connect",
+                )
                 phase = 1
             elif phase == 1 and connection_state is ConnectionState.CONNECTED:
+                _record_timing_event(
+                    timing_events,
+                    stage="gui.connection_action.begin",
+                    detail="disconnect",
+                )
                 session.connection_action()
+                _record_timing_event(
+                    timing_events,
+                    stage="gui.connection_action.end",
+                    detail="disconnect",
+                )
                 phase = 2
             elif phase == 2 and connection_state is ConnectionState.READY:
                 timer.stop()
@@ -1076,7 +1208,7 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
         paths_resolver=lambda: paths,
         repository_factory=lambda _paths: repository,
         runtime_factory=create_runtime,
-        window_factory=runner.create_main_window,
+        window_factory=lambda spec: TimingMainWindow(spec, timing_events=timing_events),
         gui_factory=create_gui,
         clock=SystemClock(),
         logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-qt-slow-runtime"),
@@ -1089,5 +1221,8 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
         ConnectSaved,
         Disconnect,
     ]
+    assert len(runtime.workers) == 1
+    assert not runtime.workers[0].is_alive()
     assert len(tick_times) >= 4
-    assert max(later - earlier for earlier, later in pairwise(tick_times)) < 0.1
+    max_tick_gap = max(later - earlier for earlier, later in pairwise(tick_times))
+    assert max_tick_gap < 0.1, _format_timing_events(timing_events)
