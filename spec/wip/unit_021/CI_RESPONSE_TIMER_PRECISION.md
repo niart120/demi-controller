@@ -90,7 +90,7 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 
 ## 10. 先送り事項
 
-- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。短命workerを持続workerへ近づける仮説は `spec/wip/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` で扱う。
+- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。短命workerを持続workerへ近づける仮説は `spec/complete/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` で5回連続成功した。
 - 実Bluetooth接続中の100ミリ秒応答性はhardware acceptanceで扱う。
 
 ## 11. チェックリスト

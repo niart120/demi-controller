@@ -58,11 +58,11 @@ CI の応答性 probe で、GUI スレッドが command ごとに新しい worke
 |---|---|---|---|---|
 | green | 応答性 probe は3 command を処理しても worker を1本だけ使い、shutdown後にそのworkerを終了する | regression | integration | redで短命workerが3本になることを確認し、greenで1本かつ停止済みを確認 |
 | green | 持続 worker 化後も接続・切断シーケンスと100ミリ秒判定を維持する | regression | integration | Windows offscreenで対象 test を20回連続実行して成功 |
-| todo | macOS / Python 3.12 CI が持続 worker 化後の応答性 probe を通過する | regression | integration | remote CIで確認する |
+| green | macOS / Python 3.12 CI が持続 worker 化後の応答性 probe を通過する | regression | integration | GitHub Actions run 29428003192 の初回と4回のjob再実行で連続成功 |
 
 ## 7. 設計メモ
 
-これは production の遅延を直接測定した結論ではない。`SlowRuntime` の短命workerは、本番 `ControllerRuntime` の dedicated worker と queue に一致しないという事実に基づく、test fake の代表性とGUI側の起動負荷を改善する仮説である。macOSの結果で効果を確認できなければ、unit_021 の時刻列を再発時に使う。
+これは production の遅延を直接測定した結論ではない。`SlowRuntime` の短命workerは、本番 `ControllerRuntime` の dedicated worker と queue に一致しないという事実に基づく、test fake の代表性とGUI側の起動負荷を改善する仮説である。macOS / Python 3.12 で5回連続成功したため、この限定したCI条件では仮説を支持する。再発時は unit_021 の時刻列を使う。
 
 | Test Desiderata | 判断 | 根拠 |
 |---|---|---|
@@ -86,12 +86,11 @@ CI の応答性 probe で、GUI スレッドが command ごとに新しい worke
 | `uv run ruff format --check tests/integration/ui/test_application_lifecycle.py` / `uv run ruff check tests/integration/ui/test_application_lifecycle.py` / `uv run ty check --no-progress` | passed | 対象fileのformat/lintと全体型検査が通過 |
 | `uv run pytest tests/unit` / `$env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/integration` | passed | unit 197 passed、integration 67 passed |
 | `uv build` / `git diff --check` | passed | sdistとwheelを生成、whitespace errorなし |
-| macOS / Python 3.12 CI | not run | branchへpush後に確認する |
+| GitHub Actions run 29428003192 の macOS / Python 3.12 | passed | 初回と4回のjob再実行が連続成功し、合計5回で100ミリ秒判定を通過 |
 
 ## 10. 先送り事項
 
-- 持続 worker 化後もmacOS CIが失敗した場合は、unit_021 の時刻列を取得してworker起床、bridge配送、GUI refreshの待機箇所を分類する。
-- 実Bluetooth接続中の100ミリ秒応答性はhardware acceptanceで扱う。
+- none
 
 ## 11. チェックリスト
 
