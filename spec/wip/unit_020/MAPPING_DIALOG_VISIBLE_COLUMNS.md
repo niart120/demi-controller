@@ -57,7 +57,7 @@
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-skipped | 既定profileのmapping dialogは、4列見出しと既定の最長可視値を各列内へ収める | regression | integration | redでは既存の対象列が100pxで、最長値に228px必要なため失敗。greenでは最初の3列を標準headerのcontent-aware sizingにし、競合列を余り幅へ伸長した。追加の構造変更は不要 |
-| todo | Windows displayで取得したmapping dialog画像に、反転見出しと`いいえ`が切れず表示される | regression | manual | `tmp/ui-audit`のgit管理外画像を確認する |
+| refactor-skipped | Windows displayで取得したmapping dialog画像に、反転見出しと`いいえ`が切れず表示される | regression | manual | Qt widget grabでmain windowと3 dialogを再取得し、mappingの4列見出し、`いいえ`、Save / Cancelを確認した。`ApplicationDependencies.default()`を通すsource compositionでも同じmapping画像を取得した。追加の構造変更は不要 |
 
 ## 7. 設計メモ
 
@@ -77,7 +77,8 @@
 |---|---|---|
 | `uv run pytest tests/integration/ui/test_mapping_dialog.py::test_mapping_dialog_shows_default_columns_without_text_clipping -q -p no:cacheprovider` | passed | redでは対象列が100px、最長既定文字列に228px必要と検出。greenでは1 passed、全列が見出しと既定値を収め、横scrollなし |
 | `uv run ruff format --check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ruff check src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py` / `uv run ty check --no-progress` | passed | formatting、lint、型検査が通過 |
-| Windows Qt widget screenshot audit | not run | main windowと3 dialogを再確認する |
+| `DEMI_QT_TEST_CLOSE_AFTER_MS=250; uv run demi` | passed | Windows displayでsource GUIを起動し、250ms後の通常closeでstatus 0 |
+| Windows Qt widget screenshot audit | passed | `tmp/ui-audit`のgit管理外画像で960 x 640 main window、mapping、connection、colors dialogを確認。source compositionではproductionの`ApplicationDependencies.default()`とfake runtimeを使い、main windowとmapping dialogの画像を再取得した。Computer Use native pipeは2回とも`os error 2`で未接続 |
 | standard gate | not run | 実装後に実行する |
 
 ## 10. 先送り事項
