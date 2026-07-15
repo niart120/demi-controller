@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
+from queue import Queue
 from threading import Thread, get_ident
 from typing import TYPE_CHECKING
 
@@ -159,15 +160,25 @@ class StartupEventRuntime(ShellRuntime):
 
 @dataclass
 class SlowRuntime(ShellRuntime):
-    """Runtime fake that performs each command on a separate delayed worker."""
+    """Runtime fake that processes delayed commands on one worker."""
 
     delay_seconds: float = 0.03
     event_sink: RuntimeEventSink | None = None
     workers: list[Thread] = field(default_factory=list)
     timing_events: list[TimingEvent] = field(default_factory=list)
+    command_queue: Queue[ControllerCommand | None] = field(default_factory=Queue)
+
+    def start(self) -> None:
+        """Start the single delayed-command worker before accepting commands."""
+        if self.workers:
+            return
+        super().start()
+        worker = Thread(target=self._run_commands)
+        self.workers.append(worker)
+        worker.start()
 
     def post(self, command: ControllerCommand) -> None:
-        """Record one command and deliver its result after worker delay."""
+        """Record one command and enqueue it for the existing worker."""
         super().post(command)
         sink = self.event_sink
         if sink is None:
@@ -178,11 +189,23 @@ class SlowRuntime(ShellRuntime):
             stage="gui.runtime.post",
             detail=command_name,
         )
+        self.command_queue.put(command)
 
-        def emit_result() -> None:
+    def _run_commands(self) -> None:
+        """Process queued commands in order until shutdown."""
+        _record_timing_event(
+            self.timing_events,
+            stage="worker.start",
+            detail="SlowRuntime",
+        )
+        while (command := self.command_queue.get()) is not None:
+            sink = self.event_sink
+            if sink is None:
+                raise RuntimeError
+            command_name = type(command).__name__
             _record_timing_event(
                 self.timing_events,
-                stage="worker.start",
+                stage="worker.command.begin",
                 detail=command_name,
             )
             time.sleep(self.delay_seconds)
@@ -192,61 +215,35 @@ class SlowRuntime(ShellRuntime):
                 detail=command_name,
             )
             if isinstance(command, DiscoverAdapters):
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.begin",
-                    detail="AdaptersDiscovered",
+                self._emit_event(
+                    sink,
+                    AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)),
+                    "AdaptersDiscovered",
                 )
-                sink.emit(AdaptersDiscovered((AdapterDescriptor("usb:0", "USB Adapter", "usb"),)))
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.end",
-                    detail="AdaptersDiscovered",
-                )
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.begin",
-                    detail="ConnectionChanged(READY)",
-                )
-                sink.emit(ConnectionChanged(ConnectionState.READY))
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.end",
-                    detail="ConnectionChanged(READY)",
+                self._emit_event(
+                    sink, ConnectionChanged(ConnectionState.READY), "ConnectionChanged(READY)"
                 )
             elif isinstance(command, ConnectSaved):
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.begin",
-                    detail="ConnectionChanged(CONNECTED)",
-                )
-                sink.emit(
-                    ConnectionChanged(ConnectionState.CONNECTED, adapter_id=command.adapter_id)
-                )
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.end",
-                    detail="ConnectionChanged(CONNECTED)",
+                self._emit_event(
+                    sink,
+                    ConnectionChanged(ConnectionState.CONNECTED, adapter_id=command.adapter_id),
+                    "ConnectionChanged(CONNECTED)",
                 )
             elif isinstance(command, Disconnect):
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.begin",
-                    detail="ConnectionChanged(READY)",
-                )
-                sink.emit(ConnectionChanged(ConnectionState.READY))
-                _record_timing_event(
-                    self.timing_events,
-                    stage="worker.emit.end",
-                    detail="ConnectionChanged(READY)",
+                self._emit_event(
+                    sink, ConnectionChanged(ConnectionState.READY), "ConnectionChanged(READY)"
                 )
 
-        worker = Thread(target=emit_result)
-        self.workers.append(worker)
-        worker.start()
+    def _emit_event(self, sink: RuntimeEventSink, event: RuntimeEvent, detail: str) -> None:
+        """Send one result and record its worker-side queue boundary."""
+        _record_timing_event(self.timing_events, stage="worker.emit.begin", detail=detail)
+        sink.emit(event)
+        _record_timing_event(self.timing_events, stage="worker.emit.end", detail=detail)
 
     def close(self) -> None:
         """Join all delayed workers before recording shutdown."""
+        if self.workers:
+            self.command_queue.put(None)
         for worker in self.workers:
             worker.join()
         super().close()
@@ -1224,6 +1221,8 @@ def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(
         ConnectSaved,
         Disconnect,
     ]
+    assert len(runtime.workers) == 1
+    assert not runtime.workers[0].is_alive()
     assert len(tick_times) >= 4
     max_tick_gap = max(later - earlier for earlier, later in pairwise(tick_times))
     assert max_tick_gap < 0.1, _format_timing_events(timing_events)

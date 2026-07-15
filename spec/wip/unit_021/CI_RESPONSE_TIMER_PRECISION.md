@@ -55,8 +55,8 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| partial | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | Windows offscreenで20回連続成功。macOS 3.12では2回成功後、`PreciseTimer`設定済みで187.0msに再発したため、timer種別だけでは不十分 |
-| todo | macOS CIの失敗時にworker送出、GUI操作、refreshの時刻順を出力する | diagnostic regression | integration | productionの実行経路は変えず、assertion messageだけに観測結果を載せる |
+| deferred | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | Windows offscreenで20回連続成功。macOS 3.12では2回成功後、`PreciseTimer`設定済みで187.0msに再発したため、timer種別だけでは不十分 |
+| deferred | macOS CIの失敗時にworker送出、GUI操作、refreshの時刻順を出力する | diagnostic regression | integration | productionの実行経路は変えず、assertion messageだけに観測結果を載せる。診断付きheadはmacOS 3.12で5回連続成功し、再発時の時刻列は未取得 |
 
 ## 7. 設計メモ
 
@@ -86,10 +86,11 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 | `uv run pytest tests/unit` / `$env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/integration` | passed | unit 197 passed、integration 67 passed |
 | `uv build` / `git diff --check` | passed | sdistとwheelを生成、whitespace errorなし |
 | GitHub Actions run 29425872544 の macOS / Python 3.12 | failed | 精密timer化後の1回目と2回目は成功、3回目は最大187.0msで失敗 |
+| GitHub Actions run 29426911304 の macOS / Python 3.12 | passed | 時刻列を追加したheadで初回と4回のjob再実行が連続成功。失敗時の時刻列は未取得 |
 
 ## 10. 先送り事項
 
-- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。
+- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。短命workerを持続workerへ近づける仮説は `spec/wip/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` で扱う。
 - 実Bluetooth接続中の100ミリ秒応答性はhardware acceptanceで扱う。
 
 ## 11. チェックリスト
