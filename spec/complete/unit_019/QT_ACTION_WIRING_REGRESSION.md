@@ -70,7 +70,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | refactor-skipped | connection dialog の再検索、保存接続、pairing 確認 / 取消は既存 session action を通り、画面状態を更新する | regression | integration | `DiscoverAdapters`、pairing confirmationから編集dialogへの復帰、`ConnectSaved`をrouter bind経路で確認した。dialog factoryとsession callbackの構造は前itemで確定しており、追加refactorは不要 |
 | refactor-skipped | colors dialog の preview、取消、保存後の再接続選択は session と preview widget を同期する | regression | integration | previewへ`#ABCDEF`を反映し、取消で保存色へ戻す。接続中の保存後に「後で」はreconnect保留を解除し、「再接続する」は`RecreateWithColors`を発行する。前itemのfactory callbackで完結しており、追加refactorは不要 |
 | refactor-skipped | 接続と入力開始の toolbar action は既定の router bind から session action を呼び、snapshot を更新する | regression | integration | 接続済み設定では`ConnectSaved` / `Disconnect`、入力開始ではcapture stateとtoolbar checked stateを確認した。未設定の接続操作ではsessionが作ったconnection draftを既存factoryが再利用してdialogを表示し、Cancel後に状態を閉じる。callback配線以外の構造変更は不要 |
-| todo | 修正後の source GUI で設定 dialog を実 Windows display から開閉し、Tab / Enter / Space / Esc を記録する | manual | manual | unit_018 の未完了 acceptance を再実行する |
+| refactor-skipped | 修正後の source GUI で設定 dialog を実 Windows display から開閉し、Tab / Enter / Space / Esc を記録する | manual | manual | 2026-07-15のWindows source GUIで、割り当てはTabからCancelを選びSpace、接続設定はTabからCancelを選びEnter、色はTab後Escで閉じ、3 dialogとも表示を確認した。visual designの妥当性とY軸反転要件は本unitの対象外として`spec/dev-journal.md`へ分離した |
 
 ## 7. 設計メモ
 
@@ -113,7 +113,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | `$env:PYTHONUTF8='1'; $env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/unit -q -p no:cacheprovider --basetemp "$env:TEMP\demi-pytest-unit-elevated"` | passed | 197 passed。既定の`pytest-of-train`は既存 ACL で利用できないため、隔離一時領域を明示した |
 | `$env:PYTHONUTF8='1'; $env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp "$env:TEMP\demi-pytest-full-elevated"` | passed | 66 passed。wheel smoke は通常の Windows 権限で隔離一時領域と uv cache を使用した |
 | `uv build` / `git diff --check` | passed | source distribution と wheel を生成し、差分の空白エラーなしを確認した |
-| Windows実 display acceptance | not run | 修正後に利用者と再実行する |
+| Windows実 display acceptance | passed | 2026-07-15のsource GUIで、割り当て、接続設定、色の3 dialogが表示され、Tab / Space、Tab / Enter、Tab / Escで安全に閉じることを利用者が確認した |
 
 ## 10. 先送り事項
 
@@ -121,6 +121,7 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 |---|---|---|
 | macOS / Linux の実 display acceptance | この環境では対象 desktop がない | `spec/wip/unit_018/QT_QUALITY_AND_OS_ACCEPTANCE.md` |
 | standalone artifact の Qt plugin / license / clean-environment smoke | source UI action 配線とは別の artifact 課題 | milestone 7 standalone packaging unit |
+| 設定画面を含む視覚設計の妥当性とY軸反転の要件 | dialog表示の受入では、画面設計と入力意味論の要件を評価していない | `spec/dev-journal.md` の2026-07-15記録。次のwork unitで範囲を確定する |
 
 ## 11. チェックリスト
 
@@ -129,4 +130,4 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 - [x] TDD Test List を更新した
 - [x] 全設定 action と通常 toolbar action の本番配線を確認した
 - [x] targeted test と standard gate を記録した
-- [ ] Windows実 display acceptance を再実行した
+- [x] Windows実 display acceptance を再実行した

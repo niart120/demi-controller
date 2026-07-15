@@ -109,7 +109,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | refactor-skipped | Windows、macOS、Linux CIでdependency install、display-free import / version、offscreen Qt、unit / integration、buildが成功する | regression | package | workflow contractで3 OS、Python 3.12 / 3.13、offscreen Qt、unit / integration / buildを固定し、PR #22の6 job成功をsource-level証拠として記録した。追加refactorは不要 |
 | refactor-skipped | source checkoutの`demi`、`project-demi`、`python -m demi`は同じQt runnerを起動し、test用timerで正常closeできる | regression | integration | `DEMI_QT_TEST_CLOSE_AFTER_MS`が有効な整数の場合だけrunnerが通常の`window.close()`を予約する。3 entry pointをoffscreen subprocessで起動してstatus 0を確認し、通常CLI引数は追加しなかったため、追加refactorは不要 |
 | refactor-skipped | clean環境へwheelをinstallするとPySide6 dependencyが解決され、GUI起動 / closeとversion表示が成功する | regression | package | temporary venvへlocal wheelだけをinstallし、親sourceの`PYTHONPATH`を除外してPySide6 import、`python -m demi --version`、offscreen Qt起動 / closeを確認した。standalone artifactは対象外のため、追加refactorは不要 |
-| todo | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | OS / scale / mouse / screenを記録する |
+| todo | Windows実displayでwindow、DPI、font、focus、Tab / Enter / Space / Esc、dialog、capture、F12、画面端、closeを確認する | new | manual | 2026-07-15にAW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hzで、capture、F12、画面端、focus loss、3設定dialogとkeyboard操作を確認した。main windowの通常close結果はこの受入記録では未報告のため、itemは継続する |
 | refactor-skipped | macOS実displayでwindow、DPI、font、focus、pointer capability、closeを確認するか、未実行理由と制約を記録する | new | manual | 現在の作業環境にmacOS host / desktop sessionがないため未実行。OS版、display scale、font、native focus、pointer capability、closeの実画面証拠は取得していない。macOS CIのoffscreen成功を実display acceptanceと扱わず、macOS desktop環境での後続受入が必要 |
 | refactor-skipped | Linux実displayでX11 / Waylandを明記し、window、DPI、font、focus、pointer capability、closeを確認するか、未実行理由を記録する | new | manual | 現在の作業環境にLinux host / desktop sessionがないため未実行。X11 / Wayland、compositor、OS版、display scale、font、native focus、pointer capability、closeを取得していない。Linux CIのoffscreen成功を実display acceptanceと扱わず、対象desktopでの後続受入が必要 |
 | refactor-skipped | 8ms入力評価の平均 / 95 / 99、preview最大60Hz、100ms GUI応答性、250ms watchdog誤発火を診断値で確認する | characterization | integration | `InputPublisher.timing_metrics`が最大512件の正の評価間隔から平均、nearest-rank p95 / p99を出す。fake clockの8 / 8 / 16 / 8 / 8msで平均9.6ms、p95 / p99 16msを確認し、preview 60Hz、slow runtime中の100ms未満probe、250ms未満watchdog非発火を既存統合 / unit testで再確認した。これはdesktop OSの実時間保証ではないため、追加refactorは不要 |
@@ -229,7 +229,7 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run pytest tests/integration -p no:cacheprovider` | passed | 59 passed。同じcache ACL制約下で、source / wheel GUI smokeを含むintegration全体を確認した |
 | `uv build` | passed | `demi_controller-0.1.0.tar.gz` と `demi_controller-0.1.0-py3-none-any.whl` を生成 |
 | `git diff --check` | passed | whitespace errorなし |
-| Windows実display acceptance | not run | PySide6 UI実装後に対象Windows desktopで実行する |
+| Windows実display acceptance | partial | 2026-07-15のsource GUI。AW2725QF、2560×1440、DPR 1.5、150%、mouse polling rate 1000Hz。最大観測入力間隔は93ms、delta記録は画面上で確認できたように見えたとの利用者報告、画面端でもcapture継続、read failureなし、入力停止後にpreview停止、F12で停止、focus lossでneutralizeを確認した。割り当てはTabからCancelを選びSpace、接続設定はTabからCancelを選びEnter、色はTab後Escで閉じ、3 dialogとも表示を確認した。開始・終了時刻とpacket数、main windowの通常close結果は未記録 |
 | `uv run python packaging/build.py` / standalone smoke | not run | 本unitの対象外。milestone 7で実行する |
 
 ## 10. 先送り事項
