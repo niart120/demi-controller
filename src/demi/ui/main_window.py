@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QTimer
@@ -19,6 +20,7 @@ from demi.input.relative_pointer import (
     RelativePointerCapability,
     RelativePointerQuality,
 )
+from demi.platform.windows_mouse_hook import WindowsMouseInputSuppressor
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
 from demi.ui.dialogs.connection import ConnectionDialog
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 type ShutdownCallback = Callable[[WindowSettings | None], bool]
 type RelativePointerBackend = WindowsRawInputBackend | QtRelativePointerBackend
 type SettingsDialogFactory = Callable[[QWidget], QDialog | None]
+type InputStateChangedCallback = Callable[[], object]
 
 
 class MainWindow(QMainWindow):
@@ -98,7 +101,9 @@ class MainWindow(QMainWindow):
         self._shutdown_started = False
         self._input_application: QApplication | None = None
         self._input_adapter: QtInputAdapter | None = None
+        self._input_state_changed_callback: InputStateChangedCallback | None = None
         self._native_input_filter: WindowsRawInputBackend | None = None
+        self._mouse_input_suppressor: WindowsMouseInputSuppressor | None = None
         self._relative_pointer_backend: RelativePointerBackend | None = None
         self._input_coordinator: CaptureCoordinator | None = None
         self._input_evaluation_interval_ms: int | None = None
@@ -127,6 +132,15 @@ class MainWindow(QMainWindow):
         """
         self._shutdown_callback = callback
 
+    def set_input_state_changed_callback(self, callback: InputStateChangedCallback | None) -> None:
+        """Set the GUI refresh request invoked after an input-state transition.
+
+        Args:
+            callback: Refreshes the application snapshot after F12, focus, or
+                dialog input changes; ``None`` disables the notification.
+        """
+        self._input_state_changed_callback = callback
+
     def begin_shutdown(self) -> None:
         """Stop UI-owned callbacks and close the active dialog once."""
         if self._shutdown_started:
@@ -148,9 +162,22 @@ class MainWindow(QMainWindow):
         if enabled:
             self.grabMouse()
             self.setCursor(Qt.CursorShape.BlankCursor)
+            suppressor = self._mouse_input_suppressor
+            try:
+                if suppressor is not None:
+                    suppressor.start()
+            except OSError:
+                self.releaseMouse()
+                self.unsetCursor()
+                raise
             return
-        self.releaseMouse()
-        self.unsetCursor()
+        try:
+            suppressor = self._mouse_input_suppressor
+            if suppressor is not None:
+                suppressor.stop()
+        finally:
+            self.releaseMouse()
+            self.unsetCursor()
 
     @property
     def relative_pointer_capability(self) -> RelativePointerCapability:
@@ -279,6 +306,7 @@ class MainWindow(QMainWindow):
         publisher: InputPublisher,
         coordinator: CaptureCoordinator,
         raw_input_backend: WindowsRawInputBackend | None = None,
+        mouse_input_suppressor: WindowsMouseInputSuppressor | None = None,
     ) -> None:
         """Install the Qt and native input filters owned by this main window.
 
@@ -286,6 +314,8 @@ class MainWindow(QMainWindow):
             publisher: Receives normalized pointer movement for input evaluation.
             coordinator: Owns capture, neutralization, and failure transitions.
             raw_input_backend: Optional injectable Win32 backend for tests.
+            mouse_input_suppressor: Optional injectable Windows mouse-delivery
+                suppressor for tests.
 
         Raises:
             RuntimeError: If input was already configured or QApplication is absent.
@@ -314,13 +344,21 @@ class MainWindow(QMainWindow):
             application.installNativeEventFilter(backend)
             self._native_input_filter = backend
             self._relative_pointer_backend = backend
+        if mouse_input_suppressor is not None:
+            self._mouse_input_suppressor = mouse_input_suppressor
+        elif sys.platform == "win32":
+            self._mouse_input_suppressor = WindowsMouseInputSuppressor(
+                on_button_pressed=publisher.state.press_mouse_button,
+                on_button_released=publisher.state.release_mouse_button,
+            )
+        self._input_coordinator = coordinator
         adapter = QtInputAdapter(
             state=publisher.state,
             is_captured=lambda: coordinator.is_captured,
-            on_stop_capture=coordinator.stop_capture,
-            on_focus_lost=coordinator.on_focus_lost,
-            on_focus_gained=coordinator.on_focus_gained,
-            on_dialog_opened=coordinator.open_configuration,
+            on_stop_capture=self._stop_input_capture,
+            on_focus_lost=self._handle_input_focus_loss,
+            on_focus_gained=self._handle_input_focus_gain,
+            on_dialog_opened=self._open_input_configuration,
             capture_epoch=lambda: coordinator.capture_epoch,
             on_relative_position=self._handle_relative_position,
             is_focus_event_target=lambda watched: watched is self,
@@ -328,7 +366,6 @@ class MainWindow(QMainWindow):
         application.installEventFilter(adapter)
         self._input_application = application
         self._input_adapter = adapter
-        self._input_coordinator = coordinator
         self._input_evaluation_interval_ms = publisher.evaluation_interval_ms
         self._input_evaluation_timer.setInterval(self._input_evaluation_interval_ms)
         self._input_evaluation_timer.start()
@@ -421,6 +458,30 @@ class MainWindow(QMainWindow):
         if isinstance(backend, QtRelativePointerBackend):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
 
+    def _stop_input_capture(self) -> None:
+        self._run_input_transition(lambda coordinator: coordinator.stop_capture())
+
+    def _handle_input_focus_loss(self) -> None:
+        self._run_input_transition(lambda coordinator: coordinator.on_focus_lost())
+
+    def _handle_input_focus_gain(self) -> None:
+        self._run_input_transition(lambda coordinator: coordinator.on_focus_gained())
+
+    def _open_input_configuration(self) -> None:
+        self._run_input_transition(lambda coordinator: coordinator.open_configuration())
+
+    def _run_input_transition(
+        self,
+        transition: Callable[[CaptureCoordinator], object],
+    ) -> None:
+        coordinator = self._input_coordinator
+        if coordinator is None:
+            return
+        transition(coordinator)
+        callback = self._input_state_changed_callback
+        if callback is not None:
+            callback()
+
     def _open_settings_dialog(self, factory: SettingsDialogFactory | None) -> None:
         if self._shutdown_started or factory is None or self._active_settings_dialog is not None:
             return
@@ -464,6 +525,10 @@ class MainWindow(QMainWindow):
         return backend
 
     def _remove_input_filters(self) -> None:
+        suppressor = self._mouse_input_suppressor
+        if suppressor is not None:
+            with suppress(OSError):
+                suppressor.stop()
         self._input_evaluation_timer.stop()
         self._input_evaluation_interval_ms = None
         self._input_coordinator = None

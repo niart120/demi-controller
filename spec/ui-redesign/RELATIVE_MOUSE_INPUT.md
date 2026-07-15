@@ -153,6 +153,17 @@ dialog や preview widget が個別に登録してはならない。
 - absolute mouse flag の入力を relative delta として解釈しない。
 - mouse device ごとの値を統合する現行仕様とし、device 分離は後続候補にする。
 
+### 7.4 外部ウィンドウへのマウス配送
+
+`QWidget.grabMouse()` とWin32 `SetCapture` は、別スレッドのウィンドウへのクリックを防ぐ契約ではない。
+WindowsでDemiが前面かつ捕捉中は、`WH_MOUSE_LL` の専用backendがマウス移動、ボタン、ホイールを抑止する。
+このbackendはRaw Inputの代替ではない。Raw Inputは未加速relative motionを読み、low-level hookは外部配送の抑止と
+マウスボタンsourceの更新だけを担当する。
+
+hook callbackはGUIスレッドのmessage loopで短時間に終え、Qt API、設定保存、controller runtimeを呼ばない。F12、focus loss、
+dialog open、shutdownではhookを無効化してから解除を試みる。hookの登録に失敗した捕捉は開始せず、callbackが入力を
+永続的に抑止する状態を作らない。
+
 ## 8. macOS と Linux
 
 ### 8.1 macOS

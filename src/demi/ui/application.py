@@ -135,6 +135,7 @@ class QtApplicationEventRouter:
         if not self._active:
             return
         self._session = session
+        self._window.set_input_state_changed_callback(self.refresh)
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
         self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
@@ -147,6 +148,7 @@ class QtApplicationEventRouter:
     def deactivate(self) -> None:
         """Drop queued runtime callbacks after application shutdown begins."""
         self._active = False
+        self._window.set_input_state_changed_callback(None)
         self._session = None
         self._runtime_stopped_handler = None
 

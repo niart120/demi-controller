@@ -3,7 +3,8 @@ from pathlib import Path
 from threading import Thread, get_ident
 
 import pytest
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QCoreApplication, QObject, Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
@@ -35,6 +36,7 @@ from demi.controller.events import (
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
+from demi.platform.windows_mouse_hook import WindowsMouseInputSuppressor
 from demi.ui.application import QtApplicationEventRouter
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
@@ -111,6 +113,24 @@ class _PointerCapture:
         self.enabled.append(enabled)
 
 
+@dataclass
+class _MouseHookRegistrar:
+    """Provide a no-op low-level hook boundary for GUI route tests."""
+
+    handles: list[int] = field(default_factory=list)
+
+    def install(self, callback: object) -> int:
+        """Record an installed callback without touching desktop input."""
+        del callback
+        handle = len(self.handles) + 1
+        self.handles.append(handle)
+        return handle
+
+    def remove(self, handle: int) -> None:
+        """Record removal by dropping the supplied hook handle."""
+        self.handles.remove(handle)
+
+
 class _RecordingMainWindow(MainWindow):
     """Main window that records every widget refresh thread."""
 
@@ -122,6 +142,48 @@ class _RecordingMainWindow(MainWindow):
         """Record the GUI thread before applying the standard refresh."""
         self.refresh_threads.append(get_ident())
         super().refresh(snapshot)
+
+
+def test_f12_capture_release_refreshes_the_bound_toolbar(
+    qt_application: QApplication,
+) -> None:
+    """Keep F12 capture release consistent with the toolbar action state."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=window,
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    window.configure_input(
+        publisher=coordinator.publisher,
+        coordinator=coordinator,
+        mouse_input_suppressor=WindowsMouseInputSuppressor(registrar=_MouseHookRegistrar()),
+    )
+
+    window.main_toolbar.capture_action.trigger()
+    assert coordinator.app_state is AppState.CAPTURED
+    assert window.main_toolbar.capture_action.text() == "入力解除"
+    assert window.main_toolbar.capture_action.isChecked()
+
+    QCoreApplication.sendEvent(
+        window,
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
+    )
+    qt_application.processEvents()
+
+    assert coordinator.app_state is AppState.IDLE
+    assert window.main_toolbar.capture_action.text() == "入力開始"
+    assert not window.main_toolbar.capture_action.isChecked()
 
 
 @pytest.mark.parametrize(
