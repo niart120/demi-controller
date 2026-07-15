@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QHeaderView,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -201,6 +202,10 @@ class MappingDialog(QDialog):
         self.table.setModel(self._mapping_model)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table_header = self.table.horizontalHeader()
+        for column in range(3):
+            table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.capture_button = QPushButton("次の入力を取得", self)
         self.capture_label = QLabel("入力を取得していません", self)
         self.inverted_checkbox = QCheckBox("反転", self)
@@ -220,6 +225,8 @@ class MappingDialog(QDialog):
         layout.addWidget(self.save_error_label)
         layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
+        self.setMinimumSize(640, 520)
+        self.resize(720, 640)
 
         QWidget.setTabOrder(self.table, self.inverted_checkbox)
         QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
