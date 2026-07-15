@@ -5,11 +5,16 @@ from PySide6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QPushButton
 
 from demi.app import WindowSpec
-from demi.application.coordinator import CaptureCoordinator
+from demi.application.coordinator import CaptureCoordinator, CaptureFailure
 from demi.application.state import AppState
 from demi.domain.controller import ControllerFrame
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
+from demi.platform.windows_mouse_hook import (
+    WM_LBUTTONDOWN,
+    WM_LBUTTONUP,
+    WindowsMouseInputSuppressor,
+)
 from demi.platform.windows_raw_input import (
     HID_USAGE_GENERIC_MOUSE,
     HID_USAGE_PAGE_GENERIC,
@@ -187,6 +192,136 @@ def test_raw_input_capture_keeps_qt_button_focus_and_dialog_events(
 
     assert coordinator.app_state is AppState.CONFIGURING
     coordinator.begin_shutdown()
+
+
+def test_capture_suppresses_external_mouse_delivery_and_preserves_button_mapping(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    clock = FakeClock()
+    sink = FakeSink()
+    publisher = InputPublisher(clock=clock, sink=sink)
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    registrar = FakeRawInputRegistrar()
+    raw_input = WindowsRawInputBackend(registrar=registrar)
+    hook_registrar = FakeMouseHookRegistrar()
+    suppressor = WindowsMouseInputSuppressor(
+        registrar=hook_registrar,
+        on_button_pressed=publisher.state.press_mouse_button,
+        on_button_released=publisher.state.release_mouse_button,
+    )
+    coordinator = CaptureCoordinator(
+        publisher=publisher,
+        pointer_capture=window,
+        relative_pointer_capture=window,
+    )
+    window.configure_input(
+        publisher=publisher,
+        coordinator=coordinator,
+        raw_input_backend=raw_input,
+        mouse_input_suppressor=suppressor,
+    )
+
+    assert coordinator.start_capture() is True
+    assert suppressor.handle_message(WM_LBUTTONDOWN) is True
+    assert publisher.state.is_source_active("MOUSE:LEFT") is True
+    assert suppressor.handle_message(WM_LBUTTONUP) is True
+    assert publisher.state.is_source_active("MOUSE:LEFT") is False
+
+    QCoreApplication.sendEvent(window, _key_event(Qt.Key.Key_F12))
+
+    assert coordinator.app_state is AppState.IDLE
+    assert suppressor.active is False
+    assert hook_registrar.removed_handles == [0x1234]
+
+
+def test_mouse_suppression_releases_for_focus_dialog_and_shutdown(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    hook_registrar = FakeMouseHookRegistrar()
+    suppressor = WindowsMouseInputSuppressor(registrar=hook_registrar)
+    coordinator = CaptureCoordinator(publisher=publisher, pointer_capture=window)
+    window.configure_input(
+        publisher=publisher,
+        coordinator=coordinator,
+        mouse_input_suppressor=suppressor,
+    )
+
+    assert coordinator.start_capture() is True
+    assert coordinator.on_focus_lost() is not None
+    assert coordinator.app_state is AppState.SUSPENDED
+    assert suppressor.active is False
+
+    coordinator.on_focus_gained()
+    assert coordinator.start_capture() is True
+    window.on_dialog_opened()
+    assert coordinator.app_state is AppState.CONFIGURING
+    assert suppressor.active is False
+
+    assert coordinator.close_configuration() is True
+    assert coordinator.start_capture() is True
+    assert coordinator.begin_shutdown() is not None
+    assert suppressor.active is False
+    assert hook_registrar.removed_handles == [0x1234, 0x1234, 0x1234]
+
+
+@dataclass
+class FakeMouseHookRegistrar:
+    """Record low-level hook registration without calling Win32."""
+
+    callbacks: list[object] = field(default_factory=list)
+    removed_handles: list[int] = field(default_factory=list)
+
+    def install(self, callback: object) -> int:
+        """Store the supplied callback and return a stable hook handle."""
+        self.callbacks.append(callback)
+        return 0x1234
+
+    def remove(self, handle: int) -> None:
+        """Record one logical hook removal."""
+        self.removed_handles.append(handle)
+
+
+class FailingMouseHookRegistrar:
+    """Reject mouse-hook installation without exposing a Windows API."""
+
+    def install(self, callback: object) -> int:
+        """Reject the registration attempt."""
+        del callback
+        raise OSError
+
+    def remove(self, handle: int) -> None:
+        """Accept cleanup after a failed installation."""
+        del handle
+
+
+def test_mouse_hook_registration_failure_rolls_back_capture(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    raw_input = WindowsRawInputBackend(registrar=FakeRawInputRegistrar())
+    suppressor = WindowsMouseInputSuppressor(registrar=FailingMouseHookRegistrar())
+    coordinator = CaptureCoordinator(
+        publisher=publisher,
+        pointer_capture=window,
+        relative_pointer_capture=window,
+    )
+    window.configure_input(
+        publisher=publisher,
+        coordinator=coordinator,
+        raw_input_backend=raw_input,
+        mouse_input_suppressor=suppressor,
+    )
+
+    assert coordinator.start_capture() is False
+    assert coordinator.app_state is AppState.IDLE
+    assert coordinator.capture_failure is CaptureFailure.POINTER_CAPTURE
+    assert suppressor.active is False
 
 
 def _key_event(key: Qt.Key) -> QKeyEvent:

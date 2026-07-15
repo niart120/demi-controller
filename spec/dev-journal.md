@@ -61,7 +61,7 @@ Pinned sources:
 ### 方針
 
 - unit_015では既存のfocus loss時neutralizeを維持する。
-- click抑止の可否とUI上の操作方針は未決定である。必要になった時点で独立したwork unitとして、capture中の終了操作、dialog操作、accessibility、Windows入力制約を含めて設計する。
+- click抑止の要件はunit_023へ昇格した。実装と未検証のWindows実display受入は作業仕様を正本とする。
 
 ## 2026-07-15: 設定画面の視覚設計とY軸反転
 
