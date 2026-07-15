@@ -108,7 +108,11 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 | `uv run pytest tests/integration/ui/test_qt_runtime_events.py::test_router_binds_connection_and_capture_toolbar_actions_to_the_session tests/integration/ui/test_qt_runtime_events.py::test_router_opens_connection_settings_when_connection_is_not_configured -q -p no:cacheprovider` | passed | 2 passed。設定済み接続 / 切断、入力開始 / 解除、未設定接続時のconnection dialog表示とCancel後の状態復帰を確認した |
 | `uv run ruff format --check src/demi/ui/application.py src/demi/ui/main_window.py src/demi/ui/toolbar.py tests/integration/ui/test_qt_runtime_events.py` / `uv run ruff check src/demi/ui/application.py src/demi/ui/main_window.py src/demi/ui/toolbar.py tests/integration/ui/test_qt_runtime_events.py` / `uv run ty check --no-progress` | passed | 4 files already formatted、All checks passed、All checks passed |
 | `uv run pytest tests/integration/ui -q -p no:cacheprovider --basetemp .tmp-pytest` | passed | 56 passed。既定のWindows一時ディレクトリはアクセス拒否になるため、作業領域内の一時ディレクトリを明示した |
-| standard gate | not run | 実装完了後に実行する |
+| `uv sync --dev` / `uv lock --check` | passed | 77 packages resolved、74 packages checked。lockfile の更新不要を確認した |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | passed | 127 files already formatted、All checks passed、All checks passed |
+| `$env:PYTHONUTF8='1'; $env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/unit -q -p no:cacheprovider --basetemp "$env:TEMP\demi-pytest-unit-elevated"` | passed | 197 passed。既定の`pytest-of-train`は既存 ACL で利用できないため、隔離一時領域を明示した |
+| `$env:PYTHONUTF8='1'; $env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp "$env:TEMP\demi-pytest-full-elevated"` | passed | 66 passed。wheel smoke は通常の Windows 権限で隔離一時領域と uv cache を使用した |
+| `uv build` / `git diff --check` | passed | source distribution と wheel を生成し、差分の空白エラーなしを確認した |
 | Windows実 display acceptance | not run | 修正後に利用者と再実行する |
 
 ## 10. 先送り事項
@@ -124,5 +128,5 @@ Windows 実 display 受入で判明した、割り当て、接続設定、コン
 - [x] 既定起動構成で未表示を再現した
 - [x] TDD Test List を更新した
 - [x] 全設定 action と通常 toolbar action の本番配線を確認した
-- [ ] targeted test と standard gate を記録した
+- [x] targeted test と standard gate を記録した
 - [ ] Windows実 display acceptance を再実行した
