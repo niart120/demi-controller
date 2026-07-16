@@ -164,7 +164,7 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 
 `SwbtControllerAdapter` は package root から export されない controller adapter 境界である。追加引数は `int` と µs 単位の Google style docstring が一致し、`ty`、ruff、関係試験を通過した。production の `Any`、`cast()`、type ignore は追加していない。test の `cast()` は `**kwargs: object` で受けた既存 runtime factory 引数を `ControllerAdapterFactory` へ絞る局所境界に限定する。
 
-現在の GUI は `evaluation_interval_ms` の編集欄を公開していないため、保存ファイルの値は起動時に入力 timer と swbt report の両方へ適用される。将来この値をライブ編集できるようにする場合は、`InputPublisher.reconfigure()` だけでなく Qt timer の周期変更と接続中 controller の再生成を同じ操作へ含める必要がある。このライブ再設定は今回の対象外とする。
+現在の GUI は `evaluation_interval_ms` の編集欄を公開していないため、保存ファイルの値は起動時に入力 timer と swbt report の両方へ適用される。将来この値をライブ編集できるようにする場合は、`InputPublisher.reconfigure()` だけでなく Qt timer の周期変更と接続中 controller の再生成を同じ操作へ含める必要がある。このライブ再設定は Unit 024 の対象外とする。
 
 ### 7.11 不規則な評価間隔での角変位 TDD red
 
@@ -176,7 +176,7 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 
 `InputPublisher` に X、Y 軸ごとの未出力移動量を保持した。各評価で `入力移動量 - 平滑化移動量` を残量へ加え、該当軸が 0 count になった評価で平滑化値へ残量を足して 0 に戻す。これにより、4、16、12、5、8 ms の列でも最初の四つの出力は同符号を保ち、時間積分は入力 2 count 分と一致し、最後の評価は 0 となった。
 
-残量は速度履歴と同じく、再設定、capture epoch 変更、capture 解除で破棄する。別 capture の入力へ前回の未出力移動量を持ち越さない。
+残量は速度履歴と同じく、再設定、capture epoch 変更、capture 解除で破棄する。別 capture の入力へ直前の capture で未出力だった移動量を持ち越さない。
 
 ### 7.13 方向反転時の過走 TDD red
 
