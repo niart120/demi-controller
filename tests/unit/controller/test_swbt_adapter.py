@@ -178,6 +178,14 @@ def test_adapter_info_and_project_colors_cross_the_public_boundary() -> None:
             ),
         ),
     )
+    assert constructor_kwargs["adapter"] == "usb:0"
+    assert constructor_kwargs["key_store_path"] == "bond.json"
+    swbt_colors = constructor_kwargs["controller_colors"]
+    assert isinstance(swbt_colors, ControllerColors)
+    assert swbt_colors.body == 0xABCDEF
+    assert swbt_colors.buttons == 0x102030
+    assert swbt_colors.left_grip == 0x405060
+    assert swbt_colors.right_grip == 0x708090
 
 
 def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
@@ -204,11 +212,3 @@ def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
     )
 
     assert constructor_kwargs["report_period_us"] == 16_000
-    assert constructor_kwargs["adapter"] == "usb:0"
-    assert constructor_kwargs["key_store_path"] == "bond.json"
-    swbt_colors = constructor_kwargs["controller_colors"]
-    assert isinstance(swbt_colors, ControllerColors)
-    assert swbt_colors.body == 0xABCDEF
-    assert swbt_colors.buttons == 0x102030
-    assert swbt_colors.left_grip == 0x405060
-    assert swbt_colors.right_grip == 0x708090
