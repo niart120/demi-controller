@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 
 from demi.application.settings_editor import BindingConflict, SettingsEditor
 from demi.domain.errors import DomainValueError
-from demi.domain.mapping import Binding
+from demi.domain.mapping import Binding, is_button_target
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 
 _ROOT_INDEX = QModelIndex()
@@ -127,6 +127,10 @@ class MappingTableModel(QAbstractTableModel):
     def inverted_at(self, row: int) -> bool:
         """Return the inversion state for one active profile row."""
         return self._bindings()[row].inverted
+
+    def is_invertible_at(self, row: int) -> bool:
+        """Return whether one active profile row supports inversion."""
+        return is_button_target(self._bindings()[row].target)
 
     def restore_default_profile(self) -> None:
         """Restore the standard profile through the application-owned editor."""
@@ -378,7 +382,7 @@ class MappingDialog(QDialog):
             return
         self._updating_inverted = True
         try:
-            self.inverted_checkbox.setEnabled(True)
+            self.inverted_checkbox.setEnabled(self._mapping_model.is_invertible_at(current.row()))
             self.inverted_checkbox.setChecked(self._mapping_model.inverted_at(current.row()))
         finally:
             self._updating_inverted = False

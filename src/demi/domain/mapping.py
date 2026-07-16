@@ -10,7 +10,7 @@ from .errors import DomainValueError
 
 
 class BindingTarget(StrEnum):
-    """Canonical configuration targets for buttons and stick directions."""
+    """Canonical configuration targets for controller and diagnostic inputs."""
 
     BUTTON_A = "BUTTON:A"
     BUTTON_B = "BUTTON:B"
@@ -38,6 +38,11 @@ class BindingTarget(StrEnum):
     RIGHT_STICK_DOWN = "RIGHT_STICK:DOWN"
     RIGHT_STICK_LEFT = "RIGHT_STICK:LEFT"
     RIGHT_STICK_RIGHT = "RIGHT_STICK:RIGHT"
+    GYRO_Y_NEGATIVE = "GYRO:Y_NEGATIVE"
+    GYRO_Y_POSITIVE = "GYRO:Y_POSITIVE"
+    GYRO_Z_POSITIVE = "GYRO:Z_POSITIVE"
+    GYRO_Z_NEGATIVE = "GYRO:Z_NEGATIVE"
+    ACCEL_ZERO = "ACCEL:ZERO"
 
 
 _SOURCE_PATTERN = re.compile(r"(?:KEY:[A-Z0-9_]+(?:\+[A-Z0-9_]+)*|MOUSE:[A-Z0-9_]+)")
@@ -62,6 +67,15 @@ _BUTTON_TARGETS: dict[BindingTarget, LogicalButton] = {
     BindingTarget.BUTTON_DPAD_LEFT: LogicalButton.DPAD_LEFT,
     BindingTarget.BUTTON_DPAD_RIGHT: LogicalButton.DPAD_RIGHT,
 }
+_DIAGNOSTIC_TARGETS = frozenset(
+    {
+        BindingTarget.GYRO_Y_NEGATIVE,
+        BindingTarget.GYRO_Y_POSITIVE,
+        BindingTarget.GYRO_Z_POSITIVE,
+        BindingTarget.GYRO_Z_NEGATIVE,
+        BindingTarget.ACCEL_ZERO,
+    }
+)
 
 
 def logical_button_for_target(target: BindingTarget) -> LogicalButton:
@@ -75,6 +89,11 @@ def logical_button_for_target(target: BindingTarget) -> LogicalButton:
 def is_button_target(target: BindingTarget) -> bool:
     """Return whether a binding target represents a logical button."""
     return target in _BUTTON_TARGETS
+
+
+def is_diagnostic_target(target: BindingTarget) -> bool:
+    """Return whether a binding target controls a fixed IMU diagnostic."""
+    return target in _DIAGNOSTIC_TARGETS
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,7 +123,7 @@ class Binding:
         if not isinstance(self.inverted, bool):
             raise DomainValueError
         amount = float(self.amount)
-        if is_button_target(self.target) and amount != 1.0:
+        if (is_button_target(self.target) or is_diagnostic_target(self.target)) and amount != 1.0:
             raise DomainValueError
         if not is_button_target(self.target) and (self.inverted or not 0.0 <= amount <= 1.0):
             raise DomainValueError
@@ -143,7 +162,7 @@ def default_profile() -> InputProfile:
     """Return the immutable built-in ``Default`` input profile.
 
     Returns:
-        The 28-binding profile defined by the initial configuration.
+        The 33-binding profile defined by the initial configuration.
     """
     return InputProfile(
         id="default",
@@ -178,5 +197,10 @@ def default_profile() -> InputProfile:
             Binding("KEY:2", BindingTarget.BUTTON_DPAD_RIGHT),
             Binding("KEY:3", BindingTarget.BUTTON_DPAD_DOWN),
             Binding("KEY:4", BindingTarget.BUTTON_DPAD_LEFT),
+            Binding("KEY:I", BindingTarget.GYRO_Y_NEGATIVE),
+            Binding("KEY:K", BindingTarget.GYRO_Y_POSITIVE),
+            Binding("KEY:J", BindingTarget.GYRO_Z_POSITIVE),
+            Binding("KEY:L", BindingTarget.GYRO_Z_NEGATIVE),
+            Binding("KEY:O", BindingTarget.ACCEL_ZERO),
         ),
     )

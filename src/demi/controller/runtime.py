@@ -1,6 +1,7 @@
 """Dedicated worker-thread controller runtime."""
 
 import asyncio
+from dataclasses import replace
 from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING
 
@@ -320,7 +321,7 @@ class ControllerRuntime:
             self._connected = True
             self._connected_adapter_id = command.adapter_id
             self._watchdog.set_connected(True)
-            await self._apply_rest_state()
+            await self._apply_connection_initial_state()
             self._set_connection_state(ConnectionState.CONNECTED, command.adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
@@ -346,7 +347,7 @@ class ControllerRuntime:
             self._connected = True
             self._connected_adapter_id = command.adapter_id
             self._watchdog.set_connected(True)
-            await self._apply_rest_state()
+            await self._apply_connection_initial_state()
             self._set_connection_state(ConnectionState.CONNECTED, command.adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
@@ -389,7 +390,7 @@ class ControllerRuntime:
             await adapter.recreate_with_colors(command.colors)
             self._connected = True
             self._watchdog.set_connected(True)
-            await self._apply_rest_state()
+            await self._apply_connection_initial_state()
             self._set_connection_state(ConnectionState.CONNECTED, adapter_id)
         except Exception as error:  # noqa: BLE001
             self._connected = False
@@ -439,6 +440,17 @@ class ControllerRuntime:
     async def _apply_rest_state(self) -> None:
         if self._adapter is not None:
             await self._adapter.apply_frame(self._neutral_frame())
+
+    async def _apply_connection_initial_state(self) -> None:
+        if self._adapter is not None:
+            await self._adapter.apply_frame(self._connection_initial_frame())
+
+    def _connection_initial_frame(self) -> ControllerFrame:
+        frame = self._neutral_frame()
+        latest = self._latest_frame
+        if latest is not None and latest.capture_active and latest.accel_g == AccelG(0.0, 0.0, 0.0):
+            return replace(frame, accel_g=latest.accel_g)
+        return frame
 
     def _neutral_frame(self) -> ControllerFrame:
         return ControllerFrame(

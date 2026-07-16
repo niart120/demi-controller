@@ -196,13 +196,35 @@ target = "BUTTON:DPAD_DOWN"
 [[profiles.bindings]]
 source = "KEY:4"
 target = "BUTTON:DPAD_LEFT"
+
+[[profiles.bindings]]
+source = "KEY:I"
+target = "GYRO:Y_NEGATIVE"
+
+[[profiles.bindings]]
+source = "KEY:K"
+target = "GYRO:Y_POSITIVE"
+
+[[profiles.bindings]]
+source = "KEY:J"
+target = "GYRO:Z_POSITIVE"
+
+[[profiles.bindings]]
+source = "KEY:L"
+target = "GYRO:Z_NEGATIVE"
+
+[[profiles.bindings]]
+source = "KEY:O"
+target = "ACCEL:ZERO"
 ```
 
-組み込みプロファイルはアプリ内の正本から生成し、ユーザー設定には編集後の完全なbinding配列を保存する。0.1.0では差分保存を採用しない。移行と復旧を単純にするためである。
+組み込みプロファイルはアプリ内の正本から生成し、ユーザー設定には編集後の完全なbinding配列を保存する。0.1.0では差分保存を採用しない。旧版の組み込み Default profile に診断targetが不足する場合、読み込み時に不足行だけをメモリ上で末尾へ補い、既存bindingと変更済みsourceを保持する。補完結果は `MIGRATED` とし、次回の明示保存で設定ファイルへ反映する。
 
-`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。角度は設定境界でラジアンへ変換し、`YawPitchModel` 内ではラジアン、ラジアン毎秒、Gだけを使う。静的加速度は仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。
+`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。角度は設定境界でラジアンへ変換し、`YawPitchModel` 内ではラジアン、ラジアン毎秒、Gだけを使う。静的加速度は通常経路で仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。完全な0Gはprofileの診断targetで一時的に上書きする。
 
-`inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向へ指定された場合は設定エラーとし、反対方向ターゲットへの割り当てを案内する。反転割り当ての有効判定は `source_active XOR inverted` とする。
+`inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
+
+診断targetは `GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`ACCEL:ZERO` とする。既定sourceは I/K/J/L/O だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
 
 ## 3. 型と制約
 
@@ -221,6 +243,7 @@ target = "BUTTON:DPAD_LEFT"
 | pitch_limit_degrees | 1.0..89.0 |
 | stick amount | 0.0..1.0 |
 | binding.inverted | 真偽値。ボタンターゲットだけで使用可能 |
+| diagnostic amount | `1.0` 固定 |
 
 未知の列挙値はエラーとする。数値を黙って範囲内へ修正せず、読み込み結果へ警告を含めて安全な既定値へ置換する。
 
@@ -235,6 +258,12 @@ valid current schema
   -> decode
   -> validate
   -> LOADED
+
+valid current schema with incomplete built-in Default diagnostics
+  -> decode
+  -> append missing diagnostics in memory
+  -> preserve stored file until explicit save
+  -> MIGRATED
 
 valid old schema
   -> decode old

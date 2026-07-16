@@ -46,7 +46,7 @@ def test_default_settings_match_the_initial_configuration() -> None:
         pitch_limit_degrees=75.0,
     )
     assert settings.profiles[0].name == "Default"
-    assert len(settings.profiles[0].bindings) == 28
+    assert len(settings.profiles[0].bindings) == 33
 
 
 def test_color_values_are_normalized_to_uppercase_hex() -> None:

@@ -8,7 +8,12 @@ from demi.domain.mapping import InputProfile, default_profile
 from demi.domain.physical_input import PhysicalInputState
 from demi.domain.settings import MouseSettings
 
-from .mapper import aggregate_buttons, synthesize_stick
+from .mapper import (
+    aggregate_buttons,
+    is_accel_zero_active,
+    synthesize_diagnostic_gyro,
+    synthesize_stick,
+)
 from .timing import InputEvaluationMetrics, InputTimingSnapshot
 from .yaw_pitch_model import YawPitchModel
 
@@ -167,10 +172,22 @@ class InputPublisher:
                 "right",
                 circular_limit=self._circular_limit,
             )
-            gyro_rate, accel_g = self._model.update(
+            mouse_gyro_rate, accel_g = self._model.update(
                 dx=dx,
                 dy=dy,
                 dt_seconds=dt_seconds,
+            )
+            if is_accel_zero_active(self._profile, self._state):
+                accel_g = AccelG(0.0, 0.0, 0.0)
+            diagnostic_gyro_rate = synthesize_diagnostic_gyro(self._profile, self._state)
+            gyro_rate = GyroRate(
+                x_radians_per_second=mouse_gyro_rate.x_radians_per_second,
+                y_radians_per_second=(
+                    mouse_gyro_rate.y_radians_per_second + diagnostic_gyro_rate.y_radians_per_second
+                ),
+                z_radians_per_second=(
+                    mouse_gyro_rate.z_radians_per_second + diagnostic_gyro_rate.z_radians_per_second
+                ),
             )
         else:
             buttons = frozenset()

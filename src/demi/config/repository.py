@@ -4,11 +4,12 @@ import os
 import shutil
 import tempfile
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
+from demi.domain.mapping import default_profile, is_diagnostic_target
 from demi.domain.settings import AppSettings
 
 from .codec import dumps_settings, loads_settings
@@ -45,7 +46,8 @@ class SettingsRepository:
         """Load settings, distinguishing first run and recovery outcomes.
 
         Returns:
-            A settings snapshot with FIRST_RUN, LOADED, or RECOVERED status.
+            A settings snapshot with FIRST_RUN, LOADED, MIGRATED, or RECOVERED
+            status.
 
         Raises:
             SettingsPersistenceError: The settings file cannot be read.
@@ -62,7 +64,11 @@ class SettingsRepository:
                 SettingsLoadStatus.RECOVERED,
                 self._backup_corrupt_file(),
             )
-        return SettingsLoadResult(settings, SettingsLoadStatus.LOADED)
+        settings, migrated = _with_missing_default_diagnostics(settings)
+        return SettingsLoadResult(
+            settings,
+            SettingsLoadStatus.MIGRATED if migrated else SettingsLoadStatus.LOADED,
+        )
 
     def save(self, settings: AppSettings) -> None:
         """Atomically replace the settings file with a validated snapshot.
@@ -114,3 +120,28 @@ class SettingsRepository:
         except OSError:
             return None
         return backup_path
+
+
+def _with_missing_default_diagnostics(settings: AppSettings) -> tuple[AppSettings, bool]:
+    diagnostic_bindings = tuple(
+        binding for binding in default_profile().bindings if is_diagnostic_target(binding.target)
+    )
+    migrated = False
+    profiles = []
+    for candidate in settings.profiles:
+        migrated_profile = candidate
+        if candidate.id == "default" and candidate.builtin:
+            existing_targets = {binding.target for binding in candidate.bindings}
+            missing = tuple(
+                binding for binding in diagnostic_bindings if binding.target not in existing_targets
+            )
+            if missing:
+                migrated_profile = replace(
+                    candidate,
+                    bindings=(*candidate.bindings, *missing),
+                )
+                migrated = True
+        profiles.append(migrated_profile)
+    if not migrated:
+        return settings, False
+    return replace(settings, profiles=tuple(profiles)), True

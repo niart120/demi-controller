@@ -53,6 +53,27 @@ def test_codec_preserves_custom_colors_and_inverted_binding() -> None:
     assert restored.profiles[0].bindings[1].amount == 0.75
 
 
+def test_codec_preserves_configurable_imu_diagnostic_targets() -> None:
+    profile = InputProfile(
+        id="diagnostic",
+        name="Diagnostic",
+        builtin=False,
+        bindings=(
+            Binding(source="KEY:U", target=BindingTarget.GYRO_Y_NEGATIVE),
+            Binding(source="MOUSE:MIDDLE", target=BindingTarget.ACCEL_ZERO),
+        ),
+    )
+    settings = replace(
+        AppSettings.default(),
+        active_profile=profile.id,
+        profiles=(profile,),
+    )
+
+    restored = loads_settings(dumps_settings(settings))
+
+    assert restored == settings
+
+
 def test_unknown_schema_is_rejected_by_the_migration_boundary() -> None:
     raw = encode_settings(AppSettings.default())
     raw["schema"] = "demi.settings/v2"

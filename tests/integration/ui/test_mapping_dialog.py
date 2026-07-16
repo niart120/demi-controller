@@ -201,7 +201,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     assert modal.open(DialogKind.MAPPING, original) is True
     editor = modal.editor
     assert editor is not None
-    editor.update_binding(0, source="KEY:K")
+    editor.update_binding(0, source="KEY:P")
 
     def save_modal() -> bool:
         try:
@@ -221,7 +221,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     assert dialog.isVisible()
     assert dialog.save_error_label.text() == "設定を保存できませんでした"
     assert modal.editor is editor
-    assert editor.draft.profiles[0].bindings[0].source == "KEY:K"
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:P"
     assert repository.saved == original
     assert repository.save_calls == 1
 
@@ -270,6 +270,33 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
 
     assert saved_drafts[-1].profiles[0].bindings[0].inverted is True
     assert dialog.result() == int(QDialog.DialogCode.Accepted)
+
+
+def test_mapping_dialog_exposes_configurable_imu_diagnostics(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    model = dialog.table.model()
+    assert model is not None
+
+    assert model.rowCount() == 33
+    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
+    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "KEY:I"
+    assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
+    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "KEY:O"
+
+    dialog.table.selectRow(32)
+    qt_application.processEvents()
+
+    assert not dialog.inverted_checkbox.isEnabled()
+    assert dialog.set_source(32, "KEY:P") is True
+    assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
+
+    dialog.close()
+    qt_application.processEvents()
 
 
 def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
