@@ -71,6 +71,8 @@ class InputPublisher:
         self._sequence = 0
         self._last_monotonic_ns: int | None = None
         self._capture_epoch: int | None = None
+        self._previous_mouse_x_per_second = 0.0
+        self._previous_mouse_y_per_second = 0.0
         self._timing_metrics = InputEvaluationMetrics()
 
     @property
@@ -111,6 +113,7 @@ class InputPublisher:
         self._state.clear()
         self._last_monotonic_ns = None
         self._capture_epoch = None
+        self._reset_mouse_smoothing()
 
     def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
         """Evaluate current input and offer one controller frame.
@@ -129,9 +132,11 @@ class InputPublisher:
         if epoch_changed:
             self._state.clear()
             self._model.reset()
+            self._reset_mouse_smoothing()
         if not capture_active:
             self._state.clear()
             self._model.reset()
+            self._reset_mouse_smoothing()
 
         if first_evaluation or epoch_changed:
             dt_seconds = 0.0
@@ -140,6 +145,8 @@ class InputPublisher:
 
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
+            if dt_seconds > 0.0:
+                dx, dy = self._smooth_mouse_motion(dx, dy, dt_seconds)
             buttons = aggregate_buttons(self._profile, self._state, capture_active=True)
             left_stick = synthesize_stick(
                 self._profile,
@@ -187,3 +194,24 @@ class InputPublisher:
         if isinstance(value, bool) or not isinstance(value, int) or not 4 <= value <= 32:
             raise DomainValueError
         return value
+
+    def _smooth_mouse_motion(
+        self,
+        dx: float,
+        dy: float,
+        dt_seconds: float,
+    ) -> tuple[float, float]:
+        current_x_per_second = dx / dt_seconds
+        current_y_per_second = dy / dt_seconds
+        smoothed_x_per_second = (self._previous_mouse_x_per_second + current_x_per_second) * 0.5
+        smoothed_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
+        self._previous_mouse_x_per_second = current_x_per_second
+        self._previous_mouse_y_per_second = current_y_per_second
+        return (
+            smoothed_x_per_second * dt_seconds,
+            smoothed_y_per_second * dt_seconds,
+        )
+
+    def _reset_mouse_smoothing(self) -> None:
+        self._previous_mouse_x_per_second = 0.0
+        self._previous_mouse_y_per_second = 0.0

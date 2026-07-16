@@ -124,8 +124,9 @@ def test_publisher_preserves_constant_gyro_rate_across_irregular_intervals() -> 
         frame = publisher.publish(capture_active=True, capture_epoch=1)
         gyro_z_rates.append(frame.gyro_rate.z_radians_per_second)
 
-    assert gyro_z_rates[0] < 0.0
-    assert gyro_z_rates == pytest.approx([gyro_z_rates[0]] * len(gyro_z_rates))
+    expected_rate = -mouse_units_per_second * BASE_YAW_RADIANS_PER_INPUT_UNIT
+    assert gyro_z_rates[0] == pytest.approx(expected_rate * 0.5)
+    assert gyro_z_rates[1:] == pytest.approx([expected_rate] * (len(gyro_z_rates) - 1))
 
 
 def test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation() -> None:
@@ -146,6 +147,25 @@ def test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation()
     assert sum(rate * interval_seconds for rate in gyro_z_rates) == pytest.approx(
         -3 * BASE_YAW_RADIANS_PER_INPUT_UNIT
     )
+
+
+def test_capture_boundary_discards_pending_smoothed_mouse_motion() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.publish(capture_active=True, capture_epoch=1)
+    publisher.state.add_mouse_motion(1.0, 0.0)
+    clock.now_ns += 8_000_000
+    moving = publisher.publish(capture_active=True, capture_epoch=1)
+
+    released = publisher.publish(capture_active=False, capture_epoch=2)
+    restarted = publisher.publish(capture_active=True, capture_epoch=3)
+    clock.now_ns += 8_000_000
+    empty_tick = publisher.publish(capture_active=True, capture_epoch=3)
+
+    assert moving.gyro_rate.z_radians_per_second < 0.0
+    assert released.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert restarted.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert empty_tick.gyro_rate == GyroRate(0.0, 0.0, 0.0)
 
 
 def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
