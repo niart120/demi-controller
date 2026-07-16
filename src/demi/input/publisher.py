@@ -209,17 +209,37 @@ class InputPublisher:
         smoothed_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
         smoothed_dx = smoothed_x_per_second * dt_seconds
         smoothed_dy = smoothed_y_per_second * dt_seconds
-        self._pending_mouse_x_units += dx - smoothed_dx
-        self._pending_mouse_y_units += dy - smoothed_dy
+        self._pending_mouse_x_units += dx
+        self._pending_mouse_y_units += dy
         if dx == 0.0:
-            smoothed_dx += self._pending_mouse_x_units
+            smoothed_dx = self._pending_mouse_x_units
             self._pending_mouse_x_units = 0.0
+        else:
+            smoothed_dx = self._limit_to_pending_motion(
+                smoothed_dx,
+                self._pending_mouse_x_units,
+            )
+            self._pending_mouse_x_units -= smoothed_dx
         if dy == 0.0:
-            smoothed_dy += self._pending_mouse_y_units
+            smoothed_dy = self._pending_mouse_y_units
             self._pending_mouse_y_units = 0.0
+        else:
+            smoothed_dy = self._limit_to_pending_motion(
+                smoothed_dy,
+                self._pending_mouse_y_units,
+            )
+            self._pending_mouse_y_units -= smoothed_dy
         self._previous_mouse_x_per_second = current_x_per_second
         self._previous_mouse_y_per_second = current_y_per_second
         return smoothed_dx, smoothed_dy
+
+    @staticmethod
+    def _limit_to_pending_motion(candidate: float, pending: float) -> float:
+        if candidate * pending <= 0.0:
+            return 0.0
+        if abs(candidate) > abs(pending):
+            return pending
+        return candidate
 
     def _reset_mouse_smoothing(self) -> None:
         self._previous_mouse_x_per_second = 0.0
