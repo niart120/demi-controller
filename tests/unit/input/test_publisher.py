@@ -194,6 +194,23 @@ def test_publisher_does_not_overshoot_rotation_when_mouse_direction_reverses() -
     assert cumulative_mouse_units[-1] == pytest.approx(0.0)
 
 
+def test_publisher_applies_mouse_direction_reversal_without_a_zero_frame() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.publish(capture_active=True, capture_epoch=1)
+
+    publisher.state.add_mouse_motion(1.0, 0.0)
+    clock.now_ns += 8_000_000
+    forward = publisher.publish(capture_active=True, capture_epoch=1)
+
+    publisher.state.add_mouse_motion(-1.0, 0.0)
+    clock.now_ns += 8_000_000
+    reversed_frame = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert forward.gyro_rate.z_radians_per_second < 0.0
+    assert reversed_frame.gyro_rate.z_radians_per_second > 0.0
+
+
 def test_capture_boundary_discards_pending_smoothed_mouse_motion() -> None:
     clock = FakeClock()
     publisher = InputPublisher(clock=clock, sink=FakeSink())
