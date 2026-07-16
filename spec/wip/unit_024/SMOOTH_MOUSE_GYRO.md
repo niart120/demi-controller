@@ -70,7 +70,7 @@
 | green | swbt の 3 IMU slot が移動中の連続した標本として変換される | characterization / regression | unit | 現行の断続列は 3 slot 単位の非 0 block と 0 block になる |
 | refactor-skipped | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する。追加の production 整理は不要 |
 | green | 評価間隔が揺れても一定速度入力の角速度を保つ | regression | unit | 4、8、16、12、5 ms で開始後の角速度が一致した |
-| red | 疎な入力と評価間隔の揺れが重なっても総角変位を保つ | regression / edge | unit | 2 count の入力が約 3.2083 count 相当に増えることを再現した |
+| green | 疎な入力と評価間隔の揺れが重なっても総角変位を保つ | regression / edge | unit | 残量清算により 2 count の積分と入力後の 0 を保った |
 | green | 機材不要の標準 gate と package build が通る | characterization | package | 205 unit、72 integration、ruff、ty、lock、build が通過した |
 | todo | 実機で低速・中速・高速のカメラ移動が滑らかで、停止後に流れない | regression | hardware | 環境値と時刻、入力条件、観測結果を記録する |
 
@@ -144,7 +144,7 @@ Tidy 分類は behavior change である。公開 API と設定を増やさず `
 
 ### 7.8 平滑化 TDD green
 
-`InputPublisher` は各評価区間の `dx`、`dy` を input units/s へ変換し、現在値と直前値の算術平均を同じ区間の移動量へ戻してから `YawPitchModel` へ渡す。count の単純平均ではなく速度を平均するため、4 ms から 16 ms に評価間隔が変わっても、開始 tick の半量出力後は一定速度を保つ。
+`InputPublisher` は各評価区間の `dx`、`dy` を input units/s へ変換し、現在値と直前値の算術平均を同じ区間の移動量へ戻してから `YawPitchModel` へ渡す。count の単純平均ではなく速度を平均するため、4 ms から 16 ms に評価間隔が変わっても、開始 tick の半量出力後は一定速度を保つ。入力移動量と平滑化出力の差は軸ごとに保持し、0 count の区間で清算する。
 
 固定 8 ms では各入力を現在と次の評価へ半分ずつ分配する。1 count と 0 count の交互列は全移動区間で同符号となり、時間積分は元の 3 count 分と一致し、最後の入力から 1 評価後に 0 となる。reconfigure、capture epoch 変更、capture 解除では履歴を破棄し、古い移動を次の状態へ持ち越さない。
 
@@ -165,6 +165,12 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 4 ms の 1 count、16 ms の 0 count、12 ms の 1 count、5 ms と 8 ms の 0 count を順に評価した。現行の速度平均は、4 ms 区間で得た 250 units/s の半分を次の 16 ms 全体へ適用する。このため、入力は合計 2 count でも出力角速度の時間積分は約 3.2083 count 相当となった。
 
 平滑化には、区間ごとの速度を滑らかにするだけでなく、入力した移動量と出力した移動量の差分を保持し、0 count の区間で残量を清算する必要がある。修正後は不規則な区間でも移動中の同符号出力、2 count 分の総角変位、最後の 0 への収束を同時に満たす。
+
+### 7.12 不規則な評価間隔での角変位 TDD green
+
+`InputPublisher` に X、Y 軸ごとの未出力移動量を保持した。各評価で `入力移動量 - 平滑化移動量` を残量へ加え、該当軸が 0 count になった評価で平滑化値へ残量を足して 0 に戻す。これにより、4、16、12、5、8 ms の列でも最初の四つの出力は同符号を保ち、時間積分は入力 2 count 分と一致し、最後の評価は 0 となった。
+
+残量は速度履歴と同じく、再設定、capture epoch 変更、capture 解除で破棄する。別 capture の入力へ前回の未出力移動量を持ち越さない。
 
 ## 8. 対象ファイル
 
@@ -193,6 +199,7 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_preserves_constant_gyro_rate_across_irregular_intervals -q -p no:cacheprovider` | passed (1 passed) | 4、8、16、12、5 ms の評価間隔で一定速度から同じ角速度を得た |
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation -q -p no:cacheprovider` | expected failed (1 failed) | `[-0.0654498..., -0.0, ...]` となり、総角変位と停止は保つが移動区間の連続性がない |
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_preserves_sparse_rotation_across_irregular_intervals -q -p no:cacheprovider` | expected failed (1 failed) | 2 count の期待角変位 `-0.0010471975... rad` に対し `-0.0016798794... rad` となり、約 3.2083 count 相当へ増えた |
+| `uv run pytest tests/unit/input/test_publisher.py::test_publisher_preserves_sparse_rotation_across_irregular_intervals tests/unit/input/test_publisher.py::test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation tests/unit/input/test_publisher.py::test_publisher_preserves_constant_gyro_rate_across_irregular_intervals tests/unit/input/test_publisher.py::test_capture_boundary_discards_pending_smoothed_mouse_motion -q -p no:cacheprovider` | passed (4 passed) | 不規則周期の 2 count、固定周期の 3 count、一定速度、capture 境界を確認した |
 | `uv run pytest tests/unit/input/test_publisher.py tests/unit/input/test_yaw_pitch_model.py tests/unit/application/test_coordinator.py tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed (25 passed) | 疎な Raw Input、総角変位、周期揺れ、既存 yaw/pitch、capture coordinator を確認した |
 | `uv run ruff format --check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ruff check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ty check --no-progress` / `git diff --check` | passed | format、lint、型、空白を確認した |
 | `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps -q -p no:cacheprovider` | passed (1 passed) | 全 9 frame の swbt 角速度が同符号かつ同値であることを確認した |
