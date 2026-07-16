@@ -3,10 +3,45 @@
 from math import hypot
 from typing import Literal
 
-from demi.domain.controller import LogicalButton, StickVector
+from demi.domain.controller import GyroRate, LogicalButton, StickVector
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import InputProfile, is_button_target, logical_button_for_target
 from demi.domain.physical_input import PhysicalInputState
+
+IJKL_GYRO_RADIANS_PER_SECOND = 1.0
+_IJKL_GYRO_SOURCES = frozenset(
+    {
+        "KEY:I",
+        "KEY:K",
+        "KEY:J",
+        "KEY:L",
+    }
+)
+
+
+def synthesize_ijkl_gyro(
+    state: PhysicalInputState,
+    *,
+    capture_active: bool = True,
+) -> GyroRate:
+    """Convert held I/J/K/L keys into fixed diagnostic Y/Z gyro rates.
+
+    Args:
+        state: Current normalized held-input state.
+        capture_active: Disable the diagnostic input when false.
+
+    Returns:
+        A fixed-rate Y/Z gyro value with opposing directions cancelled.
+    """
+    if not capture_active:
+        return GyroRate(0.0, 0.0, 0.0)
+    y_direction = float(state.is_source_active("KEY:K")) - float(state.is_source_active("KEY:I"))
+    z_direction = float(state.is_source_active("KEY:J")) - float(state.is_source_active("KEY:L"))
+    return GyroRate(
+        x_radians_per_second=0.0,
+        y_radians_per_second=y_direction * IJKL_GYRO_RADIANS_PER_SECOND,
+        z_radians_per_second=z_direction * IJKL_GYRO_RADIANS_PER_SECOND,
+    )
 
 
 def aggregate_buttons(
@@ -30,6 +65,8 @@ def aggregate_buttons(
         return frozenset()
     buttons: set[LogicalButton] = set()
     for binding in profile.bindings:
+        if binding.source in _IJKL_GYRO_SOURCES:
+            continue
         if is_button_target(binding.target) and (
             state.is_source_active(binding.source) ^ binding.inverted
         ):
@@ -68,6 +105,8 @@ def synthesize_stick(
     y_negative = 0.0
     y_positive = 0.0
     for binding in profile.bindings:
+        if binding.source in _IJKL_GYRO_SOURCES:
+            continue
         target = binding.target.value
         if not target.startswith(prefix) or not state.is_source_active(binding.source):
             continue
