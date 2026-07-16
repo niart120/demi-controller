@@ -143,7 +143,12 @@ class InputPublisher:
         if first_evaluation or epoch_changed:
             dt_seconds = 0.0
         else:
-            dt_seconds = (now_ns - self._last_monotonic_ns) / 1_000_000_000.0
+            elapsed_ns = now_ns - self._last_monotonic_ns
+            dt_seconds = (
+                self._evaluation_interval_ms / 1_000.0
+                if elapsed_ns == 0
+                else elapsed_ns / 1_000_000_000.0
+            )
 
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
