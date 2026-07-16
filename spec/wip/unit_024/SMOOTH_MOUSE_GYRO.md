@@ -77,7 +77,20 @@ status は `todo`、`red`、`green`、`refactor-done`、`refactor-skipped`、`de
 
 - 再現判定は画面描画ではなく、一定方向へ移動している区間の swbt 公開物理値に 0 の標本が含まれるかで行う。
 - 2026-07-16 時点の lock は swbt-python 0.3.0 である。
-- 原因候補の順位付けは再現試験を実行して赤を確認した後に記録する。
+
+### 7.1 確認済みの近接要因
+
+runtime を通さない Raw Input、`InputPublisher`、swbt 公開物理値の経路で、16 ms ごとの 1 count が `-0.065973...`、`0.0` の交互列へ変換された。整数 mouse count のない評価 tick を即座に角速度 0 とする現行処理は、低速連続移動をパルス列にする。
+
+### 7.2 原因仮説
+
+以下は未検証の順位である。利用者の指摘を反映し、Project_Demi と swbt-python の入力・送信周期不一致を最初に検証する。
+
+1. Project_Demi の 125 Hz 入力評価と swbt-python の HID report 周期が一致せず、短い非 0 / 0 の状態を不均一に標本化している。report 周期を計測し、同じ入力列をその周期で標本化すると欠落位置を再現できるはずである。
+2. 整数 mouse count の量子化と評価 tick ごとの即時 0 化が主因である。swbt-python と runtime を除いた現行の再現結果はこの予測と一致する。周期を合わせても低速 count が評価周期より疎なら 0 が残るはずである。
+3. runtime の latest-only mailbox と非同期 `apply()` が中間フレームを置換し、仮説 2 のパルス列を増幅している。`apply()` を意図的に遅らせると非 0 フレームの欠落数が増えるはずである。
+4. 同一値を複製した 3 IMU slot と swbt-python 0.3.0 の report 生成が時間軸を粗くしている。1 report 内の 3 slot と連続 report の物理値を観測すれば、重複標本と更新境界を特定できるはずである。
+5. Qt timer の揺れが角速度の振幅を変調している。mouse count を実経過時間に比例させた入力でも出力角速度が変動する場合に成立する。
 
 ## 8. 対象ファイル
 
