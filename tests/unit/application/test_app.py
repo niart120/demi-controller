@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from unittest.mock import patch
 
 from demi.app import ApplicationDependencies, ApplicationSession, _window_spec_for, run_application
 from demi.application.coordinator import CaptureCoordinator
@@ -196,6 +197,42 @@ def test_application_runner_assembles_boundaries_and_starts_the_runtime() -> Non
     assert gui_kwargs["dialogs"] is gui_kwargs["session"].dialogs
     assert callable(gui_kwargs["editor_provider"])
     assert {"backend", "bridge", "event_pump", "status_bar", "view"}.isdisjoint(gui_kwargs)
+
+
+def test_application_runner_aligns_report_period_with_saved_input_interval() -> None:
+    paths = SettingsPaths(Path("config"), Path("data"), Path("log"))
+    settings = replace(
+        AppSettings.default(),
+        input=InputSettings(evaluation_interval_ms=16),
+    )
+    repository_result = SettingsLoadResult(settings, SettingsLoadStatus.LOADED)
+    runtime = FakeRuntime()
+    adapter_kwargs: dict[str, object] = {}
+
+    def create_adapter(**kwargs: object) -> object:
+        adapter_kwargs.update(kwargs)
+        return object()
+
+    def create_runtime(**kwargs: object) -> FakeRuntime:
+        adapter_factory = kwargs["adapter_factory"]
+        assert callable(adapter_factory)
+        adapter_factory()
+        return runtime
+
+    dependencies = ApplicationDependencies(
+        paths_resolver=lambda: paths,
+        repository_factory=lambda _paths: FakeRepository(repository_result),
+        runtime_factory=create_runtime,
+        window_factory=lambda _spec: FakeWindow(),
+        gui_factory=lambda **_kwargs: FakeGui(),
+        clock=FakeClock(),
+        logger_configurer=lambda _paths, _level: logging.getLogger("demi-test-report-period"),
+    )
+
+    with patch("demi.app.SwbtControllerAdapter", create_adapter):
+        assert run_application(dependencies) == 0
+
+    assert adapter_kwargs["report_period_us"] == 16_000
 
 
 def test_application_runner_configures_the_optional_input_window_boundary() -> None:
