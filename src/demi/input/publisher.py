@@ -56,8 +56,8 @@ class InputPublisher:
             mouse_settings: Mouse-to-IMU settings, defaulting to application
                 defaults.
             circular_limit: Whether diagonal stick values are normalized.
-            evaluation_interval_ms: Scheduled input evaluation interval.
-            evaluation_interval_ms: Interval between scheduled input evaluations.
+            evaluation_interval_ms: Interval between scheduled input evaluations,
+                in milliseconds.
         """
         self._clock = clock
         self._sink = sink
