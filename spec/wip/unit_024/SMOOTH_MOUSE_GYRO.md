@@ -71,7 +71,7 @@
 | refactor-skipped | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する。追加の production 整理は不要 |
 | green | 評価間隔が揺れても一定速度入力の角速度を保つ | regression | unit | 4、8、16、12、5 ms で開始後の角速度が一致した |
 | green | 疎な入力と評価間隔の揺れが重なっても総角変位を保つ | regression / edge | unit | 残量清算により 2 count の積分と入力後の 0 を保った |
-| green | 不規則な評価間隔で方向反転しても実入力の移動範囲を越えない | regression / edge | unit | 候補出力を未出力移動量で制限し、累積位置を 0 から +0.5 count の範囲に保った |
+| refactor-skipped | 不規則な評価間隔で方向反転しても実入力の移動範囲を越えない | regression / edge | unit | 候補出力を未出力移動量で制限し、累積位置を 0 から +0.5 count の範囲に保った |
 | green | 機材不要の標準 gate と package build が通る | characterization | package | 205 unit、72 integration、ruff、ty、lock、build が通過した |
 | todo | 実機で低速・中速・高速のカメラ移動が滑らかで、停止後に流れない | regression | hardware | 環境値と時刻、入力条件、観測結果を記録する |
 
@@ -184,6 +184,8 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 現在入力と未出力移動量の和を、その時点で出力可能な移動量とした。2-tap の候補値は、出力可能量と同符号の場合だけ、その絶対値を上限として採用する。候補値が反対方向の場合は 0 とし、0 count の評価では残りを清算する。
 
 4 ms の +1 count、16 ms の -1 count、8 ms の 0 count に対する出力は `+0.5`、`0.0`、`-0.5` count 相当となった。累積位置は `+0.5`、`+0.5`、`0.0` count であり、実入力の 0 から +1 count の範囲を越えず、総角変位も保存した。
+
+X、Y 軸は別の残量を所有するため状態更新を明示し、候補制限の数値処理だけを private helper に分けた。公開 API と責務境界は増えておらず、追加の構造変更は行わない。
 
 ## 8. 対象ファイル
 
