@@ -64,11 +64,11 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| green | 16 ms ごとの 1 count を 8 ms ごとに評価しても、移動区間の swbt ジャイロ値に 0 が入らない | regression | integration | 速度 2-tap 後は全 9 frame の swbt 物理値が同符号となる |
+| refactor-done | 16 ms ごとの 1 count を 8 ms ごとに評価しても、移動区間の swbt ジャイロ値に 0 が入らない | regression | integration | 全 9 frame の swbt 物理値が同符号かつ同値であることを固定した |
 | green | 保存済み入力評価周期と swbt-python の report 周期が一致する | characterization | integration | 保存設定は 8 ms、swbt-python 0.3.0 の Pro Controller 既定値は 8000 µs |
 | green | frame 変換と swbt-python state 差し替えが 8 ms 周期内に完了する | characterization | integration | 各 10,000 回の p99 は 9.5 µs と 0.9 µs |
 | green | swbt の 3 IMU slot が移動中の連続した標本として変換される | characterization / regression | unit | 現行の断続列は 3 slot 単位の非 0 block と 0 block になる |
-| green | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する |
+| refactor-skipped | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する。追加の production 整理は不要 |
 | green | 評価間隔が揺れても一定速度入力の角速度と総角変位を保つ | regression | unit | 4、8、16、12、5 ms で角速度が一致した |
 | todo | runtime が評価フレームを置換しても送信ジャイロの連続性を保つ | characterization / regression | integration | `apply()` 待機を制御する fake を使う |
 | todo | 実機で低速・中速・高速のカメラ移動が滑らかで、停止後に流れない | regression | hardware | 環境値と時刻、入力条件、観測結果を記録する |
@@ -147,6 +147,12 @@ Tidy 分類は behavior change である。公開 API と設定を増やさず `
 
 固定 8 ms では各入力を現在と次の評価へ半分ずつ分配する。1 count と 0 count の交互列は全移動区間で同符号となり、時間積分は元の 3 count 分と一致し、最後の入力から 1 評価後に 0 となる。reconfigure、capture epoch 変更、capture 解除では履歴を破棄し、古い移動を次の状態へ持ち越さない。
 
+### 7.9 Refactor review
+
+`InputPublisher` が入力評価時系列を所有し、`YawPitchModel` が 1 区間の yaw/pitch 変換を所有する境界は維持できている。private helper の追加だけで公開 API、設定、runtime を変更しておらず、production の追加分割は行わない。
+
+integration test は非 0 の確認だけでは振幅変調を見逃すため、全 9 frame の swbt 角速度が同値である assertion を追加した。同じ再現 command は 0.17 秒で通過した。
+
 ## 8. 対象ファイル
 
 | path | change | 内容 |
@@ -171,6 +177,7 @@ Tidy 分類は behavior change である。公開 API と設定を増やさず `
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation -q -p no:cacheprovider` | expected failed (1 failed) | `[-0.0654498..., -0.0, ...]` となり、総角変位と停止は保つが移動区間の連続性がない |
 | `uv run pytest tests/unit/input/test_publisher.py tests/unit/input/test_yaw_pitch_model.py tests/unit/application/test_coordinator.py tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed (25 passed) | 疎な Raw Input、総角変位、周期揺れ、既存 yaw/pitch、capture coordinator を確認した |
 | `uv run ruff format --check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ruff check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ty check --no-progress` / `git diff --check` | passed | format、lint、型、空白を確認した |
+| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps -q -p no:cacheprovider` | passed (1 passed) | 全 9 frame の swbt 角速度が同符号かつ同値であることを確認した |
 
 ## 10. 先送り事項
 

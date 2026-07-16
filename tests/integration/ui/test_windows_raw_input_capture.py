@@ -384,3 +384,4 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
         gyro_z_rates.append(converted.imu_frames[0].to_gyro_rate()[2])
 
     assert all(rate < 0.0 for rate in gyro_z_rates), gyro_z_rates
+    assert len(set(gyro_z_rates)) == 1, gyro_z_rates
