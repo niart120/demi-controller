@@ -178,6 +178,32 @@ def test_adapter_info_and_project_colors_cross_the_public_boundary() -> None:
             ),
         ),
     )
+
+
+def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
+    gamepad = RecordingGamepad()
+    constructor_kwargs: dict[str, object] = {}
+
+    def gamepad_factory(**kwargs: object) -> RecordingGamepad:
+        constructor_kwargs.update(kwargs)
+        return gamepad
+
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=gamepad_factory,
+        adapter_lister=lambda: (),
+        report_period_us=16_000,
+    )
+
+    asyncio.run(
+        adapter.connect_saved(
+            "usb:0",
+            Path("bond.json"),
+            30.0,
+            ControllerColorSettings(),
+        )
+    )
+
+    assert constructor_kwargs["report_period_us"] == 16_000
     assert constructor_kwargs["adapter"] == "usb:0"
     assert constructor_kwargs["key_store_path"] == "bond.json"
     swbt_colors = constructor_kwargs["controller_colors"]
