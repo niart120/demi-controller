@@ -6,6 +6,7 @@ from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalBut
 from demi.domain.mapping import default_profile
 from demi.domain.settings import MouseSettings
 from demi.input.publisher import InputPublisher
+from demi.input.yaw_pitch_model import BASE_YAW_RADIANS_PER_INPUT_UNIT
 
 
 @dataclass
@@ -125,6 +126,26 @@ def test_publisher_preserves_constant_gyro_rate_across_irregular_intervals() -> 
 
     assert gyro_z_rates[0] < 0.0
     assert gyro_z_rates == pytest.approx([gyro_z_rates[0]] * len(gyro_z_rates))
+
+
+def test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.publish(capture_active=True, capture_epoch=1)
+    interval_seconds = 0.008
+    gyro_z_rates: list[float] = []
+
+    for dx in (1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0):
+        publisher.state.add_mouse_motion(dx, 0.0)
+        clock.now_ns += 8_000_000
+        frame = publisher.publish(capture_active=True, capture_epoch=1)
+        gyro_z_rates.append(frame.gyro_rate.z_radians_per_second)
+
+    assert all(rate < 0.0 for rate in gyro_z_rates[:-1]), gyro_z_rates
+    assert gyro_z_rates[-1] == 0.0
+    assert sum(rate * interval_seconds for rate in gyro_z_rates) == pytest.approx(
+        -3 * BASE_YAW_RADIANS_PER_INPUT_UNIT
+    )
 
 
 def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
