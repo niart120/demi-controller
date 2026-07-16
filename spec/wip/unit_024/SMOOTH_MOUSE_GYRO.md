@@ -74,7 +74,7 @@
 | green | 疎な入力と評価間隔の揺れが重なっても総角変位を保つ | regression / edge | unit | 残量清算により 2 count の積分と入力後の 0 を保った |
 | refactor-skipped | 不規則な評価間隔で方向反転しても実入力の移動範囲を越えない | regression / edge | unit | 候補出力を未出力移動量で制限し、累積位置を 0 から +0.5 count の範囲に保った |
 | green | Windows 上の Qt 入力 timer と swbt report loop の実効周期を計測する | characterization | runtime | 8 ms 設定の Qt callback は平均 7.996 ms だが、16 ms 待機と 0 ms catch-up のバーストになった |
-| todo | 同一時刻の catch-up 評価が移動中のジャイロを 0 で上書きしない | regression / edge | integration | 16 ms 待機と同一時刻 callback の列を fake clock で再現する |
+| red | 同一時刻の catch-up 評価が移動中のジャイロを 0 で上書きしない | regression / edge | integration | 5回のcatch-up後にlatest swbt stateがすべて角速度0となった |
 | green | 機材不要の標準 gate と package build が通る | characterization | package | 207 unit、72 integration、ruff、ty、lock、build が通過した |
 | todo | 実機で低速・中速・高速のカメラ移動が滑らかで、停止後に流れない | regression | hardware | 環境値と時刻、入力条件、観測結果を記録する |
 
@@ -200,6 +200,12 @@ swbt-python 0.3.0 の report loop と同じ `asyncio.sleep(0.008)` は平均 9.4
 
 現行 `InputPublisher` は単調時刻が進まないcatch-up callbackで `dt_seconds = 0` とし、平滑化を通さず0 countを角速度0へ変換する。この0フレームが直前の非0フレームをruntimeのlatest-only stateで上書きする経路を、残る近接要因として検証する。
 
+### 7.16 同一時刻 catch-up の TDD red
+
+Windows Raw Inputから16 msごとに1 countを5回入力し、各入力評価の直後に単調時刻を進めずcatch-up評価を行った。runtimeのlatest-only stateに相当する各catch-up frameをswbt公開物理値へ変換すると、角速度Zは5回とも0となった。
+
+この列では公称の入力評価とreport周期がともに8 msでも、Qt callbackの位相が16/0 msへ偏るだけで移動中のstateが毎回0に上書きされる。修正後は各burstの最終stateが同符号かつ同値の非0角速度となる必要がある。
+
 ## 8. 対象ファイル
 
 | path | change | 内容 |
@@ -229,6 +235,7 @@ swbt-python 0.3.0 の report loop と同じ `asyncio.sleep(0.008)` は平均 9.4
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_does_not_overshoot_rotation_when_mouse_direction_reverses -q -p no:cacheprovider` | expected failed (1 failed) | +1 count から -1 count へ反転した際、累積出力が実入力の最大 +1 count を越えて +2 count となった |
 | `uv run pytest tests/unit/input/test_publisher.py::test_publisher_does_not_overshoot_rotation_when_mouse_direction_reverses tests/unit/input/test_publisher.py::test_publisher_preserves_sparse_rotation_across_irregular_intervals tests/unit/input/test_publisher.py::test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation tests/unit/input/test_publisher.py::test_publisher_preserves_constant_gyro_rate_across_irregular_intervals tests/unit/input/test_publisher.py::test_capture_boundary_discards_pending_smoothed_mouse_motion -q -p no:cacheprovider` | passed (5 passed) | 方向反転、周期揺れ、固定周期、一定速度、capture 境界を確認した |
 | `uv run python .tmp_input_timer_probe.py 8` / `uv run python .tmp_input_timer_probe.py 16` | passed | commit対象外の一時probeで Qt `PreciseTimer`、本番 `InputEvaluationMetrics`、`asyncio.sleep()` を各512回計測した。8 ms Qt callback は16/0 msのバーストとなり、16 ms設定でもasyncioのp95は31 msだった |
+| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_windows_timer_catch_up_does_not_overwrite_gyro_motion_with_zero -q -p no:cacheprovider` | expected failed (1 failed) | 16 ms待機と同一時刻catch-upを5回繰り返すと、catch-up後のswbt角速度Zがすべて0となった |
 | `uv run pytest tests/unit/input/test_publisher.py tests/unit/input/test_yaw_pitch_model.py tests/unit/application/test_coordinator.py tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed (25 passed) | 疎な Raw Input、総角変位、周期揺れ、既存 yaw/pitch、capture coordinator を確認した |
 | `uv run ruff format --check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ruff check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ty check --no-progress` / `git diff --check` | passed | format、lint、型、空白を確認した |
 | `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps -q -p no:cacheprovider` | passed (1 passed) | 全 9 frame の swbt 角速度が同符号かつ同値であることを確認した |

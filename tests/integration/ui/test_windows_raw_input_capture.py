@@ -385,3 +385,49 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
 
     assert all(rate < 0.0 for rate in gyro_z_rates), gyro_z_rates
     assert len(set(gyro_z_rates)) == 1, gyro_z_rates
+
+
+def test_windows_timer_catch_up_does_not_overwrite_gyro_motion_with_zero() -> None:
+    """Keep the latest gyro state moving after a same-timestamp timer catch-up."""
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=RecordingFrameSink())
+    messages = FakeNativeMessageReader(
+        {
+            index: NativeWindowsMessage(
+                message=WM_INPUT,
+                l_param=200 + index,
+                window_handle=0x1234,
+            )
+            for index in range(1, 6)
+        }
+    )
+    packets = FakeRawInputReader(
+        {200 + index: RawMousePacket(flags=0, dx=1, dy=0) for index in range(1, 6)}
+    )
+    backend = WindowsRawInputBackend(
+        registrar=FakeRawInputRegistrar(),
+        on_relative_motion=publisher.state.add_mouse_motion,
+        message_reader=messages,
+        raw_input_reader=packets,
+    )
+    backend.start_capture(0x1234, capture_epoch=1)
+    publisher.publish(capture_active=True, capture_epoch=1)
+
+    catch_up_gyro_z_rates: list[float] = []
+    for tick in range(1, 6):
+        assert (
+            backend.handle_native_event(
+                QByteArray(b"windows_generic_MSG"),
+                tick,
+                capture_epoch=1,
+            )
+            is False
+        )
+        clock.now_ns += 16_000_000
+        publisher.publish(capture_active=True, capture_epoch=1)
+        catch_up_frame = publisher.publish(capture_active=True, capture_epoch=1)
+        converted = frame_to_input_state(catch_up_frame)
+        catch_up_gyro_z_rates.append(converted.imu_frames[0].to_gyro_rate()[2])
+
+    assert all(rate < 0.0 for rate in catch_up_gyro_z_rates), catch_up_gyro_z_rates
+    assert len(set(catch_up_gyro_z_rates)) == 1, catch_up_gyro_z_rates
