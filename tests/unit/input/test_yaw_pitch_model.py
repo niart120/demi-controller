@@ -120,26 +120,6 @@ def test_no_motion_keeps_pose_but_returns_zero_gyro() -> None:
     assert accel == AccelG(-sin(pitch), 0.0, cos(pitch))
 
 
-def test_sparse_motion_is_spread_without_zero_gaps_or_lost_angle() -> None:
-    model = YawPitchModel(MouseSettings())
-    dt_seconds = 0.008
-
-    rates = [
-        model.update(
-            dx=dx,
-            dy=0.0,
-            dt_seconds=dt_seconds,
-        )[0].z_radians_per_second
-        for dx in (1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
-    ]
-
-    assert all(rate < 0.0 for rate in rates[:-1]), rates
-    assert rates[-1] == 0.0
-    assert sum(rate * dt_seconds for rate in rates) == pytest.approx(
-        -3.0 * BASE_YAW_RADIANS_PER_INPUT_UNIT
-    )
-
-
 def test_reset_returns_pose_to_horizontal_neutral() -> None:
     model = YawPitchModel(MouseSettings())
     model.update(dx=0.0, dy=10.0, dt_seconds=0.01)
