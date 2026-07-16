@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+import pytest
+
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.mapping import default_profile
 from demi.domain.settings import MouseSettings
@@ -103,6 +105,26 @@ def test_publisher_exposes_recent_input_evaluation_metrics() -> None:
     assert metrics.mean_interval_ms == 9.6
     assert metrics.p95_interval_ms == 16.0
     assert metrics.p99_interval_ms == 16.0
+
+
+def test_publisher_preserves_constant_gyro_rate_across_irregular_intervals() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.publish(capture_active=True, capture_epoch=1)
+    mouse_units_per_second = 500.0
+    gyro_z_rates: list[float] = []
+
+    for interval_ms in (4, 8, 16, 12, 5):
+        publisher.state.add_mouse_motion(
+            mouse_units_per_second * interval_ms / 1_000,
+            0.0,
+        )
+        clock.now_ns += interval_ms * 1_000_000
+        frame = publisher.publish(capture_active=True, capture_epoch=1)
+        gyro_z_rates.append(frame.gyro_rate.z_radians_per_second)
+
+    assert gyro_z_rates[0] < 0.0
+    assert gyro_z_rates == pytest.approx([gyro_z_rates[0]] * len(gyro_z_rates))
 
 
 def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
