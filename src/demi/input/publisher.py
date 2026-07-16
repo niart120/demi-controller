@@ -73,6 +73,8 @@ class InputPublisher:
         self._capture_epoch: int | None = None
         self._previous_mouse_x_per_second = 0.0
         self._previous_mouse_y_per_second = 0.0
+        self._pending_mouse_x_units = 0.0
+        self._pending_mouse_y_units = 0.0
         self._timing_metrics = InputEvaluationMetrics()
 
     @property
@@ -205,13 +207,22 @@ class InputPublisher:
         current_y_per_second = dy / dt_seconds
         smoothed_x_per_second = (self._previous_mouse_x_per_second + current_x_per_second) * 0.5
         smoothed_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
+        smoothed_dx = smoothed_x_per_second * dt_seconds
+        smoothed_dy = smoothed_y_per_second * dt_seconds
+        self._pending_mouse_x_units += dx - smoothed_dx
+        self._pending_mouse_y_units += dy - smoothed_dy
+        if dx == 0.0:
+            smoothed_dx += self._pending_mouse_x_units
+            self._pending_mouse_x_units = 0.0
+        if dy == 0.0:
+            smoothed_dy += self._pending_mouse_y_units
+            self._pending_mouse_y_units = 0.0
         self._previous_mouse_x_per_second = current_x_per_second
         self._previous_mouse_y_per_second = current_y_per_second
-        return (
-            smoothed_x_per_second * dt_seconds,
-            smoothed_y_per_second * dt_seconds,
-        )
+        return smoothed_dx, smoothed_dy
 
     def _reset_mouse_smoothing(self) -> None:
         self._previous_mouse_x_per_second = 0.0
         self._previous_mouse_y_per_second = 0.0
+        self._pending_mouse_x_units = 0.0
+        self._pending_mouse_y_units = 0.0
