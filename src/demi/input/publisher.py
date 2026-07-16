@@ -73,8 +73,8 @@ class InputPublisher:
         self._capture_epoch: int | None = None
         self._previous_mouse_x_per_second = 0.0
         self._previous_mouse_y_per_second = 0.0
-        self._pending_mouse_x_units = 0.0
-        self._pending_mouse_y_units = 0.0
+        self._unemitted_mouse_x_units = 0.0
+        self._unemitted_mouse_y_units = 0.0
         self._timing_metrics = InputEvaluationMetrics()
 
     @property
@@ -115,7 +115,7 @@ class InputPublisher:
         self._state.clear()
         self._last_monotonic_ns = None
         self._capture_epoch = None
-        self._reset_mouse_smoothing()
+        self._reset_mouse_resampling()
 
     def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
         """Evaluate current input and offer one controller frame.
@@ -134,11 +134,11 @@ class InputPublisher:
         if epoch_changed:
             self._state.clear()
             self._model.reset()
-            self._reset_mouse_smoothing()
+            self._reset_mouse_resampling()
         if not capture_active:
             self._state.clear()
             self._model.reset()
-            self._reset_mouse_smoothing()
+            self._reset_mouse_resampling()
 
         if first_evaluation or epoch_changed:
             dt_seconds = 0.0
@@ -153,7 +153,7 @@ class InputPublisher:
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
             if dt_seconds > 0.0:
-                dx, dy = self._smooth_mouse_motion(dx, dy, dt_seconds)
+                dx, dy = self._resample_mouse_motion(dx, dy, dt_seconds)
             buttons = aggregate_buttons(self._profile, self._state, capture_active=True)
             left_stick = synthesize_stick(
                 self._profile,
@@ -202,7 +202,7 @@ class InputPublisher:
             raise DomainValueError
         return value
 
-    def _smooth_mouse_motion(
+    def _resample_mouse_motion(
         self,
         dx: float,
         dy: float,
@@ -210,60 +210,62 @@ class InputPublisher:
     ) -> tuple[float, float]:
         current_x_per_second = dx / dt_seconds
         current_y_per_second = dy / dt_seconds
-        smoothed_x_per_second = (self._previous_mouse_x_per_second + current_x_per_second) * 0.5
-        smoothed_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
-        smoothed_dx = smoothed_x_per_second * dt_seconds
-        smoothed_dy = smoothed_y_per_second * dt_seconds
-        self._pending_mouse_x_units += dx
-        self._pending_mouse_y_units += dy
+        resampled_x_per_second = (self._previous_mouse_x_per_second + current_x_per_second) * 0.5
+        resampled_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
+        resampled_dx = resampled_x_per_second * dt_seconds
+        resampled_dy = resampled_y_per_second * dt_seconds
+        self._unemitted_mouse_x_units += dx
+        self._unemitted_mouse_y_units += dy
         if dx == 0.0 or self._can_emit_reversed_motion(
             current_x_per_second,
             self._previous_mouse_x_per_second,
-            self._pending_mouse_x_units,
+            self._unemitted_mouse_x_units,
         ):
-            smoothed_dx = self._pending_mouse_x_units
-            self._pending_mouse_x_units = 0.0
+            resampled_dx = self._unemitted_mouse_x_units
+            self._unemitted_mouse_x_units = 0.0
         else:
-            smoothed_dx = self._limit_to_pending_motion(
-                smoothed_dx,
-                self._pending_mouse_x_units,
+            resampled_dx = self._limit_to_unemitted_motion(
+                resampled_dx,
+                self._unemitted_mouse_x_units,
             )
-            self._pending_mouse_x_units -= smoothed_dx
+            self._unemitted_mouse_x_units -= resampled_dx
         if dy == 0.0 or self._can_emit_reversed_motion(
             current_y_per_second,
             self._previous_mouse_y_per_second,
-            self._pending_mouse_y_units,
+            self._unemitted_mouse_y_units,
         ):
-            smoothed_dy = self._pending_mouse_y_units
-            self._pending_mouse_y_units = 0.0
+            resampled_dy = self._unemitted_mouse_y_units
+            self._unemitted_mouse_y_units = 0.0
         else:
-            smoothed_dy = self._limit_to_pending_motion(
-                smoothed_dy,
-                self._pending_mouse_y_units,
+            resampled_dy = self._limit_to_unemitted_motion(
+                resampled_dy,
+                self._unemitted_mouse_y_units,
             )
-            self._pending_mouse_y_units -= smoothed_dy
+            self._unemitted_mouse_y_units -= resampled_dy
         self._previous_mouse_x_per_second = current_x_per_second
         self._previous_mouse_y_per_second = current_y_per_second
-        return smoothed_dx, smoothed_dy
+        return resampled_dx, resampled_dy
 
     @staticmethod
     def _can_emit_reversed_motion(
         current_per_second: float,
         previous_per_second: float,
-        pending: float,
+        unemitted: float,
     ) -> bool:
-        return current_per_second * previous_per_second < 0.0 and current_per_second * pending > 0.0
+        return (
+            current_per_second * previous_per_second < 0.0 and current_per_second * unemitted > 0.0
+        )
 
     @staticmethod
-    def _limit_to_pending_motion(candidate: float, pending: float) -> float:
-        if candidate * pending <= 0.0:
+    def _limit_to_unemitted_motion(candidate: float, unemitted: float) -> float:
+        if candidate * unemitted <= 0.0:
             return 0.0
-        if abs(candidate) > abs(pending):
-            return pending
+        if abs(candidate) > abs(unemitted):
+            return unemitted
         return candidate
 
-    def _reset_mouse_smoothing(self) -> None:
+    def _reset_mouse_resampling(self) -> None:
         self._previous_mouse_x_per_second = 0.0
         self._previous_mouse_y_per_second = 0.0
-        self._pending_mouse_x_units = 0.0
-        self._pending_mouse_y_units = 0.0
+        self._unemitted_mouse_x_units = 0.0
+        self._unemitted_mouse_y_units = 0.0

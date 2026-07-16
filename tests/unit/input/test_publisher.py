@@ -129,7 +129,7 @@ def test_publisher_preserves_constant_gyro_rate_across_irregular_intervals() -> 
     assert gyro_z_rates[1:] == pytest.approx([expected_rate] * (len(gyro_z_rates) - 1))
 
 
-def test_publisher_smooths_sparse_mouse_counts_without_changing_total_rotation() -> None:
+def test_publisher_resamples_sparse_mouse_counts_without_changing_total_rotation() -> None:
     clock = FakeClock()
     publisher = InputPublisher(clock=clock, sink=FakeSink())
     publisher.publish(capture_active=True, capture_epoch=1)
@@ -211,7 +211,7 @@ def test_publisher_applies_mouse_direction_reversal_without_a_zero_frame() -> No
     assert reversed_frame.gyro_rate.z_radians_per_second > 0.0
 
 
-def test_capture_boundary_discards_pending_smoothed_mouse_motion() -> None:
+def test_capture_boundary_discards_unemitted_resampled_mouse_motion() -> None:
     clock = FakeClock()
     publisher = InputPublisher(clock=clock, sink=FakeSink())
     publisher.publish(capture_active=True, capture_epoch=1)
