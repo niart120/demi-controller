@@ -174,7 +174,7 @@ class SystemClock:
 
     def monotonic_ns(self) -> int:
         """Return the current monotonic time in nanoseconds."""
-        return time.monotonic_ns()
+        return time.perf_counter_ns()
 
 
 class ApplicationSession:

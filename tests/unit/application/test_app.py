@@ -4,7 +4,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
-from demi.app import ApplicationDependencies, ApplicationSession, _window_spec_for, run_application
+import pytest
+
+import demi.app as app_module
+from demi.app import (
+    ApplicationDependencies,
+    ApplicationSession,
+    SystemClock,
+    _window_spec_for,
+    run_application,
+)
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.dialogs import DialogKind
 from demi.application.state import ConnectionState
@@ -35,6 +44,7 @@ from demi.domain.settings import (
     WindowSettings,
 )
 from demi.input.publisher import InputPublisher
+from demi.input.yaw_pitch_model import BASE_YAW_RADIANS_PER_INPUT_UNIT
 
 if TYPE_CHECKING:
     from demi.controller.adapter import ControllerAdapterFactory
@@ -163,6 +173,26 @@ class FakeGui:
         """Record one GUI loop entry."""
         self.runs += 1
         return self.exit_status
+
+
+def test_system_clock_keeps_eight_millisecond_mouse_gyro_continuous(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coarse_ticks = iter((0, 0, 15_625_000, 15_625_000, 31_250_000))
+    precise_ticks = iter((0, 8_000_000, 16_000_000, 24_000_000, 32_000_000))
+    monkeypatch.setattr(app_module.time, "monotonic_ns", lambda: next(coarse_ticks))
+    monkeypatch.setattr(app_module.time, "perf_counter_ns", lambda: next(precise_ticks))
+    publisher = InputPublisher(clock=SystemClock(), sink=FakeRuntime())
+    publisher.publish(capture_active=True, capture_epoch=1)
+
+    rates: list[float] = []
+    for _ in range(4):
+        publisher.state.add_mouse_motion(1.0, 0.0)
+        frame = publisher.publish(capture_active=True, capture_epoch=1)
+        rates.append(frame.gyro_rate.z_radians_per_second)
+
+    expected_rate = -BASE_YAW_RADIANS_PER_INPUT_UNIT / 0.008
+    assert rates[1:] == pytest.approx([expected_rate] * 3)
 
 
 def test_application_runner_assembles_boundaries_and_starts_the_runtime() -> None:

@@ -27,7 +27,7 @@ class SystemPreviewClock:
 
     def monotonic_ns(self) -> int:
         """Return the current process monotonic timestamp."""
-        return time.monotonic_ns()
+        return time.perf_counter_ns()
 
 
 class PreviewRepaintLimiter:
