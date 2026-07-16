@@ -104,6 +104,7 @@ markers = [
 - 移行
 - 旧Default profileの既存bindingを保持した診断target補完と `MIGRATED`
 - 診断targetのTOML往復、`amount = 1.0` 固定、反転拒否
+- 接続ローカル操作の Ctrl+Return / Ctrl+Enter 往復と、項目追加前のv1設定に対する既定値補完
 - binding競合
 
 ### 3.6 状態遷移
@@ -165,6 +166,7 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - 色変更プレビュー
 - エラー分類からユーザー向け文
 - モーダル排他
+- 捕捉中の Ctrl+Return / Ctrl+Enter が保持入力を解除せず、状態依存の接続actionを1回発行
 
 ### 4.4 Qt入力アダプター
 
@@ -176,6 +178,7 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - dx/dy
 - deactivate
 - F12優先
+- Ctrl+ReturnとCtrl+Enterを区別したshortcut配送
 
 実ウィンドウ試験は `ui` マーカーへ分離する。
 

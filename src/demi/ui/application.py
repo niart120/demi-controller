@@ -136,6 +136,9 @@ class QtApplicationEventRouter:
             return
         self._session = session
         self._window.set_input_state_changed_callback(self.refresh)
+        self._window.main_toolbar.set_connection_shortcuts(
+            session.settings.local_actions.connection
+        )
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
         self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
