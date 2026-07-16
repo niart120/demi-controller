@@ -1,13 +1,17 @@
 from dataclasses import dataclass
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
+import demi.ui.controller_preview as preview_module
 from demi.app import WindowSpec
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
 from demi.ui.controller_preview import (
     ControllerPreviewWidget,
+    PreviewRepaintLimiter,
+    SystemPreviewClock,
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
@@ -22,6 +26,18 @@ class FakeClock:
     def monotonic_ns(self) -> int:
         """Return the configured repaint timestamp."""
         return self.now_ns
+
+
+def test_system_preview_clock_preserves_the_sixty_hz_repaint_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coarse_ticks = iter((0, 0, 15_625_000, 15_625_000))
+    precise_ticks = iter((0, 8_000_000, 16_000_000, 17_000_000))
+    monkeypatch.setattr(preview_module.time, "monotonic_ns", lambda: next(coarse_ticks))
+    monkeypatch.setattr(preview_module.time, "perf_counter_ns", lambda: next(precise_ticks))
+    limiter = PreviewRepaintLimiter(clock=SystemPreviewClock())
+
+    assert [limiter.allows_repaint() for _ in range(4)] == [True, False, False, True]
 
 
 def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(

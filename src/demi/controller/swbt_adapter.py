@@ -87,10 +87,18 @@ class SwbtControllerAdapter(ControllerAdapter):
         *,
         gamepad_factory: GamepadFactory = ProController,
         adapter_lister: AdapterLister = list_adapters,
+        report_period_us: int = 8_000,
     ) -> None:
-        """Initialize an adapter with injectable public-API boundaries."""
+        """Initialize an adapter with injectable public-API boundaries.
+
+        Args:
+            gamepad_factory: Public swbt gamepad constructor.
+            adapter_lister: Public swbt adapter discovery function.
+            report_period_us: Periodic input report interval in microseconds.
+        """
         self._gamepad_factory = gamepad_factory
         self._adapter_lister = adapter_lister
+        self._report_period_us = report_period_us
         self._gamepad: SwbtGamepad | None = None
         self._adapter_id: str | None = None
         self._bond_path: Path | None = None
@@ -183,6 +191,7 @@ class SwbtControllerAdapter(ControllerAdapter):
             adapter=adapter_id,
             key_store_path=str(bond_path),
             controller_colors=to_swbt_colors(colors),
+            report_period_us=self._report_period_us,
         )
         self._adapter_id = adapter_id
         self._bond_path = bond_path

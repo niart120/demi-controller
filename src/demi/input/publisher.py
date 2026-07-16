@@ -56,8 +56,8 @@ class InputPublisher:
             mouse_settings: Mouse-to-IMU settings, defaulting to application
                 defaults.
             circular_limit: Whether diagonal stick values are normalized.
-            evaluation_interval_ms: Scheduled input evaluation interval.
-            evaluation_interval_ms: Interval between scheduled input evaluations.
+            evaluation_interval_ms: Interval between scheduled input evaluations,
+                in milliseconds.
         """
         self._clock = clock
         self._sink = sink
@@ -71,6 +71,10 @@ class InputPublisher:
         self._sequence = 0
         self._last_monotonic_ns: int | None = None
         self._capture_epoch: int | None = None
+        self._previous_mouse_x_per_second = 0.0
+        self._previous_mouse_y_per_second = 0.0
+        self._unemitted_mouse_x_units = 0.0
+        self._unemitted_mouse_y_units = 0.0
         self._timing_metrics = InputEvaluationMetrics()
 
     @property
@@ -111,6 +115,7 @@ class InputPublisher:
         self._state.clear()
         self._last_monotonic_ns = None
         self._capture_epoch = None
+        self._reset_mouse_resampling()
 
     def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
         """Evaluate current input and offer one controller frame.
@@ -129,17 +134,26 @@ class InputPublisher:
         if epoch_changed:
             self._state.clear()
             self._model.reset()
+            self._reset_mouse_resampling()
         if not capture_active:
             self._state.clear()
             self._model.reset()
+            self._reset_mouse_resampling()
 
         if first_evaluation or epoch_changed:
             dt_seconds = 0.0
         else:
-            dt_seconds = (now_ns - self._last_monotonic_ns) / 1_000_000_000.0
+            elapsed_ns = now_ns - self._last_monotonic_ns
+            dt_seconds = (
+                self._evaluation_interval_ms / 1_000.0
+                if elapsed_ns == 0
+                else elapsed_ns / 1_000_000_000.0
+            )
 
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
+            if dt_seconds > 0.0:
+                dx, dy = self._resample_mouse_motion(dx, dy, dt_seconds)
             buttons = aggregate_buttons(self._profile, self._state, capture_active=True)
             left_stick = synthesize_stick(
                 self._profile,
@@ -187,3 +201,71 @@ class InputPublisher:
         if isinstance(value, bool) or not isinstance(value, int) or not 4 <= value <= 32:
             raise DomainValueError
         return value
+
+    def _resample_mouse_motion(
+        self,
+        dx: float,
+        dy: float,
+        dt_seconds: float,
+    ) -> tuple[float, float]:
+        current_x_per_second = dx / dt_seconds
+        current_y_per_second = dy / dt_seconds
+        resampled_x_per_second = (self._previous_mouse_x_per_second + current_x_per_second) * 0.5
+        resampled_y_per_second = (self._previous_mouse_y_per_second + current_y_per_second) * 0.5
+        resampled_dx = resampled_x_per_second * dt_seconds
+        resampled_dy = resampled_y_per_second * dt_seconds
+        self._unemitted_mouse_x_units += dx
+        self._unemitted_mouse_y_units += dy
+        if dx == 0.0 or self._can_emit_reversed_motion(
+            current_x_per_second,
+            self._previous_mouse_x_per_second,
+            self._unemitted_mouse_x_units,
+        ):
+            resampled_dx = self._unemitted_mouse_x_units
+            self._unemitted_mouse_x_units = 0.0
+        else:
+            resampled_dx = self._limit_to_unemitted_motion(
+                resampled_dx,
+                self._unemitted_mouse_x_units,
+            )
+            self._unemitted_mouse_x_units -= resampled_dx
+        if dy == 0.0 or self._can_emit_reversed_motion(
+            current_y_per_second,
+            self._previous_mouse_y_per_second,
+            self._unemitted_mouse_y_units,
+        ):
+            resampled_dy = self._unemitted_mouse_y_units
+            self._unemitted_mouse_y_units = 0.0
+        else:
+            resampled_dy = self._limit_to_unemitted_motion(
+                resampled_dy,
+                self._unemitted_mouse_y_units,
+            )
+            self._unemitted_mouse_y_units -= resampled_dy
+        self._previous_mouse_x_per_second = current_x_per_second
+        self._previous_mouse_y_per_second = current_y_per_second
+        return resampled_dx, resampled_dy
+
+    @staticmethod
+    def _can_emit_reversed_motion(
+        current_per_second: float,
+        previous_per_second: float,
+        unemitted: float,
+    ) -> bool:
+        return (
+            current_per_second * previous_per_second < 0.0 and current_per_second * unemitted > 0.0
+        )
+
+    @staticmethod
+    def _limit_to_unemitted_motion(candidate: float, unemitted: float) -> float:
+        if candidate * unemitted <= 0.0:
+            return 0.0
+        if abs(candidate) > abs(unemitted):
+            return unemitted
+        return candidate
+
+    def _reset_mouse_resampling(self) -> None:
+        self._previous_mouse_x_per_second = 0.0
+        self._previous_mouse_y_per_second = 0.0
+        self._unemitted_mouse_x_units = 0.0
+        self._unemitted_mouse_y_units = 0.0
