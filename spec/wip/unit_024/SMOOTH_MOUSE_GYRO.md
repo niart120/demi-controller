@@ -70,7 +70,7 @@
 | green | swbt の 3 IMU slot が移動中の連続した標本として変換される | characterization / regression | unit | 現行の断続列は 3 slot 単位の非 0 block と 0 block になる |
 | refactor-skipped | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する。追加の production 整理は不要 |
 | green | 評価間隔が揺れても一定速度入力の角速度と総角変位を保つ | regression | unit | 4、8、16、12、5 ms で角速度が一致した |
-| todo | runtime が評価フレームを置換しても送信ジャイロの連続性を保つ | characterization / regression | integration | `apply()` 待機を制御する fake を使う |
+| green | 機材不要の標準 gate と package build が通る | characterization | package | 205 unit、72 integration、ruff、ty、lock、build が通過した |
 | todo | 実機で低速・中速・高速のカメラ移動が滑らかで、停止後に流れない | regression | hardware | 環境値と時刻、入力条件、観測結果を記録する |
 
 status は `todo`、`red`、`green`、`refactor-done`、`refactor-skipped`、`deferred` を使う。
@@ -190,6 +190,12 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 | `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps -q -p no:cacheprovider` | passed (1 passed) | 全 9 frame の swbt 角速度が同符号かつ同値であることを確認した |
 | `uv run pytest tests/unit/application/test_app.py::test_application_runner_aligns_report_period_with_saved_input_interval tests/unit/controller/test_swbt_adapter.py::test_configured_report_period_crosses_the_public_gamepad_boundary tests/integration/controller/test_swbt_lifecycle.py -q -p no:cacheprovider` | passed (4 passed) | 保存済み 16 ms、adapter 16000 µs、既存 swbt lifecycle を確認した |
 | `uv run ty check --no-progress` / `uv run ruff check src/demi/app.py src/demi/controller/swbt_adapter.py tests/unit/application/test_app.py tests/unit/controller/test_swbt_adapter.py` / `uv run ruff format --check src/demi/app.py src/demi/controller/swbt_adapter.py tests/unit/application/test_app.py tests/unit/controller/test_swbt_adapter.py` | passed | 型境界、Google style docstring、lint、format を確認した |
+| `uv sync --dev` / `uv lock --check` | passed | 77 packages resolved、74 packages checked |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` / `git diff --check` | passed | 129 files formatted、lint、型、空白を確認した |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed (205 passed) | 全 unit tree |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed (72 passed) | controller、UI、package integration tree |
+| `uv build` | passed | `dist/demi_controller-0.1.0.tar.gz` と `dist/demi_controller-0.1.0-py3-none-any.whl` を生成した |
+| 実機ゲーム内カメラ確認 | not run | Bluetooth アダプター、対象機器、ゲーム操作を伴うため利用者受入を実施する |
 
 ## 10. 先送り事項
 
