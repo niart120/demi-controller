@@ -65,7 +65,7 @@
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-done | 16 ms ごとの 1 count を 8 ms ごとに評価しても、移動区間の swbt ジャイロ値に 0 が入らない | regression | integration | 全 9 frame の swbt 物理値が同符号かつ同値であることを固定した |
-| green | 保存済み入力評価周期と swbt-python の report 周期が一致する | characterization | integration | 保存設定は 8 ms、swbt-python 0.3.0 の Pro Controller 既定値は 8000 µs |
+| refactor-done | 保存済み入力評価周期と swbt-python の report 周期が一致する | characterization / regression | integration | 16 ms の保存値が swbt 公開 constructor の 16000 µs へ渡ることを固定した |
 | green | frame 変換と swbt-python state 差し替えが 8 ms 周期内に完了する | characterization | integration | 各 10,000 回の p99 は 9.5 µs と 0.9 µs |
 | green | swbt の 3 IMU slot が移動中の連続した標本として変換される | characterization / regression | unit | 現行の断続列は 3 slot 単位の非 0 block と 0 block になる |
 | refactor-skipped | 連続入力の総角変位が平滑化の有無で変わらず、入力停止後に 0 へ収束する | regression / edge | unit | 3 count の積分を保ち、1 評価の tail 後に 0 へ収束する。追加の production 整理は不要 |
@@ -153,12 +153,22 @@ Tidy 分類は behavior change である。公開 API と設定を増やさず `
 
 integration test は非 0 の確認だけでは振幅変調を見逃すため、全 9 frame の swbt 角速度が同値である assertion を追加した。同じ再現 command は 0.17 秒で通過した。
 
+### 7.10 入力評価と report 周期の整合
+
+`SwbtControllerAdapter` は `report_period_us` を受け取り、swbt-python の公開 `ProController` constructor へ明示的に渡す。app 組み立ては保存済み `evaluation_interval_ms` を 1000 倍し、入力評価と同じ周期を runtime の adapter factory に固定する。既定 8 ms だけでなく、16 ms の保存設定が 16000 µs として渡ることを app と adapter の境界試験で確認した。
+
+`SwbtControllerAdapter` は package root から export されない controller adapter 境界である。追加引数は `int` と µs 単位の Google style docstring が一致し、`ty`、ruff、関係試験を通過した。production の `Any`、`cast()`、type ignore は追加していない。test の `cast()` は `**kwargs: object` で受けた既存 runtime factory 引数を `ControllerAdapterFactory` へ絞る局所境界に限定する。
+
 ## 8. 対象ファイル
 
 | path | change | 内容 |
 |---|---|---|
 | `src/demi/input/publisher.py` | modify | 評価区間の mouse 速度を 2-tap 平滑化し、状態遷移で履歴を破棄する |
+| `src/demi/app.py` | modify | 保存済み入力評価周期を adapter factory の report 周期へ渡す |
+| `src/demi/controller/swbt_adapter.py` | modify | report 周期を swbt 公開 constructor へ渡す |
 | `tests/integration/ui/test_windows_raw_input_capture.py` | modify | Raw Input から swbt 物理値までの連続性再現 |
+| `tests/unit/application/test_app.py` | modify | 保存済み 16 ms と swbt 16000 µs の組み立て境界 |
+| `tests/unit/controller/test_swbt_adapter.py` | modify | report 周期の公開 gamepad 境界 |
 | `tests/unit/input/test_publisher.py` | modify | 評価周期の揺れを分離した一定速度の回帰試験 |
 | `spec/wip/unit_024/SMOOTH_MOUSE_GYRO.md` | new | 原因分析、TDD 状態、検証結果、実機受入記録 |
 
@@ -178,6 +188,8 @@ integration test は非 0 の確認だけでは振幅変調を見逃すため、
 | `uv run pytest tests/unit/input/test_publisher.py tests/unit/input/test_yaw_pitch_model.py tests/unit/application/test_coordinator.py tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed (25 passed) | 疎な Raw Input、総角変位、周期揺れ、既存 yaw/pitch、capture coordinator を確認した |
 | `uv run ruff format --check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ruff check src/demi/input/publisher.py tests/unit/input/test_publisher.py` / `uv run ty check --no-progress` / `git diff --check` | passed | format、lint、型、空白を確認した |
 | `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps -q -p no:cacheprovider` | passed (1 passed) | 全 9 frame の swbt 角速度が同符号かつ同値であることを確認した |
+| `uv run pytest tests/unit/application/test_app.py::test_application_runner_aligns_report_period_with_saved_input_interval tests/unit/controller/test_swbt_adapter.py::test_configured_report_period_crosses_the_public_gamepad_boundary tests/integration/controller/test_swbt_lifecycle.py -q -p no:cacheprovider` | passed (4 passed) | 保存済み 16 ms、adapter 16000 µs、既存 swbt lifecycle を確認した |
+| `uv run ty check --no-progress` / `uv run ruff check src/demi/app.py src/demi/controller/swbt_adapter.py tests/unit/application/test_app.py tests/unit/controller/test_swbt_adapter.py` / `uv run ruff format --check src/demi/app.py src/demi/controller/swbt_adapter.py tests/unit/application/test_app.py tests/unit/controller/test_swbt_adapter.py` | passed | 型境界、Google style docstring、lint、format を確認した |
 
 ## 10. 先送り事項
 
