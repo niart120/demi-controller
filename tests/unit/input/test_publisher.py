@@ -159,9 +159,7 @@ def test_publisher_preserves_sparse_rotation_across_irregular_intervals() -> Non
         publisher.state.add_mouse_motion(dx, 0.0)
         clock.now_ns += interval_ms * 1_000_000
         frame = publisher.publish(capture_active=True, capture_epoch=1)
-        gyro_z_samples.append(
-            (frame.gyro_rate.z_radians_per_second, interval_ms / 1_000)
-        )
+        gyro_z_samples.append((frame.gyro_rate.z_radians_per_second, interval_ms / 1_000))
 
     assert all(rate < 0.0 for rate, _interval in gyro_z_samples[:-1])
     assert gyro_z_samples[-1][0] == 0.0
