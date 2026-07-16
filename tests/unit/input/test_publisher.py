@@ -168,6 +168,32 @@ def test_publisher_preserves_sparse_rotation_across_irregular_intervals() -> Non
     )
 
 
+def test_publisher_does_not_overshoot_rotation_when_mouse_direction_reverses() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink())
+    publisher.publish(capture_active=True, capture_epoch=1)
+    emitted_mouse_units: list[float] = []
+
+    for dx, interval_ms in ((1.0, 4), (-1.0, 16), (0.0, 8)):
+        publisher.state.add_mouse_motion(dx, 0.0)
+        clock.now_ns += interval_ms * 1_000_000
+        frame = publisher.publish(capture_active=True, capture_epoch=1)
+        emitted_mouse_units.append(
+            -frame.gyro_rate.z_radians_per_second
+            * (interval_ms / 1_000)
+            / BASE_YAW_RADIANS_PER_INPUT_UNIT
+        )
+
+    cumulative_mouse_units: list[float] = []
+    total_mouse_units = 0.0
+    for emitted_mouse_unit in emitted_mouse_units:
+        total_mouse_units += emitted_mouse_unit
+        cumulative_mouse_units.append(total_mouse_units)
+
+    assert max(cumulative_mouse_units) <= 1.0
+    assert cumulative_mouse_units[-1] == pytest.approx(0.0)
+
+
 def test_capture_boundary_discards_pending_smoothed_mouse_motion() -> None:
     clock = FakeClock()
     publisher = InputPublisher(clock=clock, sink=FakeSink())
