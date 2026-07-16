@@ -135,6 +135,16 @@ RIGHT_STICK:LEFT
 RIGHT_STICK:RIGHT
 ```
 
+### IMU 診断対象
+
+```text
+GYRO:Y_NEGATIVE
+GYRO:Y_POSITIVE
+GYRO:Z_POSITIVE
+GYRO:Z_NEGATIVE
+ACCEL:ZERO
+```
+
 UI表示では日本語へ変換してよいが、設定値は英大文字の正規名とする。
 
 ## 6. コントローラー用語

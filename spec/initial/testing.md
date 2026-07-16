@@ -85,12 +85,12 @@ markers = [
 - `dt <= 0` で姿勢を更新せず、ジャイロ0と現在姿勢の1G
 - reset後のpitch=0、加速度 `(0, 0, +1) G`
 - 1周期内差分合計
-- I/K保持で評価間隔とマウスジャイロ設定に依存しない Y 軸 `-1.0 / +1.0 rad/s`
-- J/L保持で評価間隔とマウスジャイロ設定に依存しない Z 軸 `+1.0 / -1.0 rad/s`
-- I/KまたはJ/Lの同時保持による対象軸の相殺
-- I/J/K/Lと同じ source の profile binding を評価しない
-- マウス由来とI/J/K/L由来の角速度を軸ごとに加算
-- キー解放、捕捉解除、捕捉 epoch 変更で固定診断入力が残留しない
+- profileで変更したsourceから診断ジャイロ4方向を評価し、評価間隔とマウスジャイロ設定に依存しない `1.0 rad/s` を生成する
+- 同一軸の正負診断targetを同時保持した場合の相殺
+- 診断targetと同じsourceのボタンまたはスティックbindingを評価しない
+- マウス由来と診断target由来の角速度を軸ごとに加算
+- `ACCEL:ZERO` 保持中だけ最終フレームを完全な0Gとし、内部pitchを維持したまま解放後に静的1Gへ戻る
+- キー解放、捕捉解除、捕捉 epoch 変更で診断入力が残留しない
 
 ### 3.5 設定
 
@@ -102,6 +102,8 @@ markers = [
 - bond slot検証
 - 未知schema
 - 移行
+- 旧Default profileの既存bindingを保持した診断target補完と `MIGRATED`
+- 診断targetのTOML往復、`amount = 1.0` 固定、反転拒否
 - binding競合
 
 ### 3.6 状態遷移
@@ -186,7 +188,9 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - `GyroRate` が `IMUFrame.gyro_rate()` へrad/sのまま渡される
 - `AccelG` が `with_accel_g()` へGのまま渡され、ジャイロを保持した同一フレームになる
 - 生成IMUフレームが3スロットへ複製される
-- 定常rest状態はジャイロ0、加速度 `(0, 0, +1) G` であり、0Gを送らない
+- 定常rest状態はジャイロ0、加速度 `(0, 0, +1) G` であり、診断外では0Gを送らない
+- 捕捉中0Gの最新フレームがある接続では、初期フレームの操作値をニュートラル、加速度を0Gとする
+- 切断とwatchdogの安全ニュートラルは、接続初期0G診断後も `(0, 0, +1) G` を維持する
 - 完全なInputStateを1回のapplyへ渡す
 - ControllerColorsの4色
 - swbt例外がControllerErrorCategoryへ変換される

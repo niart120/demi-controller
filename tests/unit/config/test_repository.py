@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from demi.config import repository as repository_module
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadStatus, SettingsPersistenceError, SettingsRepository
+from demi.domain.mapping import Binding, BindingTarget, InputProfile, default_profile
 from demi.domain.settings import AppSettings
 
 
@@ -35,6 +37,53 @@ def test_save_then_load_returns_the_same_settings(paths: SettingsPaths) -> None:
     assert result.status is SettingsLoadStatus.LOADED
     assert result.settings == settings
     assert paths.settings_file.exists()
+
+
+def test_load_migrates_missing_default_diagnostics_without_rewriting_settings_file(
+    paths: SettingsPaths,
+) -> None:
+    repository = SettingsRepository(paths)
+    current_default = default_profile()
+    legacy_bindings = (
+        replace(current_default.bindings[0], source="KEY:P"),
+        *current_default.bindings[1:28],
+    )
+    legacy_settings = replace(
+        AppSettings.default(),
+        profiles=(replace(current_default, bindings=legacy_bindings),),
+    )
+    repository.save(legacy_settings)
+    saved_text = paths.settings_file.read_text(encoding="utf-8")
+
+    result = repository.load()
+
+    assert result.status is SettingsLoadStatus.MIGRATED
+    assert result.settings.profiles[0].bindings[:28] == legacy_bindings
+    assert [binding.target for binding in result.settings.profiles[0].bindings[28:]] == [
+        BindingTarget.GYRO_Y_NEGATIVE,
+        BindingTarget.GYRO_Y_POSITIVE,
+        BindingTarget.GYRO_Z_POSITIVE,
+        BindingTarget.GYRO_Z_NEGATIVE,
+        BindingTarget.ACCEL_ZERO,
+    ]
+    assert paths.settings_file.read_text(encoding="utf-8") == saved_text
+
+
+def test_load_does_not_add_diagnostics_to_a_custom_profile(paths: SettingsPaths) -> None:
+    repository = SettingsRepository(paths)
+    custom = InputProfile(
+        id="custom",
+        name="Custom",
+        builtin=False,
+        bindings=(Binding("KEY:F", BindingTarget.BUTTON_A),),
+    )
+    settings = replace(AppSettings.default(), active_profile="custom", profiles=(custom,))
+    repository.save(settings)
+
+    result = repository.load()
+
+    assert result.status is SettingsLoadStatus.LOADED
+    assert result.settings == settings
 
 
 def test_corrupt_file_is_preserved_and_defaults_are_recovered(paths: SettingsPaths) -> None:

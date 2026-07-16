@@ -45,6 +45,11 @@ def test_default_profile_contains_the_documented_bindings_in_order() -> None:
         ("KEY:2", "BUTTON:DPAD_RIGHT"),
         ("KEY:3", "BUTTON:DPAD_DOWN"),
         ("KEY:4", "BUTTON:DPAD_LEFT"),
+        ("KEY:I", "GYRO:Y_NEGATIVE"),
+        ("KEY:K", "GYRO:Y_POSITIVE"),
+        ("KEY:J", "GYRO:Z_POSITIVE"),
+        ("KEY:L", "GYRO:Z_NEGATIVE"),
+        ("KEY:O", "ACCEL:ZERO"),
     ]
     assert all(binding.inverted is False for binding in profile.bindings)
 
@@ -66,6 +71,26 @@ def test_stick_binding_rejects_inversion_and_out_of_range_amount() -> None:
         Binding(source="KEY:W", target=BindingTarget.LEFT_STICK_UP, inverted=True)
     with pytest.raises(DomainValueError):
         Binding(source="KEY:W", target=BindingTarget.LEFT_STICK_UP, amount=1.001)
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        BindingTarget.GYRO_Y_NEGATIVE,
+        BindingTarget.GYRO_Y_POSITIVE,
+        BindingTarget.GYRO_Z_POSITIVE,
+        BindingTarget.GYRO_Z_NEGATIVE,
+        BindingTarget.ACCEL_ZERO,
+    ],
+)
+def test_diagnostic_binding_requires_fixed_amount_without_inversion(
+    target: BindingTarget,
+) -> None:
+    assert Binding(source="KEY:O", target=target).amount == 1.0
+    with pytest.raises(DomainValueError):
+        Binding(source="KEY:O", target=target, amount=0.5)
+    with pytest.raises(DomainValueError):
+        Binding(source="KEY:O", target=target, inverted=True)
 
 
 def test_binding_accepts_normalized_modifier_source() -> None:

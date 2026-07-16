@@ -5,28 +5,50 @@ from typing import Literal
 
 from demi.domain.controller import GyroRate, LogicalButton, StickVector
 from demi.domain.errors import DomainValueError
-from demi.domain.mapping import InputProfile, is_button_target, logical_button_for_target
+from demi.domain.mapping import (
+    BindingTarget,
+    InputProfile,
+    is_button_target,
+    is_diagnostic_target,
+    logical_button_for_target,
+)
 from demi.domain.physical_input import PhysicalInputState
 
-IJKL_GYRO_RADIANS_PER_SECOND = 1.0
-_IJKL_GYRO_SOURCES = frozenset(
-    {
-        "KEY:I",
-        "KEY:K",
-        "KEY:J",
-        "KEY:L",
-    }
-)
+DIAGNOSTIC_GYRO_RADIANS_PER_SECOND = 1.0
 
 
-def synthesize_ijkl_gyro(
+def is_accel_zero_active(
+    profile: InputProfile,
+    state: PhysicalInputState,
+    *,
+    capture_active: bool = True,
+) -> bool:
+    """Return whether an active binding requests a zero-G diagnostic frame.
+
+    Args:
+        profile: Profile whose diagnostic bindings are evaluated.
+        state: Current normalized held-input state.
+        capture_active: Disable the diagnostic input when false.
+
+    Returns:
+        Whether the final frame acceleration should be overridden with zero.
+    """
+    return capture_active and any(
+        binding.target is BindingTarget.ACCEL_ZERO and state.is_source_active(binding.source)
+        for binding in profile.bindings
+    )
+
+
+def synthesize_diagnostic_gyro(
+    profile: InputProfile,
     state: PhysicalInputState,
     *,
     capture_active: bool = True,
 ) -> GyroRate:
-    """Convert held I/J/K/L keys into fixed diagnostic Y/Z gyro rates.
+    """Convert active profile diagnostics into fixed Y/Z gyro rates.
 
     Args:
+        profile: Profile whose diagnostic bindings are evaluated.
         state: Current normalized held-input state.
         capture_active: Disable the diagnostic input when false.
 
@@ -35,12 +57,19 @@ def synthesize_ijkl_gyro(
     """
     if not capture_active:
         return GyroRate(0.0, 0.0, 0.0)
-    y_direction = float(state.is_source_active("KEY:K")) - float(state.is_source_active("KEY:I"))
-    z_direction = float(state.is_source_active("KEY:J")) - float(state.is_source_active("KEY:L"))
+    active_targets = {
+        binding.target for binding in profile.bindings if state.is_source_active(binding.source)
+    }
+    y_direction = float(BindingTarget.GYRO_Y_POSITIVE in active_targets) - float(
+        BindingTarget.GYRO_Y_NEGATIVE in active_targets
+    )
+    z_direction = float(BindingTarget.GYRO_Z_POSITIVE in active_targets) - float(
+        BindingTarget.GYRO_Z_NEGATIVE in active_targets
+    )
     return GyroRate(
         x_radians_per_second=0.0,
-        y_radians_per_second=y_direction * IJKL_GYRO_RADIANS_PER_SECOND,
-        z_radians_per_second=z_direction * IJKL_GYRO_RADIANS_PER_SECOND,
+        y_radians_per_second=y_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND,
+        z_radians_per_second=z_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND,
     )
 
 
@@ -63,9 +92,10 @@ def aggregate_buttons(
     """
     if not capture_active:
         return frozenset()
+    diagnostic_sources = _diagnostic_sources(profile)
     buttons: set[LogicalButton] = set()
     for binding in profile.bindings:
-        if binding.source in _IJKL_GYRO_SOURCES:
+        if binding.source in diagnostic_sources:
             continue
         if is_button_target(binding.target) and (
             state.is_source_active(binding.source) ^ binding.inverted
@@ -104,8 +134,9 @@ def synthesize_stick(
     x_positive = 0.0
     y_negative = 0.0
     y_positive = 0.0
+    diagnostic_sources = _diagnostic_sources(profile)
     for binding in profile.bindings:
-        if binding.source in _IJKL_GYRO_SOURCES:
+        if binding.source in diagnostic_sources:
             continue
         target = binding.target.value
         if not target.startswith(prefix) or not state.is_source_active(binding.source):
@@ -127,3 +158,9 @@ def synthesize_stick(
         x /= length
         y /= length
     return StickVector(x=x, y=y)
+
+
+def _diagnostic_sources(profile: InputProfile) -> frozenset[str]:
+    return frozenset(
+        binding.source for binding in profile.bindings if is_diagnostic_target(binding.target)
+    )

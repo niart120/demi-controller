@@ -185,7 +185,13 @@ def test_commands_are_ordered_on_worker_and_events_return_to_the_sink() -> None:
     assert len(set(adapter.thread_ids)) == 1
 
 
-def make_frame(*, sequence: int, epoch: int, active: bool = True) -> ControllerFrame:
+def make_frame(
+    *,
+    sequence: int,
+    epoch: int,
+    active: bool = True,
+    zero_g: bool = False,
+) -> ControllerFrame:
     """Build a valid frame for runtime mailbox integration tests."""
     return ControllerFrame(
         sequence=sequence,
@@ -195,9 +201,57 @@ def make_frame(*, sequence: int, epoch: int, active: bool = True) -> ControllerF
         left_stick=StickVector(x=0.0, y=0.0),
         right_stick=StickVector(x=0.0, y=0.0),
         gyro_rate=GyroRate(0.0, 0.0, 0.0),
-        accel_g=AccelG(0.0, 0.0, 1.0),
+        accel_g=AccelG(0.0, 0.0, 0.0 if zero_g else 1.0),
         capture_active=active,
     )
+
+
+def test_captured_zero_g_is_used_only_for_the_connection_initial_frame() -> None:
+    adapter = RecordingAdapter()
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    pending = make_frame(sequence=1, epoch=1, zero_g=True)
+    assert runtime.offer_frame(pending) is True
+
+    for _ in range(10):
+        events.status.clear()
+        runtime.post(RequestStatus())
+        assert events.status.wait(timeout=1.0)
+        snapshot = next(
+            event for event in reversed(events.events) if isinstance(event, StatusSnapshot)
+        )
+        if snapshot.latest_frame == pending:
+            break
+    assert snapshot.latest_frame == pending
+
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bonds/default.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+
+    initial = adapter.applied_frames[0]
+    assert initial.capture_active is False
+    assert initial.buttons == frozenset()
+    assert initial.left_stick == StickVector(0.0, 0.0)
+    assert initial.right_stick == StickVector(0.0, 0.0)
+    assert initial.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert initial.accel_g == AccelG(0.0, 0.0, 0.0)
+
+    runtime.post(Disconnect())
+    assert events.ready_after_disconnect.wait(timeout=1.0)
+
+    assert adapter.applied_frames[-1].accel_g == AccelG(0.0, 0.0, 1.0)
+    runtime.close()
 
 
 def test_unconnected_frames_are_retained_and_connected_worker_applies_latest_only() -> None:

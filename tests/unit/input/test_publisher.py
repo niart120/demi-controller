@@ -67,16 +67,17 @@ def test_publisher_uses_elapsed_clock_time_and_current_input_state() -> None:
 
 
 @pytest.mark.parametrize(
-    ("symbol", "expected_gyro"),
+    ("symbol", "target", "expected_gyro"),
     [
-        ("I", GyroRate(0.0, -1.0, 0.0)),
-        ("K", GyroRate(0.0, 1.0, 0.0)),
-        ("J", GyroRate(0.0, 0.0, 1.0)),
-        ("L", GyroRate(0.0, 0.0, -1.0)),
+        ("U", BindingTarget.GYRO_Y_NEGATIVE, GyroRate(0.0, -1.0, 0.0)),
+        ("N", BindingTarget.GYRO_Y_POSITIVE, GyroRate(0.0, 1.0, 0.0)),
+        ("H", BindingTarget.GYRO_Z_POSITIVE, GyroRate(0.0, 0.0, 1.0)),
+        ("M", BindingTarget.GYRO_Z_NEGATIVE, GyroRate(0.0, 0.0, -1.0)),
     ],
 )
-def test_ijkl_keys_emit_constant_gyro_without_regular_mapping(
+def test_profile_diagnostic_keys_emit_constant_gyro_without_regular_mapping(
     symbol: str,
+    target: BindingTarget,
     expected_gyro: GyroRate,
 ) -> None:
     clock = FakeClock()
@@ -85,6 +86,7 @@ def test_ijkl_keys_emit_constant_gyro_without_regular_mapping(
         name="Conflicting",
         builtin=False,
         bindings=(
+            Binding(f"KEY:{symbol}", target),
             Binding(f"KEY:{symbol}", BindingTarget.RIGHT_STICK_UP),
             Binding(f"KEY:{symbol}", BindingTarget.BUTTON_A),
         ),
@@ -168,6 +170,51 @@ def test_ijkl_gyro_is_added_to_mouse_gyro() -> None:
         mouse_only.gyro_rate.z_radians_per_second + 1.0
     )
     assert mouse_and_keys.accel_g == mouse_only.accel_g
+
+
+def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
+    clock = FakeClock()
+    profile = InputProfile(
+        id="diagnostic",
+        name="Diagnostic",
+        builtin=False,
+        bindings=(
+            Binding("KEY:P", BindingTarget.ACCEL_ZERO),
+            Binding("KEY:U", BindingTarget.GYRO_Y_NEGATIVE),
+            Binding("KEY:P", BindingTarget.BUTTON_A),
+        ),
+    )
+    publisher = InputPublisher(clock=clock, sink=FakeSink(), profile=profile)
+    publisher.publish(capture_active=True, capture_epoch=1)
+    publisher.state.add_mouse_motion(0.0, 4.0)
+    for _ in range(3):
+        clock.now_ns += 8_000_000
+        normal = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert normal.accel_g != AccelG(0.0, 0.0, 1.0)
+
+    publisher.state.press_key("P")
+    publisher.state.press_key("U")
+    clock.now_ns += 8_000_000
+    zero_g = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert zero_g.accel_g == AccelG(0.0, 0.0, 0.0)
+    assert zero_g.gyro_rate == GyroRate(0.0, -1.0, 0.0)
+    assert zero_g.buttons == frozenset()
+
+    publisher.state.release_key("P")
+    publisher.state.release_key("U")
+    clock.now_ns += 8_000_000
+    restored = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert restored.accel_g == normal.accel_g
+    assert restored.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+
+    publisher.state.press_key("P")
+    released = publisher.publish(capture_active=False, capture_epoch=2)
+
+    assert released.accel_g == AccelG(0.0, 0.0, 1.0)
+    assert publisher.state.held_keys == set()
 
 
 def test_capture_release_emits_neutral_and_clears_held_input() -> None:
