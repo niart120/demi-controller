@@ -8,6 +8,7 @@ from demi.application.coordinator import CaptureCoordinator
 from demi.application.state import AppState
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
+from demi.controller.swbt_adapter import frame_to_input_state
 from demi.domain.controller import ControllerFrame
 from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
@@ -338,3 +339,48 @@ def test_repeated_raw_input_read_failures_stop_capture_with_a_safe_warning() -> 
     assert publisher.state.consume_mouse_motion() == (0.0, 0.0)
     assert session.presentation.model.warning == "相対マウス入力を停止しました"
     assert "0xCAFE" not in session.presentation.model.warning
+
+
+def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
+    """Reject stop-start gyro output while a slow mouse move remains in progress."""
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=RecordingFrameSink())
+    messages = FakeNativeMessageReader(
+        {
+            index: NativeWindowsMessage(
+                message=WM_INPUT,
+                l_param=100 + index,
+                window_handle=0x1234,
+            )
+            for index in range(1, 6)
+        }
+    )
+    packets = FakeRawInputReader(
+        {100 + index: RawMousePacket(flags=0, dx=1, dy=0) for index in range(1, 6)}
+    )
+    backend = WindowsRawInputBackend(
+        registrar=FakeRawInputRegistrar(),
+        on_relative_motion=publisher.state.add_mouse_motion,
+        message_reader=messages,
+        raw_input_reader=packets,
+    )
+    backend.start_capture(0x1234, capture_epoch=1)
+    publisher.publish(capture_active=True, capture_epoch=1)
+
+    gyro_z_rates: list[float] = []
+    for tick in range(1, 10):
+        if tick % 2 == 1:
+            assert (
+                backend.handle_native_event(
+                    QByteArray(b"windows_generic_MSG"),
+                    (tick + 1) // 2,
+                    capture_epoch=1,
+                )
+                is False
+            )
+        clock.now_ns += 8_000_000
+        frame = publisher.publish(capture_active=True, capture_epoch=1)
+        converted = frame_to_input_state(frame)
+        gyro_z_rates.append(converted.imu_frames[0].to_gyro_rate()[2])
+
+    assert all(rate < 0.0 for rate in gyro_z_rates), gyro_z_rates
