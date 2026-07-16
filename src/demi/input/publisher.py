@@ -216,7 +216,11 @@ class InputPublisher:
         smoothed_dy = smoothed_y_per_second * dt_seconds
         self._pending_mouse_x_units += dx
         self._pending_mouse_y_units += dy
-        if dx == 0.0:
+        if dx == 0.0 or self._can_emit_reversed_motion(
+            current_x_per_second,
+            self._previous_mouse_x_per_second,
+            self._pending_mouse_x_units,
+        ):
             smoothed_dx = self._pending_mouse_x_units
             self._pending_mouse_x_units = 0.0
         else:
@@ -225,7 +229,11 @@ class InputPublisher:
                 self._pending_mouse_x_units,
             )
             self._pending_mouse_x_units -= smoothed_dx
-        if dy == 0.0:
+        if dy == 0.0 or self._can_emit_reversed_motion(
+            current_y_per_second,
+            self._previous_mouse_y_per_second,
+            self._pending_mouse_y_units,
+        ):
             smoothed_dy = self._pending_mouse_y_units
             self._pending_mouse_y_units = 0.0
         else:
@@ -237,6 +245,14 @@ class InputPublisher:
         self._previous_mouse_x_per_second = current_x_per_second
         self._previous_mouse_y_per_second = current_y_per_second
         return smoothed_dx, smoothed_dy
+
+    @staticmethod
+    def _can_emit_reversed_motion(
+        current_per_second: float,
+        previous_per_second: float,
+        pending: float,
+    ) -> bool:
+        return current_per_second * previous_per_second < 0.0 and current_per_second * pending > 0.0
 
     @staticmethod
     def _limit_to_pending_motion(candidate: float, pending: float) -> float:
