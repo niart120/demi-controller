@@ -654,7 +654,9 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             event_bridge = QtRuntimeEventBridge(event_router.handle_runtime_event, parent=window)
             event_sink = event_bridge
         runtime = selected_dependencies.runtime_factory(
-            adapter_factory=SwbtControllerAdapter,
+            adapter_factory=lambda: SwbtControllerAdapter(
+                report_period_us=settings.input.evaluation_interval_ms * 1_000
+            ),
             event_sink=event_sink,
             clock=selected_dependencies.clock,
         )

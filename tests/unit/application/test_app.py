@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 from demi.app import ApplicationDependencies, ApplicationSession, _window_spec_for, run_application
@@ -34,6 +35,9 @@ from demi.domain.settings import (
     WindowSettings,
 )
 from demi.input.publisher import InputPublisher
+
+if TYPE_CHECKING:
+    from demi.controller.adapter import ControllerAdapterFactory
 
 
 @dataclass
@@ -214,8 +218,7 @@ def test_application_runner_aligns_report_period_with_saved_input_interval() -> 
         return object()
 
     def create_runtime(**kwargs: object) -> FakeRuntime:
-        adapter_factory = kwargs["adapter_factory"]
-        assert callable(adapter_factory)
+        adapter_factory = cast("ControllerAdapterFactory", kwargs["adapter_factory"])
         adapter_factory()
         return runtime
 
