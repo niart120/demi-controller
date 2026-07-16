@@ -1,16 +1,18 @@
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray
+from swbt import InputState
 
 from demi.app import ApplicationSession
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.state import AppState
 from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
-from demi.controller.swbt_adapter import frame_to_input_state
+from demi.controller.swbt_adapter import SwbtControllerAdapter, frame_to_input_state
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings
+from demi.domain.settings import AppSettings, ControllerColorSettings
 from demi.input.publisher import InputPublisher
 from demi.platform.windows_raw_input import (
     MOUSE_MOVE_ABSOLUTE,
@@ -42,6 +44,37 @@ class RecordingFrameSink:
     def offer_frame(self, frame: ControllerFrame) -> None:
         """Store one evaluated frame."""
         self.frames.append(frame)
+
+
+@dataclass
+class RecordingGamepad:
+    """Record complete swbt states without opening Bluetooth hardware."""
+
+    applied_states: list[InputState] = field(default_factory=list)
+
+    async def open(self) -> None:
+        """Accept the transport-open boundary."""
+
+    async def reconnect(self, timeout: float | None = None) -> None:  # noqa: ASYNC109
+        """Accept a saved-bond reconnect without hardware."""
+        del timeout
+
+    async def connect(
+        self,
+        *,
+        timeout: float | None = None,  # noqa: ASYNC109
+        allow_pairing: bool = False,
+    ) -> None:
+        """Accept an explicit connection without hardware."""
+        del timeout, allow_pairing
+
+    async def apply(self, state: InputState) -> None:
+        """Record one complete state passed to the public swbt boundary."""
+        self.applied_states.append(state)
+
+    async def close(self, *, neutral: bool = True) -> None:
+        """Accept transport cleanup without hardware."""
+        del neutral
 
 
 @dataclass
@@ -367,7 +400,7 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
     backend.start_capture(0x1234, capture_epoch=1)
     publisher.publish(capture_active=True, capture_epoch=1)
 
-    gyro_z_rates: list[float] = []
+    frames: list[ControllerFrame] = []
     for tick in range(1, 10):
         if tick % 2 == 1:
             assert (
@@ -380,11 +413,35 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
             )
         clock.now_ns += 8_000_000
         frame = publisher.publish(capture_active=True, capture_epoch=1)
-        converted = frame_to_input_state(frame)
-        gyro_z_rates.append(converted.imu_frames[0].to_gyro_rate()[2])
+        frames.append(frame)
+
+    gamepad = RecordingGamepad()
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=lambda **_kwargs: gamepad,
+        adapter_lister=lambda: (),
+    )
+
+    async def apply_frames() -> None:
+        await adapter.connect_saved(
+            "usb:0",
+            Path("bonds/default.json"),
+            1.0,
+            ControllerColorSettings(),
+        )
+        for frame in frames:
+            await adapter.apply_frame(frame)
+        await adapter.close()
+
+    asyncio.run(apply_frames())
+
+    gyro_z_rates = [state.imu_frames[0].to_gyro_rate()[2] for state in gamepad.applied_states]
 
     assert all(rate < 0.0 for rate in gyro_z_rates), gyro_z_rates
     assert len(set(gyro_z_rates)) == 1, gyro_z_rates
+    assert all(
+        len({imu.to_gyro_rate()[2] for imu in state.imu_frames}) == 1
+        for state in gamepad.applied_states
+    )
 
 
 def test_windows_timer_catch_up_does_not_overwrite_gyro_motion_with_zero() -> None:
