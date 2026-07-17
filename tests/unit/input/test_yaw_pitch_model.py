@@ -46,6 +46,30 @@ def test_vertical_motion_updates_pitch_and_pose_consistent_acceleration() -> Non
     assert model.pitch_radians == pytest.approx(pitch)
 
 
+def test_additional_pitch_rate_is_independent_of_interval_partitioning() -> None:
+    single_interval = YawPitchModel(MouseSettings(gyro_enabled=False))
+    split_intervals = YawPitchModel(MouseSettings(gyro_enabled=False))
+
+    _, single_accel = single_interval.update(
+        dx=0.0,
+        dy=0.0,
+        dt_seconds=0.25,
+        additional_pitch_rate_radians_per_second=-1.0,
+    )
+    for interval in (0.05, 0.075, 0.125):
+        _, split_accel = split_intervals.update(
+            dx=0.0,
+            dy=0.0,
+            dt_seconds=interval,
+            additional_pitch_rate_radians_per_second=-1.0,
+        )
+
+    assert split_intervals.pitch_radians == pytest.approx(-0.25)
+    assert split_accel.x_g == pytest.approx(single_accel.x_g)
+    assert split_accel.y_g == single_accel.y_g
+    assert split_accel.z_g == pytest.approx(single_accel.z_g)
+
+
 def test_yaw_is_projected_using_the_middle_pitch_of_the_interval() -> None:
     model = YawPitchModel(MouseSettings())
     dt = 0.02
