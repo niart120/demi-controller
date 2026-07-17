@@ -14,6 +14,7 @@
 | reproduced behavior | Windows の排他マウス捕捉中は左クリックが低水準フックで抑止され、接続ボタンへ届かない | `src/demi/platform/windows_mouse_hook.py` |
 | completed diagnostic input | 捕捉中0Gの最新フレームを接続初期加速度へ反映する | `spec/complete/unit_026/CONFIGURABLE_IMU_DIAGNOSTICS.md` |
 | input priority | ローカル操作は捕捉中の profile binding より優先する | `spec/initial/input.md` |
+| hardware verification | 入力捕捉中の Ctrl+Enter が実機の接続経路として動作した | 利用者報告（2026-07-17） |
 
 ### 1.3 use case
 
@@ -112,11 +113,12 @@ Qt は主キーボードの Enter を `Key_Return`、テンキー Enter を `Key
 | docstring review | passed | package rootのexport変更なし。`LocalActions`の既存説明と追加fieldに矛盾なし |
 | agentic self-review | passed | Intent Delta、non-goals、設定後方互換、Qt経路、capture / 0G維持、diff、gateを照合 |
 | `git diff --check` | passed | whitespace errorなし |
+| 実機での捕捉中 Ctrl+Enter 接続 | passed (user reported) | 2026-07-17。機材構成と実行ログは未提供 |
 | 実機での接続初期0G比較 | not run | 本unitの対象外 |
 
 ## 10. 先送り事項
 
-- 実機での途中0Gと接続初期0Gの比較は、Ctrl+Enter経路の実装後に利用者が実施する。
+- 捕捉中の Ctrl+Enter 接続経路は実機で動作した。途中0Gと接続初期0Gの挙動差は結果未報告のため、原因判断を別作業単位へ先送りする。
 
 ## 11. チェックリスト
 
