@@ -67,12 +67,12 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | 現行 `InputPublisher` が一定速度、不規則周期、疎な入力で生成する角速度列と総角変位を固定する | characterization | unit | 構造変更前の baseline |
-| todo | 専用再標本化部品が一定速度と不規則周期で現行と同じ差分列を返す | regression | unit | 初回過渡を含む |
-| todo | 専用再標本化部品が疎な同方向入力を非 0 の連続列へ変換し、総変位を保存して停止する | regression | unit | Unit 024 の変位保存契約 |
-| todo | 専用再標本化部品が方向反転を同じ評価で出力し、累積変位を実入力の範囲内に保つ | regression | unit | 反転と過走上限 |
-| todo | 専用再標本化部品を初期化すると未出力変位と速度履歴が残らない | edge | unit | X/Y 両軸 |
-| todo | `InputPublisher` を新しい再標本化部品へ切り替えても入力から `ControllerFrame` と swbt state までの時系列が変わらない | regression | integration | Windows Raw Input fixture と偽 gamepad を使用 |
+| green | 現行 `InputPublisher` が一定速度、不規則周期、疎な入力で生成する角速度列と総角変位を固定する | characterization | unit | 構造変更前に Publisher と Windows Raw Input integration の 27 件を確認 |
+| refactor-skipped | 専用再標本化部品が一定速度と不規則周期で現行と同じ差分列を返す | regression | unit | red は module 不在。軸状態の共通化を含む最小実装で初回過渡と不規則周期が green となり、追加整理は不要 |
+| refactor-skipped | 専用再標本化部品が疎な同方向入力を非 0 の連続列へ変換し、総変位を保存して停止する | regression | unit | 固定8 msと不規則周期で非0列、停止0、総変位3 / 2 countを確認。追加の製品コード変更と構造整理は不要 |
+| refactor-skipped | 専用再標本化部品が方向反転を同じ評価で出力し、累積変位を実入力の範囲内に保つ | regression | unit | 反転評価の逆符号、最大+1 count以下、最終0 countを確認。追加の製品コード変更と構造整理は不要 |
+| refactor-skipped | 専用再標本化部品を初期化すると未出力変位と速度履歴が残らない | edge | unit | X/Y に未出力変位を作った後の reset と無入力0を確認。追加の製品コード変更と構造整理は不要 |
+| refactor-done | `InputPublisher` を新しい再標本化部品へ切り替えても入力から `ControllerFrame` と swbt state までの時系列が変わらない | regression | integration | Publisher 切替と旧状態・旧補助関数の削除後に unit 28件、Windows Raw Input integration 5件が green |
 
 ## 7. 設計メモ
 
@@ -98,30 +98,34 @@
 | `src/demi/input/mouse_motion_resampler.py` | new | 軸状態と2軸再標本化の専用部品 |
 | `src/demi/input/publisher.py` | modify | 専用部品の生成、評価、初期化と旧処理の削除 |
 | `tests/unit/input/test_mouse_motion_resampler.py` | new | 一定速度、疎な入力、変位保存、反転、初期化 |
-| `tests/unit/input/test_publisher.py` | modify | Publisher 境界の characterization と責務移動後の回帰 |
-| `tests/integration/ui/test_windows_raw_input_capture.py` | modify | Raw Input から swbt state までの時系列回帰 |
 | `spec/initial/input.md` | modify | 再標本化の責務境界 |
 | `spec/initial/testing.md` | modify | 専用部品と統合境界の試験項目 |
-| `spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` | new | 作業範囲、TDD 状態、削除条件、検証記録 |
+| `spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` | new | 作業範囲、TDD 状態、削除条件、検証記録 |
 
 ## 9. 検証
 
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | spec 作成時、1 passed |
-| `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` | passed | 該当なし |
-| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | not run | 専用部品と Publisher 回帰 |
-| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | not run | Raw Input から送信境界 |
-| `rg -n "_previous_mouse_[xy]_per_second|_unemitted_mouse_[xy]_units|_resample_mouse_motion|_can_emit_reversed_motion|_limit_to_unemitted_motion|_reset_mouse_resampling" src/demi/input/publisher.py` | not run | 完了時は参照なしを期待 |
-| `uv sync --dev` | not run | 標準 gate |
-| `uv lock --check` | not run | 標準 gate |
-| `uv run ruff format --check .` | not run | 標準 gate |
-| `uv run ruff check .` | not run | 標準 gate |
-| `uv run ty check --no-progress` | not run | 標準 gate |
-| `uv run pytest tests/unit -q -p no:cacheprovider` | not run | 全 unit tree |
-| `uv run pytest tests/integration -q -p no:cacheprovider` | not run | 全 integration tree |
-| `uv build` | not run | package smoke |
-| `git diff --check` | passed | spec 作成時、whitespace error なし。既存変更の CRLF 変換警告のみ |
+| `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/initial/input.md spec/initial/testing.md spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` | passed | `spec/initial/input.md:252` の既存用語1件は評価周期の定義に必要と確認 |
+| `uv run pytest tests/unit/input/test_publisher.py tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed | 構造変更前 baseline、27 passed |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py -q -p no:cacheprovider` | failed as expected | red: `demi.input.mouse_motion_resampler` が存在せず collection error |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py -q -p no:cacheprovider` | passed | 一定速度と不規則周期、1 passed |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py::test_sparse_motion_stays_nonzero_and_preserves_total_displacement tests/unit/input/test_mouse_motion_resampler.py::test_sparse_motion_preserves_displacement_across_irregular_intervals -q -p no:cacheprovider` | passed | 疎な入力の固定 / 不規則周期、2 passed |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py::test_direction_reversal_is_emitted_without_a_zero_interval tests/unit/input/test_mouse_motion_resampler.py::test_direction_reversal_does_not_overshoot_input_displacement -q -p no:cacheprovider` | passed | 即時反転と過走上限、2 passed |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py::test_reset_discards_both_axes_history_and_unemitted_motion -q -p no:cacheprovider` | passed | X/Y の履歴と未出力変位の破棄、1 passed |
+| `uv run pytest tests/unit/input/test_mouse_motion_resampler.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | passed | 専用部品と Publisher 回帰、28 passed |
+| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed | Raw Input から送信境界、5 passed |
+| `rg -n "_previous_mouse_[xy]_per_second|_unemitted_mouse_[xy]_units|_resample_mouse_motion|_can_emit_reversed_motion|_limit_to_unemitted_motion|_reset_mouse_resampling" src/demi/input/publisher.py` | passed | 該当なし |
+| `uv sync --dev` | passed | 77 packages resolved、74 packages checked |
+| `uv lock --check` | passed | 77 packages resolved |
+| `uv run ruff format --check .` | passed | 131 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed | 238 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed | 77 passed |
+| `uv build` | passed | sdist と wheel を生成 |
+| `git diff --check` | passed | whitespace error なし。既存変更の CRLF 変換警告のみ |
 
 ## 10. 先送り事項
 
@@ -134,5 +138,5 @@
 - [x] TDD Test List を更新した
 - [x] 検証結果または未実行理由を記録した
 - [x] package / release / public API は変更対象外と確認した
-- [ ] 新経路へ切り替えた後に旧状態と旧補助関数を削除した
-- [ ] 互換ラッパー、二重計算、切替フラグが残っていないことを確認した
+- [x] 新経路へ切り替えた後に旧状態と旧補助関数を削除した
+- [x] 互換ラッパー、二重計算、切替フラグが残っていないことを確認した
