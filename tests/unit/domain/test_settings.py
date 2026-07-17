@@ -45,6 +45,7 @@ def test_default_settings_match_the_initial_configuration() -> None:
         invert_y=False,
         pitch_limit_degrees=75.0,
     )
+    assert settings.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
     assert settings.profiles[0].name == "Default"
     assert len(settings.profiles[0].bindings) == 33
 

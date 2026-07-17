@@ -165,6 +165,7 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
         "local_actions": {
             "toggle_capture": list(settings.local_actions.toggle_capture),
             "quit": list(settings.local_actions.quit),
+            "connection": list(settings.local_actions.connection),
             "release_capture": list(settings.local_actions.release_capture),
         },
         "profiles": [
@@ -259,7 +260,11 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
         ),
     )
     local_actions = _require_table(raw["local_actions"])
-    _check_keys(local_actions, frozenset({"toggle_capture", "quit", "release_capture"}))
+    _check_keys(
+        local_actions,
+        frozenset({"toggle_capture", "quit", "release_capture"}),
+        frozenset({"connection"}),
+    )
 
     try:
         return AppSettings(
@@ -302,6 +307,12 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
                 ),
                 quit=tuple(
                     _require_string(value) for value in _require_list(local_actions["quit"])
+                ),
+                connection=tuple(
+                    _require_string(value)
+                    for value in _require_list(
+                        local_actions.get("connection", ["CTRL+RETURN", "CTRL+ENTER"])
+                    )
                 ),
                 release_capture=tuple(
                     _require_string(value)

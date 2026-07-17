@@ -5,6 +5,7 @@ from threading import Thread, get_ident
 import pytest
 from PySide6.QtCore import QCoreApplication, QObject, Qt
 from PySide6.QtGui import QKeyEvent
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
@@ -416,6 +417,79 @@ def test_router_binds_connection_and_capture_toolbar_actions_to_the_session(
     assert isinstance(runtime.commands[-1], Disconnect)
     assert session.ui_snapshot.connection_state is ConnectionState.DISCONNECTING
     assert qt_application is not None
+
+
+@pytest.mark.parametrize("enter_key", [Qt.Key.Key_Return, Qt.Key.Key_Enter])
+def test_connection_shortcut_preserves_captured_zero_g_until_connect(
+    qt_application: QApplication,
+    enter_key: Qt.Key,
+) -> None:
+    """Connect through either Enter key while exclusive diagnostic input remains active."""
+    settings = replace(
+        AppSettings.default(),
+        connection=replace(AppSettings.default().connection, adapter_id="usb:0"),
+    )
+    runtime = _Runtime()
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=window,
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+    router.handle_runtime_event(
+        AdaptersDiscovered((AdapterDescriptor("usb:0", "Test Adapter", "usb"),))
+    )
+    router.handle_runtime_event(ConnectionChanged(ConnectionState.READY, adapter_id="usb:0"))
+    suppressor = WindowsMouseInputSuppressor(registrar=_MouseHookRegistrar())
+    window.configure_input(
+        publisher=coordinator.publisher,
+        coordinator=coordinator,
+        mouse_input_suppressor=suppressor,
+    )
+    window.show()
+    window.activateWindow()
+    qt_application.processEvents()
+
+    window.main_toolbar.capture_action.trigger()
+    QCoreApplication.sendEvent(
+        window,
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_O, Qt.KeyboardModifier.NoModifier),
+    )
+    zero_g_frame = window.evaluate_input()
+
+    assert coordinator.is_captured
+    assert suppressor.active
+    assert zero_g_frame.capture_active
+    assert zero_g_frame.accel_g.x_g == 0.0
+    assert zero_g_frame.accel_g.y_g == 0.0
+    assert zero_g_frame.accel_g.z_g == 0.0
+
+    QTest.keyClick(window, enter_key, Qt.KeyboardModifier.ControlModifier)
+    qt_application.processEvents()
+
+    connect_commands = [
+        command for command in runtime.commands if isinstance(command, ConnectSaved)
+    ]
+    assert len(connect_commands) == 1
+    assert session.ui_snapshot.connection_state is ConnectionState.CONNECTING
+    assert coordinator.is_captured
+    assert suppressor.active
+    latest_frame = runtime.frames[-1]
+    assert latest_frame.capture_active
+    assert latest_frame.accel_g.x_g == 0.0
+    assert latest_frame.accel_g.y_g == 0.0
+    assert latest_frame.accel_g.z_g == 0.0
+    assert coordinator.publisher.state.is_source_active("KEY:O")
+
+    coordinator.begin_shutdown()
 
 
 def test_router_opens_connection_settings_when_connection_is_not_configured(

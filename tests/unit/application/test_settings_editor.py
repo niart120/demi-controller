@@ -58,6 +58,19 @@ def test_editor_reports_duplicate_source_and_local_action_conflicts_only() -> No
     assert all(conflict.source != "KEY:V" for conflict in conflicts)
 
 
+@pytest.mark.parametrize("source", ["KEY:CTRL+RETURN", "KEY:CTRL+ENTER"])
+def test_editor_reports_connection_shortcut_conflicts(source: str) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    editor.update_binding(0, source=source)
+
+    conflicts = editor.conflicts()
+
+    assert len(conflicts) == 1
+    assert conflicts[0].source == source
+    assert conflicts[0].binding_indices == (0,)
+    assert conflicts[0].local_action == source.removeprefix("KEY:")
+
+
 def test_editor_updates_mouse_settings_without_changing_other_mouse_fields() -> None:
     editor = SettingsEditor(AppSettings.default())
 

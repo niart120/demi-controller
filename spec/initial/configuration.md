@@ -69,6 +69,7 @@ pitch_limit_degrees = 75.0
 [local_actions]
 toggle_capture = ["CTRL+C"]
 quit = ["CTRL+Q"]
+connection = ["CTRL+RETURN", "CTRL+ENTER"]
 release_capture = ["F12"]
 
 [[profiles]]
@@ -219,6 +220,8 @@ target = "ACCEL:ZERO"
 ```
 
 組み込みプロファイルはアプリ内の正本から生成し、ユーザー設定には編集後の完全なbinding配列を保存する。0.1.0では差分保存を採用しない。旧版の組み込み Default profile に診断targetが不足する場合、読み込み時に不足行だけをメモリ上で末尾へ補い、既存bindingと変更済みsourceを保持する。補完結果は `MIGRATED` とし、次回の明示保存で設定ファイルへ反映する。
+
+`local_actions.connection` は主キーボードとテンキーの Ctrl+Enter を表す。項目追加前の `demi.settings/v1` では欠落を許可し、`["CTRL+RETURN", "CTRL+ENTER"]` をメモリ上の既定値とする。次回の明示保存では項目を出力する。
 
 `horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。角度は設定境界でラジアンへ変換し、`YawPitchModel` 内ではラジアン、ラジアン毎秒、Gだけを使う。静的加速度は通常経路で仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。完全な0Gはprofileの診断targetで一時的に上書きする。
 

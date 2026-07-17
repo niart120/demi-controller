@@ -1,9 +1,9 @@
 """Qt standard toolbar whose public actions follow application state."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QToolBar, QWidget
 
 from demi.application.state import AppState, ConnectionState
@@ -96,6 +96,14 @@ class MainToolBar(QToolBar):
                 application layer.
         """
         self.connection_action.triggered.connect(lambda _checked=False: callback())
+
+    def set_connection_shortcuts(self, shortcuts: Sequence[str]) -> None:
+        """Assign configured window shortcuts to the connection action.
+
+        Args:
+            shortcuts: Portable Qt key sequence strings owned by local actions.
+        """
+        self.connection_action.setShortcuts([QKeySequence(shortcut) for shortcut in shortcuts])
 
     def bind_capture_action(self, callback: Callable[[], object]) -> None:
         """Route enabled capture action requests to the application layer.

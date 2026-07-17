@@ -22,6 +22,18 @@ def test_default_settings_round_trip_through_toml() -> None:
     assert restored == settings
     assert loaded_from_text == settings
     assert tomllib.loads(text)["schema"] == "demi.settings/v1"
+    local_actions = cast("dict[str, object]", encoded["local_actions"])
+    assert local_actions["connection"] == ["CTRL+RETURN", "CTRL+ENTER"]
+
+
+def test_codec_supplies_connection_shortcuts_for_existing_v1_settings() -> None:
+    raw = encode_settings(AppSettings.default())
+    local_actions = cast("dict[str, object]", raw["local_actions"])
+    del local_actions["connection"]
+
+    restored = decode_settings(raw)
+
+    assert restored.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
 
 
 def test_codec_preserves_custom_colors_and_inverted_binding() -> None:
