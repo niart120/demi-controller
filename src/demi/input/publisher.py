@@ -172,14 +172,17 @@ class InputPublisher:
                 "right",
                 circular_limit=self._circular_limit,
             )
+            diagnostic_gyro_rate = synthesize_diagnostic_gyro(self._profile, self._state)
             mouse_gyro_rate, accel_g = self._model.update(
                 dx=dx,
                 dy=dy,
                 dt_seconds=dt_seconds,
+                additional_pitch_rate_radians_per_second=(
+                    diagnostic_gyro_rate.y_radians_per_second
+                ),
             )
             if is_accel_zero_active(self._profile, self._state):
                 accel_g = AccelG(0.0, 0.0, 0.0)
-            diagnostic_gyro_rate = synthesize_diagnostic_gyro(self._profile, self._state)
             gyro_rate = GyroRate(
                 x_radians_per_second=mouse_gyro_rate.x_radians_per_second,
                 y_radians_per_second=(
