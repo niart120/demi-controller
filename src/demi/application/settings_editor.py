@@ -50,7 +50,7 @@ class SettingsEditor:
         """Replace one active-profile binding in the draft.
 
         Raises:
-            DomainValueError: The index, binding values, or reserved F12 source is invalid.
+            DomainValueError: The index, binding values, or reserved F4 source is invalid.
         """
         profile = self._active_profile()
         try:
@@ -58,7 +58,7 @@ class SettingsEditor:
         except IndexError:
             raise DomainValueError from None
         next_source = current.source if source is None else source
-        if next_source == "KEY:F12":
+        if next_source == "KEY:F4":
             raise DomainValueError
         updated = Binding(
             source=next_source,
@@ -263,7 +263,7 @@ class SettingsEditor:
     def validate(self) -> None:
         """Validate reserved modal rules before a repository save."""
         if any(
-            binding.source == "KEY:F12"
+            binding.source == "KEY:F4"
             for profile in self._draft.profiles
             for binding in profile.bindings
         ):

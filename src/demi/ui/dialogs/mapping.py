@@ -192,7 +192,7 @@ class MappingDialog(QDialog):
             editor: Application-owned immutable settings draft editor.
             on_dialog_opened: Neutralizes controller capture before the dialog
                 accepts any input.
-            on_release_capture: Handles the fixed F12 capture-release action.
+            on_release_capture: Handles the fixed F4 capture-release action.
             on_save: Saves the application-owned draft and reports success.
             on_cancel: Discards the application-owned draft and reports success.
             parent: Optional Qt parent for dialog ownership.
@@ -425,9 +425,9 @@ class MappingDialog(QDialog):
         if not self._belongs_to_dialog(watched):
             return False
         if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_F12:
+            if event.key() == Qt.Key.Key_F4:
                 self._capture_row = None
-                self.capture_label.setText(self.tr("Input capture released with F12"))
+                self.capture_label.setText(self.tr("Input capture released with F4"))
                 _invoke(self._on_release_capture)
                 event.accept()
                 return True

@@ -91,6 +91,25 @@ def test_operational_keyboard_is_evaluated_while_pointer_capture_is_inactive() -
     assert frame.accel_g == AccelG(0.0, 0.0, 1.0)
 
 
+def test_f12_is_evaluated_as_a_regular_keyboard_binding() -> None:
+    profile = InputProfile(
+        id="f12",
+        name="F12",
+        builtin=False,
+        bindings=(Binding(source="KEY:F12", target=BindingTarget.BUTTON_A),),
+    )
+    publisher = InputPublisher(clock=FakeClock(), sink=FakeSink(), profile=profile)
+    publisher.state.press_key("F12")
+
+    frame = publisher.publish(
+        capture_active=True,
+        pointer_capture_active=False,
+        capture_epoch=0,
+    )
+
+    assert frame.buttons == frozenset({LogicalButton.A})
+
+
 @pytest.mark.parametrize(
     ("symbol", "target", "expected_gyro"),
     [

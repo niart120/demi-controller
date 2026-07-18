@@ -61,7 +61,7 @@ class FakeRepository:
         self.saved = settings
 
 
-def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
+def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
     qt_application: QApplication,
 ) -> None:
     editor = SettingsEditor(AppSettings.default())
@@ -112,11 +112,19 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
         dialog.capture_button.click()
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
         )
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
         assert release_requests == [True]
+
+        dialog.capture_button.click()
+        QCoreApplication.sendEvent(
+            dialog.table,
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
+        )
+
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
 
         dialog.table.selectRow(1)
         dialog.capture_button.click()
