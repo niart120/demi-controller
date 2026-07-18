@@ -26,10 +26,10 @@ type CancelAction = Callable[[], bool]
 type ReconnectAction = Callable[[], object]
 
 _COLOR_LABELS: dict[ColorField, str] = {
-    "body": "本体",
-    "buttons": "ボタン",
-    "left_grip": "左グリップ",
-    "right_grip": "右グリップ",
+    "body": "Body",
+    "buttons": "Buttons",
+    "left_grip": "Left grip",
+    "right_grip": "Right grip",
 }
 
 
@@ -61,7 +61,7 @@ class ControllerColorsDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("コントローラーカラー")
+        self.setWindowTitle("Controller colors")
         self._editor = editor
         self._saved_colors = editor.draft.controller_colors
         self._connected = connected

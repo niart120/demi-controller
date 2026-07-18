@@ -45,7 +45,7 @@ type SettingsAction = Callable[[], bool]
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("対象", "入力", "反転", "競合")
+    _HEADERS = ("Target", "Input", "Inverted", "Conflict")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -193,7 +193,7 @@ class MappingDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("キー割り当て")
+        self.setWindowTitle("Key mappings")
         self._mapping_model = MappingTableModel(editor, self)
         self._on_dialog_opened = on_dialog_opened
         self._on_release_capture = on_release_capture

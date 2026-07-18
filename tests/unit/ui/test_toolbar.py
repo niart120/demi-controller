@@ -20,9 +20,9 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
         )
     )
 
-    assert toolbar.connection_action.text() == "接続"
+    assert toolbar.connection_action.text() == "Connect"
     assert toolbar.connection_action.isEnabled() is True
-    assert toolbar.capture_action.text() == "入力開始"
+    assert toolbar.capture_action.text() == "Start input"
     assert toolbar.capture_action.isChecked() is False
     assert toolbar.capture_action.isEnabled() is True
     assert toolbar.mapping_action.isEnabled() is True
@@ -37,9 +37,9 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
         )
     )
 
-    assert toolbar.connection_action.text() == "切断"
+    assert toolbar.connection_action.text() == "Disconnect"
     assert toolbar.connection_action.isEnabled() is True
-    assert toolbar.capture_action.text() == "入力解除"
+    assert toolbar.capture_action.text() == "Stop input"
     assert toolbar.capture_action.isChecked() is True
     assert toolbar.capture_action.isEnabled() is True
     assert toolbar.mapping_action.isEnabled() is True
