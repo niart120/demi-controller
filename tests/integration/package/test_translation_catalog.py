@@ -43,14 +43,17 @@ def test_sdist_and_wheel_include_loadable_japanese_catalog(tmp_path: Path) -> No
     with zipfile.ZipFile(wheel) as archive:
         wheel_names = set(archive.namelist())
         extracted_wheel = tmp_path / "extracted-wheel"
-        archive.extractall(extracted_wheel)
+        for name in ("demi/__init__.py", *sorted(expected_resources)):
+            destination = extracted_wheel / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(archive.read(name))
 
     assert expected_resources <= sdist_names
     assert expected_resources <= wheel_names
 
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(extracted_wheel)
-    smoke = subprocess.run(  # noqa: S603 - current interpreter and test-owned path only.
+    smoke = subprocess.run(
         (
             sys.executable,
             "-c",
