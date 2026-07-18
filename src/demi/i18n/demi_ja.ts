@@ -34,7 +34,7 @@
     <message><source>Invert vertically</source><translation>垂直反転</translation></message>
     <message><source>Horizontal sensitivity</source><translation>水平感度</translation></message>
     <message><source>Vertical sensitivity</source><translation>垂直感度</translation></message>
-    <message><source>Pitch limit</source><translation>pitch上限</translation></message>
+    <message><source>Pitch limit</source><translation>ピッチ上限</translation></message>
     <message><source>Restore defaults</source><translation>標準に戻す</translation></message>
     <message><source>Select a target</source><translation>対象を選択してください</translation></message>
     <message><source>Press the next key or mouse button</source><translation>次のキーまたはマウスボタンを押してください</translation></message>
