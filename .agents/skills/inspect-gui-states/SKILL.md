@@ -1,5 +1,5 @@
 ---
-name: inspect-gui-transitions
+name: inspect-gui-states
 description: "この Python repo の PySide6 GUI の任意の画面状態を Windows の通常描画で PNG に取得し、Codex の画像理解で UI/UX を確認、改善前後を比較し、UI テストを組み立てやすくする skill。画面のレイアウト、可読性、情報階層、操作状態、ダイアログ、入力検証、エラー表示を確認または改善するときに使う。"
 ---
 
@@ -18,7 +18,7 @@ description: "この Python repo の PySide6 GUI の任意の画面状態を Win
 7. UI テストを追加する場合は、画像で見つけた重要な状態を文字列、表示、活性、選択、配置などの振る舞いに基づく検証へ落とす。
 
 ```powershell
-uv run python .agents/skills/inspect-gui-transitions/scripts/capture_gui.py `
+uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py `
   --scenario tmp/gui-audit/<task>/scenario.py `
   --output tmp/gui-audit/<task>
 ```

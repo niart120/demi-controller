@@ -1,4 +1,0 @@
-interface:
-  display_name: "GUI State Reviewer"
-  short_description: "PySide6 GUI の画面状態を画像化して UI/UX をレビュー"
-  default_prompt: "$inspect-gui-transitions を使って対象の GUI 状態を画像化し、UI/UX の改善点と UI テスト観点を整理する。"
