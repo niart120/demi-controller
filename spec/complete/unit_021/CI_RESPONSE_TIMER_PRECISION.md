@@ -21,6 +21,12 @@
 | CI maintainer | macOS上で遅延runtimeの応答性 probe を実行する | 100ミリ秒の応答性契約を同じ閾値で検査する | 観測用timerの精度だけを変更する |
 | maintainer | 精密timer化後のCI結果を確認する | 失敗時にworker、bridge、GUIのどの境界で待機したかを取得する | runtime fake、bridge、production UIを同時に変更しない |
 
+### 1.4 完了時点の判定
+
+`PreciseTimer` と失敗時の時刻列は実装され、100ミリ秒の契約も維持された。ただし、精密timer設定後も187.0ミリ秒の失敗が再発したため、timer精度は単独の原因ではなかった。時刻列追加後には同じ失敗が再発せず、worker、bridge、GUIのどこで待機したかは特定できていない。
+
+後続の `unit_022` で test fake を本番に近い持続workerへ変更し、macOS / Python 3.12を含むCIが安定した。このunitは診断経路の実装を完了成果とし、時刻列による待機箇所の特定は再発時だけ行う先送り事項として閉じる。
+
 ## 2. 対象範囲
 
 - `test_qt_event_loop_stays_responsive_during_slow_runtime_operations` の観測用 `QTimer` を `Qt.TimerType.PreciseTimer` に設定する。
@@ -55,7 +61,7 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| deferred | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | Windows offscreenで20回連続成功。macOS 3.12では2回成功後、`PreciseTimer`設定済みで187.0msに再発したため、timer種別だけでは不十分 |
+| green | 応答性 probe は精密timerを使いつつ、既存の100ミリ秒契約と接続・切断シーケンスを維持する | regression | integration | `PreciseTimer`、10ミリ秒interval、100ミリ秒判定、接続・切断シーケンスを実装し、Windows offscreenとCIで確認した。timer種別だけでは不安定性を解消しなかった |
 | deferred | macOS CIの失敗時にworker送出、GUI操作、refreshの時刻順を出力する | diagnostic regression | integration | productionの実行経路は変えず、assertion messageだけに観測結果を載せる。診断付きheadはmacOS 3.12で5回連続成功し、再発時の時刻列は未取得 |
 
 ## 7. 設計メモ
@@ -65,8 +71,8 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 | Test Desiderata | 判断 | 根拠 |
 |---|---|---|
 | precise | 維持 | 最大100ミリ秒というNFR-001の判定を残す |
-| deterministic | 未達 | 精密timer化後もmacOS 3.12で187.0msを検出。次段は失敗時の時刻列を取得する |
-| representative | 未解決 | `SlowRuntime` の短命workerはproductionの持続workerと一致しない。第1段では同時に変えない |
+| deterministic | 後続で改善 | 精密timer化だけではmacOS 3.12で187.0msを検出した。`unit_022` の持続worker化後は対象CIが5回連続成功した |
+| representative | 後続で改善 | `SlowRuntime` の短命workerはproductionと一致しなかった。`unit_022` で起動時workerとqueueを持つ形へ変更した |
 | fast | 維持 | 対象テストはWindows offscreenで約0.3秒、20回反復も短時間で完了する |
 
 ## 8. 対象ファイル
@@ -74,7 +80,7 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 | path | change | 内容 |
 |---|---|---|
 | `tests/integration/ui/test_application_lifecycle.py` | modify | 応答性 probe の観測timerを精密timerへ設定する |
-| `spec/wip/unit_021/CI_RESPONSE_TIMER_PRECISION.md` | new | 対象範囲、TDD状態、検証、次段の条件を記録する |
+| `spec/complete/unit_021/CI_RESPONSE_TIMER_PRECISION.md` | new | 対象範囲、TDD状態、検証、次段の条件を記録する |
 
 ## 9. 検証
 
@@ -87,10 +93,12 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 | `uv build` / `git diff --check` | passed | sdistとwheelを生成、whitespace errorなし |
 | GitHub Actions run 29425872544 の macOS / Python 3.12 | failed | 精密timer化後の1回目と2回目は成功、3回目は最大187.0msで失敗 |
 | GitHub Actions run 29426911304 の macOS / Python 3.12 | passed | 時刻列を追加したheadで初回と4回のjob再実行が連続成功。失敗時の時刻列は未取得 |
+| 2026-07-19 Windows offscreen 20回反復 | passed | 現在の対象testを20回連続実行し、100ミリ秒判定をすべて通過 |
+| GitHub Actions run 29646343053 | passed | 2026-07-18のmain CIでmacOS / Python 3.12を含む全6 matrixのintegration testが成功 |
 
 ## 10. 先送り事項
 
-- 時刻列でworker起床、bridge配送、GUI refreshのどこに待機があるかを確認してから、runtime fake、bridge、GUIのいずれを変えるかを選ぶ。短命workerを持続workerへ近づける仮説は `spec/complete/unit_022/PERSISTENT_SLOW_RUNTIME_WORKER.md` で5回連続成功した。
+- 時刻列追加後に100ミリ秒以上の停止が再発していないため、worker起床、bridge配送、GUI refreshのどこで待機したかは未特定である。再発時は既存の時刻列を使う新しい作業単位で原因を分類する。
 - 実Bluetooth接続中の100ミリ秒応答性はhardware acceptanceで扱う。
 
 ## 11. チェックリスト
@@ -99,3 +107,5 @@ Qtの既定 `CoarseTimer` は観測器のtimer typeであり、本番のworker-t
 - [x] TDD Test List を更新した
 - [x] 検証結果または未実行理由を更新した
 - [x] package / release / public API に触れないことを確認した
+- [x] `unit_021` 単独の結果と `unit_022` の改善結果を分けて記録した
+- [x] 未取得の失敗時刻列を再発時の作業条件として記録した

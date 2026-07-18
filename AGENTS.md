@@ -44,6 +44,7 @@
 - `agentic-self-review`: 作業完了前、PR 前、引き継ぎ前に品質ゲート結果と未検証リスクを整理する。
 - `diagnosing-bugs`: Matt Pocock 氏の第三者提供 skill。再現困難な不具合と性能退行で、赤にできる再現手順、仮説、計測、回帰テストを順に作る。
 - `docs-quality-review`: README、docs、docstring、spec、PR 本文、AGENTS/SKILLS の文言、置き場所、根拠を確認する。
+- `inspect-gui-states`: PySide6 GUI の任意状態を画像化し、視覚的な UI/UX 改善と UI テスト設計を支援する。
 - `type-boundary-review`: `ty` の結果、公開 API、標準ライブラリの型構文、`Any` / `Unknown` / `None` / `Protocol` / `TYPE_CHECKING` / `py.typed` の型境界を確認する。
 - `docstring-style`: 公開 API の Google 形式 docstring を、型注釈、ruff pydocstyle、README/docs と整合させる。
 - `spec-format`: `spec/wip` / `spec/complete` の作業仕様を作成、更新、完了移動する。
