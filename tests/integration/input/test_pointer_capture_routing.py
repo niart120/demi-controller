@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.state import AppState
 from demi.domain.controller import ControllerFrame, LogicalButton
 from demi.input.publisher import InputPublisher
 
@@ -89,3 +90,25 @@ def test_pointer_capture_stop_clears_mouse_but_preserves_keyboard() -> None:
     assert publisher.state.held_mouse_buttons == set()
     assert coordinator.evaluate().buttons == frozenset({LogicalButton.A})
     assert pointer_capture.calls == [True, False]
+
+
+def test_focus_loss_neutralizes_operational_keyboard_without_pointer_capture() -> None:
+    clock = FakeClock()
+    sink = FakeSink()
+    publisher = InputPublisher(clock=clock, sink=sink)
+    coordinator = CaptureCoordinator(
+        publisher=publisher,
+        pointer_capture=FakePointerCapture(),
+    )
+    publisher.state.press_key("F")
+    assert coordinator.evaluate().buttons == frozenset({LogicalButton.A})
+
+    neutral = coordinator.on_focus_lost()
+
+    assert neutral is not None
+    assert neutral.capture_active is False
+    assert neutral.buttons == frozenset()
+    assert neutral.gyro_rate.z_radians_per_second == 0.0
+    assert neutral.accel_g.z_g == 1.0
+    assert publisher.state.held_keys == set()
+    assert coordinator.app_state is AppState.SUSPENDED

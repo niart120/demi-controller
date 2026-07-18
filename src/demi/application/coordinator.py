@@ -219,7 +219,7 @@ class CaptureCoordinator:
     def on_focus_lost(self) -> ControllerFrame | None:
         """Suspend capture on focus loss and neutralize immediately."""
         self._focused = False
-        if not self.is_captured:
+        if self._app_state not in {AppState.IDLE, AppState.CAPTURED}:
             return None
         return self._leave_capture(AppState.SUSPENDED)
 
