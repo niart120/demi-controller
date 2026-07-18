@@ -1,9 +1,9 @@
 """Pure mapping operations from physical state to domain controls."""
 
-from math import hypot
+from math import hypot, isfinite
 from typing import Literal
 
-from demi.domain.controller import GyroRate, LogicalButton, StickVector
+from demi.domain.controller import LogicalButton, StickVector
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import (
     BindingTarget,
@@ -14,7 +14,54 @@ from demi.domain.mapping import (
 )
 from demi.domain.physical_input import PhysicalInputState
 
+from .rotation_intent import RotationIntent
+
 DIAGNOSTIC_GYRO_RADIANS_PER_SECOND = 1.0
+
+
+def synthesize_diagnostic_rotation_intent(
+    profile: InputProfile,
+    state: PhysicalInputState,
+    *,
+    dt_seconds: float,
+    capture_active: bool = True,
+) -> RotationIntent:
+    """Convert active Y/Z diagnostic bindings into angular displacement.
+
+    Args:
+        profile: Profile whose diagnostic bindings are evaluated.
+        state: Current normalized held-input state.
+        dt_seconds: Elapsed evaluation time used to integrate fixed rates.
+        capture_active: Disable the diagnostic input when false.
+
+    Returns:
+        Yaw and pitch displacement for the current evaluation.
+
+    Raises:
+        DomainValueError: The elapsed time is not a finite number.
+    """
+    if (
+        isinstance(dt_seconds, bool)
+        or not isinstance(dt_seconds, (int, float))
+        or not isfinite(dt_seconds)
+    ):
+        raise DomainValueError
+    if not capture_active or dt_seconds <= 0.0:
+        return RotationIntent(0.0, 0.0)
+
+    active_targets = {
+        binding.target for binding in profile.bindings if state.is_source_active(binding.source)
+    }
+    pitch_direction = float(BindingTarget.GYRO_Y_POSITIVE in active_targets) - float(
+        BindingTarget.GYRO_Y_NEGATIVE in active_targets
+    )
+    yaw_direction = float(BindingTarget.GYRO_Z_POSITIVE in active_targets) - float(
+        BindingTarget.GYRO_Z_NEGATIVE in active_targets
+    )
+    return RotationIntent(
+        yaw_delta_radians=(yaw_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND * dt_seconds),
+        pitch_delta_radians=(pitch_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND * dt_seconds),
+    )
 
 
 def is_accel_zero_active(
@@ -36,40 +83,6 @@ def is_accel_zero_active(
     return capture_active and any(
         binding.target is BindingTarget.ACCEL_ZERO and state.is_source_active(binding.source)
         for binding in profile.bindings
-    )
-
-
-def synthesize_diagnostic_gyro(
-    profile: InputProfile,
-    state: PhysicalInputState,
-    *,
-    capture_active: bool = True,
-) -> GyroRate:
-    """Convert active profile diagnostics into fixed Y/Z gyro rates.
-
-    Args:
-        profile: Profile whose diagnostic bindings are evaluated.
-        state: Current normalized held-input state.
-        capture_active: Disable the diagnostic input when false.
-
-    Returns:
-        A fixed-rate Y/Z gyro value with opposing directions cancelled.
-    """
-    if not capture_active:
-        return GyroRate(0.0, 0.0, 0.0)
-    active_targets = {
-        binding.target for binding in profile.bindings if state.is_source_active(binding.source)
-    }
-    y_direction = float(BindingTarget.GYRO_Y_POSITIVE in active_targets) - float(
-        BindingTarget.GYRO_Y_NEGATIVE in active_targets
-    )
-    z_direction = float(BindingTarget.GYRO_Z_POSITIVE in active_targets) - float(
-        BindingTarget.GYRO_Z_NEGATIVE in active_targets
-    )
-    return GyroRate(
-        x_radians_per_second=0.0,
-        y_radians_per_second=y_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND,
-        z_radians_per_second=z_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND,
     )
 
 

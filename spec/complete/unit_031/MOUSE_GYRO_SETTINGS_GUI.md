@@ -59,7 +59,7 @@
 - `spec/complete/unit_002/DOMAIN_AND_SETTINGS.md`
 - `spec/complete/unit_007/SETTINGS_MODAL.md`
 - `spec/complete/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
-- `spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md`
+- `spec/complete/unit_030/UNIFIED_ROTATION_POSE_MODEL.md`
 
 ## 5. 振る舞い仕様
 

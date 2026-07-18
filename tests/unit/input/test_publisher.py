@@ -1,16 +1,16 @@
 from dataclasses import dataclass, field
-from math import cos, sin
+from math import cos, radians, sin
 
 import pytest
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.mapping import Binding, BindingTarget, InputProfile, default_profile
 from demi.domain.settings import MouseSettings
-from demi.input.publisher import InputPublisher
-from demi.input.yaw_pitch_model import (
+from demi.input.mouse_rotation_mapper import (
     BASE_PITCH_RADIANS_PER_INPUT_UNIT,
     BASE_YAW_RADIANS_PER_INPUT_UNIT,
 )
+from demi.input.publisher import InputPublisher
 
 
 @dataclass
@@ -135,7 +135,9 @@ def test_opposed_ijkl_keys_cancel_and_release_without_residual_gyro() -> None:
     clock.now_ns += 8_000_000
     remaining = publisher.publish(capture_active=True, capture_epoch=1)
 
-    assert remaining.gyro_rate == GyroRate(0.0, -1.0, 1.0)
+    assert remaining.gyro_rate.x_radians_per_second == pytest.approx(sin(0.004))
+    assert remaining.gyro_rate.y_radians_per_second == -1.0
+    assert remaining.gyro_rate.z_radians_per_second == pytest.approx(cos(0.004))
 
     epoch_reset = publisher.publish(capture_active=True, capture_epoch=2)
 
@@ -169,7 +171,7 @@ def test_keyboard_pitch_gyro_updates_pose_consistent_acceleration() -> None:
     assert frame.accel_g.z_g == pytest.approx(cos(expected_pitch))
 
 
-def test_keyboard_pitch_pose_persists_after_release_and_ignores_yaw_keys() -> None:
+def test_keyboard_pitch_pose_persists_after_release_and_projects_yaw_keys() -> None:
     clock = FakeClock()
     publisher = InputPublisher(
         clock=clock,
@@ -192,7 +194,9 @@ def test_keyboard_pitch_pose_persists_after_release_and_ignores_yaw_keys() -> No
     assert moving.accel_g.z_g == pytest.approx(cos(0.1))
     assert released.gyro_rate == GyroRate(0.0, 0.0, 0.0)
     assert released.accel_g == moving.accel_g
-    assert yaw_only.gyro_rate == GyroRate(0.0, 0.0, 1.0)
+    assert yaw_only.gyro_rate.x_radians_per_second == pytest.approx(-sin(0.1))
+    assert yaw_only.gyro_rate.y_radians_per_second == 0.0
+    assert yaw_only.gyro_rate.z_radians_per_second == pytest.approx(cos(0.1))
     assert yaw_only.accel_g == released.accel_g
 
 
@@ -221,7 +225,7 @@ def test_keyboard_pitch_pose_resets_at_capture_boundaries() -> None:
     assert capture_released.gyro_rate == GyroRate(0.0, 0.0, 0.0)
 
 
-def test_ijkl_gyro_is_added_to_mouse_gyro() -> None:
+def test_mouse_and_ijkl_rotation_are_combined_before_pose_projection() -> None:
     clock = FakeClock()
     baseline = InputPublisher(clock=clock, sink=FakeSink())
     combined = InputPublisher(clock=clock, sink=FakeSink())
@@ -236,16 +240,16 @@ def test_ijkl_gyro_is_added_to_mouse_gyro() -> None:
     mouse_only = baseline.publish(capture_active=True, capture_epoch=1)
     mouse_and_keys = combined.publish(capture_active=True, capture_epoch=1)
 
-    assert mouse_and_keys.gyro_rate.x_radians_per_second == pytest.approx(
-        mouse_only.gyro_rate.x_radians_per_second
-    )
-    assert mouse_and_keys.gyro_rate.y_radians_per_second == pytest.approx(
-        mouse_only.gyro_rate.y_radians_per_second - 1.0
-    )
-    assert mouse_and_keys.gyro_rate.z_radians_per_second == pytest.approx(
-        mouse_only.gyro_rate.z_radians_per_second + 1.0
-    )
     expected_pitch = 1.5 * BASE_PITCH_RADIANS_PER_INPUT_UNIT - 0.008
+    expected_yaw = -BASE_YAW_RADIANS_PER_INPUT_UNIT + 0.008
+    middle_pitch = expected_pitch * 0.5
+    assert mouse_and_keys.gyro_rate.x_radians_per_second == pytest.approx(
+        -sin(middle_pitch) * expected_yaw / 0.008
+    )
+    assert mouse_and_keys.gyro_rate.y_radians_per_second == pytest.approx(expected_pitch / 0.008)
+    assert mouse_and_keys.gyro_rate.z_radians_per_second == pytest.approx(
+        cos(middle_pitch) * expected_yaw / 0.008
+    )
     assert mouse_and_keys.accel_g.x_g == pytest.approx(-sin(expected_pitch))
     assert mouse_and_keys.accel_g.y_g == 0.0
     assert mouse_and_keys.accel_g.z_g == pytest.approx(cos(expected_pitch))
@@ -324,6 +328,34 @@ def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
 
     assert released.accel_g == AccelG(0.0, 0.0, 1.0)
     assert publisher.state.held_keys == set()
+
+
+def test_accel_zero_keeps_updating_the_shared_pitch_limited_pose() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(
+        clock=clock,
+        sink=FakeSink(),
+        mouse_settings=MouseSettings(pitch_limit_degrees=10.0),
+    )
+    publisher.publish(capture_active=True, capture_epoch=1)
+    publisher.state.press_key("K")
+    publisher.state.press_key("O")
+    clock.now_ns += 400_000_000
+
+    zero_g = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert zero_g.accel_g == AccelG(0.0, 0.0, 0.0)
+    assert zero_g.gyro_rate.y_radians_per_second == pytest.approx(radians(10.0) / 0.4)
+
+    publisher.state.release_key("K")
+    publisher.state.release_key("O")
+    clock.now_ns += 8_000_000
+    restored = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert restored.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert restored.accel_g.x_g == pytest.approx(-sin(radians(10.0)))
+    assert restored.accel_g.y_g == 0.0
+    assert restored.accel_g.z_g == pytest.approx(cos(radians(10.0)))
 
 
 def test_capture_release_emits_neutral_and_clears_held_input() -> None:

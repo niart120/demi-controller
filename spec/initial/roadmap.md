@@ -54,7 +54,7 @@ uv run python -m demi --version
 - キー・マウスソース正規化
 - ボタン集約
 - スティック合成
-- YawPitchModel
+- 入力元非依存のRotationIntentとRotationPoseModel
 - 8ミリ秒Publisher
 
 完了条件:

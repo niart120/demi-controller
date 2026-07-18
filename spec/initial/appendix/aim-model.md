@@ -1,13 +1,13 @@
 # 補記: マウスジャイロ姿勢モデル
 
 状態: 非規範  
-対象: `YawPitchModel`
+対象: `RotationIntent`、`RotationPoseModel`
 
 この文書はモデル選定の経緯を残す。実装要件と受入条件は `input.md`、`requirements.md`、`testing.md` を正本とする。
 
 ## 採用したモデル
 
-`YawPitchModel` は、水平入力をワールド上方向まわりのyaw、垂直入力をpitchとして扱う。rollは蓄積せず、pitchを±90度より手前で制限する。
+`RotationPoseModel` は、入力元に依存しない水平角変位をワールド上方向まわりのyaw、垂直角変位をpitchとして扱う。マウスと診断キーの `RotationIntent` を周期ごとに加算し、rollは蓄積せず、合成pitchを±90度より手前で制限する。
 
 この構成はTPSカメラで一般的なyaw/pitch分離に近く、極への到達はpitch上限で防ぐ。クォータニオンを回転合成へ使う場合でも、極付近でyaw軸と視線が一致する問題はpitch上限で避ける。
 
@@ -35,7 +35,7 @@
 
 ## 静的加速度との整合
 
-ジャイロだけを生成すると、受信側が加速度から姿勢を推定する場合に、仮想pitchとセンサー入力が一致しない。そこで0.1.0では、同じ `YawPitchModel` のpitchから静的加速度も生成する。
+ジャイロだけを生成すると、受信側が加速度から姿勢を推定する場合に、仮想pitchとセンサー入力が一致しない。そこで0.1.0では、同じ `RotationPoseModel` のpitchから静的加速度も生成する。
 
 Pro Controller基準の座標を +Xトリガー、+Y左、+Zボタン面外向きとすると、静止時の比力は次になる。
 

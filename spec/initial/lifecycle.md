@@ -91,7 +91,7 @@ virtual pitch: 0 rad
 
 ```text
 1. PhysicalInputState.clear()
-2. YawPitchModel.reset()
+2. RotationPoseModel.reset()
 3. increment capture_epoch
 4. PointerCapturePort.set_pointer_capture(True)
 5. AppState = CAPTURED
@@ -121,7 +121,7 @@ virtual pitch: 0 rad
 2. increment capture_epoch
 3. PointerCapturePort.release(), best effort
 4. PhysicalInputState.clear()
-5. YawPitchModel.reset()
+5. RotationPoseModel.reset()
 6. create neutral ControllerFrame(capture_active=False)
 7. ControllerPort.offer_frame(neutral)
 8. update ControllerPreviewWidget immediately

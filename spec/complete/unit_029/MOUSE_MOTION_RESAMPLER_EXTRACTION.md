@@ -49,7 +49,7 @@
 - `spec/initial/testing.md`
 - `spec/complete/unit_024/SMOOTH_MOUSE_GYRO.md`
 - `spec/complete/unit_028/KEYBOARD_GYRO_ACCELERATION.md`
-- `spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md`
+- `spec/complete/unit_030/UNIFIED_ROTATION_POSE_MODEL.md`
 
 ## 5. 振る舞い仕様
 
@@ -130,7 +130,7 @@
 ## 10. 先送り事項
 
 - Raw Input 到着時刻から速度標本と失効時刻を作る方式は、実入力 trace で現行再標本化の問題を確認した場合に別の作業仕様へ切り出す。Unit 029 ではアルゴリズムを変更しない。
-- マウスとキーボードを統一姿勢モデルへ接続する変更は `spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` で扱う。
+- マウスとキーボードを統一姿勢モデルへ接続する変更は `spec/complete/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` で完了した。
 
 ## 11. チェックリスト
 

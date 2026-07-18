@@ -77,8 +77,10 @@ markers = [
 - `pitch_limit_degrees` が設定境界でラジアンへ変換される
 - pitchの±上限
 - pitch上限でもyawが継続する
+- マウスと診断キーのpitch角変位を加算した後に共通上限を適用し、上限では実効ジャイロYも停止する
 - 上限から中央方向へ直ちに戻れる
 - 区間中央pitchによるジャイロX/Z軸投影
+- マウスyawと診断キーyawが同じX/Z軸投影を使う
 - 更新後pitchによる `AccelG(-sin(pitch), 0, cos(pitch))`
 - `AccelG` のノルムが許容誤差内で1
 - yawだけを変えても `AccelG` が変化しない
@@ -91,11 +93,12 @@ markers = [
 - マウス方向反転を0の評価を挟まず出力し、累積変位を実入力の範囲内に保つ
 - マウス再標本化のresetでX/Yの速度履歴と未出力変位を破棄する
 - Windows Raw Inputから偽gamepadまで、低速入力と同時刻catch-upのジャイロ列を維持する
-- profileで変更したsourceから診断ジャイロ4方向を評価し、評価間隔とマウスジャイロ設定に依存しない `1.0 rad/s` を生成する
+- 疎なRaw Inputと診断キーを同時入力し、総yaw、共通pitch上限、3 IMU slotを維持する
+- profileで変更したsourceから診断ジャイロ4方向を評価し、マウスジャイロ設定に依存しない `1.0 rad/s` の回転要求を生成する
 - 同一軸の正負診断targetを同時保持した場合の相殺
 - 診断targetと同じsourceのボタンまたはスティックbindingを評価しない
-- マウス由来と診断target由来の角速度を軸ごとに加算
-- Y 軸診断targetの固定角速度を実経過時間で仮想 pitch へ積分し、評価周期の分割によらず同じ静的1Gを生成する
+- マウス由来と診断target由来のyaw / pitch角変位を軸ごとに加算してから姿勢を更新する
+- Y 軸診断targetの固定角速度を実経過時間で統一pitchへ積分し、評価周期の分割によらず同じ静的1Gを生成する
 - Y 軸診断targetの解放後は姿勢を維持し、Z 軸診断targetだけでは静的加速度を変更しない
 - 捕捉解除と捕捉 epoch 変更で診断target由来の姿勢を水平へ戻す
 - `ACCEL:ZERO` 保持中だけ最終フレームを完全な0Gとし、内部pitchを維持したまま解放後に静的1Gへ戻る
@@ -306,7 +309,9 @@ uv run pytest -m "not hardware and not bumble"
 
 - `demi.domain`
 - `demi.input.mapper`
-- `demi.input.yaw_pitch_model`
+- `demi.input.mouse_rotation_mapper`
+- `demi.input.rotation_intent`
+- `demi.input.rotation_pose_model`
 - `demi.config`
 - `demi.application.coordinator`
 

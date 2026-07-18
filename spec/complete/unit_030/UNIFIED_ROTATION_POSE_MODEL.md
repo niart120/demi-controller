@@ -89,15 +89,15 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | マウスだけの yaw / pitch 入力が現行と同じ角変位、ジャイロ、静的1Gを生成する | characterization | unit | 新モデル切替前の baseline |
-| todo | キーだけの Y 軸入力が `rate * dt` の pitch 角変位を生成し、周期分割によらず同じ姿勢になる | regression | unit | Unit 028 の振る舞いを移植 |
-| todo | マウスとキーの同時入力が yaw / pitch ごとの角変位を加算してから姿勢を更新する | new | unit | 入力順序を入れ替えて同値を確認 |
-| todo | 合成 pitch が設定上限へ達すると姿勢と実効ジャイロ Y が同時に停止し、内向き入力で直ちに戻る | new | unit | 上限の外向き / 内向き境界 |
-| todo | pitch を持つ状態のマウス yaw と Z 軸キー yaw が同じ X/Z 投影を生成する | new | unit | キーの常時 Z 軸加算を置き換える |
-| todo | `ACCEL:ZERO` 保持中も統一姿勢を更新し、解放後に更新済み姿勢の静的1Gへ戻る | regression | unit | Unit 026 / 028 の契約 |
-| todo | 非正の `dt_seconds`、捕捉解除、epoch 変更、再設定で姿勢と残留入力を安全に処理する | edge | unit | neutral と reset |
-| todo | 疎な Raw Input とキー同時入力を `InputPublisher` から偽 gamepad まで通し、総回転量、pitch 制限、3 IMU slot を保持する | regression | integration | Unit 024 の送信境界を含む |
-| todo | 新モデル切替後の全 unit / integration tree が旧モデルなしで通る | regression | integration | 互換経路を使わない |
+| refactor-skipped | マウスだけの yaw / pitch 入力が現行と同じ角変位、ジャイロ、静的1Gを生成する | characterization | unit | redは新しいマウス変換部品が未実装で収集失敗。greenは角変位、区間中央pitch投影、静的1Gの1件。部品の責務が分離済みのため追加整理なし |
+| refactor-skipped | キーだけの Y 軸入力が `rate * dt` の pitch 角変位を生成し、周期分割によらず同じ姿勢になる | regression | unit | redは回転意図生成関数が未実装で収集失敗。greenは0.2秒と0.1秒2回の同値を確認。旧関数はPublisher切替時に削除するため追加整理なし |
+| refactor-skipped | マウスとキーの同時入力が yaw / pitch ごとの角変位を加算してから姿勢を更新する | new | unit | redは `RotationIntent` の加算未対応で1 failed。greenは入力順序を入れ替えた同値を含む3件。軸ごとの不変値加算で完結するため追加整理なし |
+| refactor-skipped | 合成 pitch が設定上限へ達すると姿勢と実効ジャイロ Y が同時に停止し、内向き入力で直ちに戻る | new | unit | 試験追加直後からgreen。上限到達時の実効ジャイロ、外向き停止、内向き復帰を4件で確認。単一clamp経路のため追加整理なし |
+| refactor-skipped | pitch を持つ状態のマウス yaw と Z 軸キー yaw が同じ X/Z 投影を生成する | new | unit | 試験追加直後からgreen。30度pitchで同じyaw角変位を与え、マウスとJキーのX/Z投影一致を5件で確認。単一投影経路のため追加整理なし |
+| refactor-done | `ACCEL:ZERO` 保持中も統一姿勢を更新し、解放後に更新済み姿勢の静的1Gへ戻る | regression | unit | redは旧Publisherが上限外でも要求ジャイロ1.0を送信。greenは10度上限の実効0.4363と解放後1Gを確認。未使用の旧診断ジャイロ合成関数を削除後も37件green |
+| refactor-skipped | 非正の `dt_seconds`、捕捉解除、epoch 変更、再設定で姿勢と残留入力を安全に処理する | edge | unit | 新モデルの非正時間とreset、既存Publisherの捕捉解除・epoch・再設定を9件で確認。各所有者の既存reset経路で完結するため追加整理なし |
+| refactor-skipped | 疎な Raw Input とキー同時入力を `InputPublisher` から偽 gamepad まで通し、総回転量、pitch 制限、3 IMU slot を保持する | regression | integration | 試験追加直後からgreen。偽gamepad変換後に3 countの総yaw、10度pitch上限、3 slot同値を確認。既存fixtureを再利用し追加整理なし |
+| refactor-done | 新モデル切替後の全 unit / integration tree が旧モデルなしで通る | regression | integration | 旧テストの感度、反転、無効化、上限、無入力、resetを新所有者へ移植し、旧source/testと未使用関数を削除。unit 250件、integration 80件がgreen |
 
 ## 8. 設計メモ
 
@@ -148,11 +148,22 @@
 | `tests/unit/input/test_mapper.py` | modify | キー由来 yaw / pitch 角速度要求 |
 | `tests/unit/input/test_publisher.py` | modify | 入力源の合成、0G、捕捉境界、旧経路なしの回帰 |
 | `tests/unit/input/test_yaw_pitch_model.py` | delete | 振る舞いを新しい所有者のテストへ移植後に撤去 |
+| `tests/unit/application/test_app.py` | modify | 基準yaw角定数の新所有者を参照 |
 | `tests/integration/ui/test_windows_raw_input_capture.py` | modify | Raw Input、キー、姿勢、偽 gamepad の統合回帰 |
+| `spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` | modify | 完了した後続仕様へのリンク |
+| `spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` | modify | 完了した関連仕様へのリンク |
+| `spec/initial/README.md` | modify | 統一回転姿勢モデルを現在判断として記録 |
+| `spec/initial/appendix/aim-model.md` | modify | モデル選定理由を統一姿勢へ更新 |
+| `spec/initial/architecture.md` | modify | 新しい入力部品と合成フロー |
+| `spec/initial/configuration.md` | modify | 設定値を消費する責務境界 |
 | `spec/initial/input.md` | modify | 入力源非依存の回転意図と姿勢モデル |
+| `spec/initial/lifecycle.md` | modify | 統一姿勢のreset境界 |
+| `spec/initial/naming.md` | modify | 回転意図、マウス変換、姿勢モデルの名称 |
 | `spec/initial/requirements.md` | modify | 共通 pitch 制限と実効角速度 |
+| `spec/initial/roadmap.md` | modify | 入力モデル成果の現在名称 |
+| `spec/initial/swbt-integration.md` | modify | 姿勢モデルとデバイス軸補正の境界 |
 | `spec/initial/testing.md` | modify | 合成、上限、投影、削除後の回帰 |
-| `spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` | new | 作業範囲、TDD 状態、旧モデル削除条件、検証記録 |
+| `spec/complete/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` | new | 作業範囲、TDD 状態、旧モデル削除条件、検証記録 |
 
 ## 10. 検証
 
@@ -160,20 +171,37 @@
 |---|---|---|
 | `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | spec 作成時、1 passed |
 | `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` | passed | Unit 031完了後、該当なし |
-| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mouse_rotation_mapper.py tests/unit/input/test_mapper.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | not run | 回転意図、姿勢、入力変換、Publisher |
-| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | not run | Raw Input から偽 gamepad |
-| `rg -n "YawPitchModel|additional_pitch_rate_radians_per_second|_mouse_pitch_radians|_additional_pitch_radians|yaw_pitch_model" src tests` | not run | 完了時は参照なしを期待 |
-| `Test-Path src/demi/input/yaw_pitch_model.py` | not run | 完了時は `False` を期待 |
-| `Test-Path tests/unit/input/test_yaw_pitch_model.py` | not run | 完了時は `False` を期待 |
-| `uv sync --dev` | not run | 標準 gate |
-| `uv lock --check` | not run | 標準 gate |
-| `uv run ruff format --check .` | not run | 標準 gate |
-| `uv run ruff check .` | not run | 標準 gate |
-| `uv run ty check --no-progress` | not run | 標準 gate |
-| `uv run pytest tests/unit -q -p no:cacheprovider` | not run | 全 unit tree |
-| `uv run pytest tests/integration -q -p no:cacheprovider` | not run | 全 integration tree |
-| `uv build` | not run | package smoke |
-| `git diff --check` | passed | spec 作成時、whitespace error なし。既存変更の CRLF 変換警告のみ |
+| `uv run pytest tests/unit/test_documentation.py tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | 完了移動後の文書構造、3 passed |
+| `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/initial spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md spec/complete/unit_030/UNIFIED_ROTATION_POSE_MODEL.md spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` | passed | 該当なし |
+| `rg -n "YawPitchModel\|yaw_pitch_model\|キー由来pitch\|角速度を軸ごとに加算" spec/initial` | passed | 現在契約に旧モデル記述なし |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | failed as expected | red: `demi.input.mouse_rotation_mapper` が未実装で収集失敗 |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | passed | マウス角変位、区間中央pitch投影、静的1G、1 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | failed as expected | red: `synthesize_diagnostic_rotation_intent` が未実装で収集失敗 |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mapper.py -q -p no:cacheprovider` | passed | キー角変位の時間積分と周期分割、既存mapper回帰、9 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | failed as expected | red: `RotationIntent` が加算を実装しておらず1 failed、2 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | passed | マウスとキーの軸別加算、入力順序の同値、3 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | passed | pitch上限到達、外向き停止、内向き復帰。試験追加直後から4 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py -q -p no:cacheprovider` | passed | 30度pitchでマウスとJキーのyaw X/Z投影一致。試験追加直後から5 passed |
+| `uv run pytest tests/unit/input/test_publisher.py::test_accel_zero_keeps_updating_the_shared_pitch_limited_pose -q -p no:cacheprovider` | failed as expected | red: 10度上限でも旧Publisherの要求ジャイロYが1.0のまま、1 failed |
+| `uv run pytest tests/unit/input/test_publisher.py::test_accel_zero_keeps_updating_the_shared_pitch_limited_pose -q -p no:cacheprovider` | passed | 0G中の共通上限、実効ジャイロY、解放後の制限済み1G、1 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mapper.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | passed | Publisher切替とyaw投影期待値更新、37 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mapper.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | passed | 未使用の旧診断ジャイロ合成関数を削除したrefactor後、37 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_publisher.py::test_keyboard_pitch_pose_resets_at_capture_boundaries tests/unit/input/test_publisher.py::test_capture_boundary_discards_unemitted_resampled_mouse_motion tests/unit/input/test_publisher.py::test_publisher_reconfigures_input_settings_and_resets_held_state -q -p no:cacheprovider` | passed | 非正時間、reset、捕捉解除、epoch変更、再設定、9 passed |
+| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py::test_sparse_raw_mouse_and_keyboard_rotation_reach_limited_three_slot_imu -q -p no:cacheprovider` | passed | 疎なRaw Input、Kキー、総yaw、10度pitch上限、3 IMU slot、1 passed |
+| `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mouse_rotation_mapper.py tests/unit/input/test_mapper.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | passed | 回転意図、姿勢、入力変換、Publisher、48 passed |
+| `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | passed | Raw Inputから偽gamepad、6 passed |
+| `rg -n "YawPitchModel|additional_pitch_rate_radians_per_second|_mouse_pitch_radians|_additional_pitch_radians|yaw_pitch_model" src tests` | passed | 該当なし |
+| `Test-Path src/demi/input/yaw_pitch_model.py` | passed | `False` |
+| `Test-Path tests/unit/input/test_yaw_pitch_model.py` | passed | `False` |
+| `uv sync --dev` | passed | 77 packages resolved、74 packages checked |
+| `uv lock --check` | passed | 77 packages resolved |
+| `uv run ruff format --check .` | passed | 134 files already formatted |
+| `uv run ruff check .` | passed | All checks passed |
+| `uv run ty check --no-progress` | passed | All checks passed |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed | 250 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed | 80 passed |
+| `uv build` | passed | sdistとwheelを生成 |
+| `git diff --check` | passed | whitespace errorなし。作業treeの改行変換警告のみ |
 
 ## 11. 先送り事項
 
@@ -185,9 +213,9 @@
 
 - [x] 対象範囲、前提条件、対象外を確認した
 - [x] TDD Test List を更新した
-- [ ] Unit 029とUnit 031の完了後に実装へ着手した
+- [x] Unit 029とUnit 031の完了後に実装へ着手した
 - [x] 検証結果または未実行理由を記録した
 - [x] package / release / public API は変更対象外と確認した
-- [ ] 新モデルへ切り替えた後に旧モデル、旧 API、旧テストを削除した
-- [ ] 旧モデルの import、互換ラッパー、fallback、切替フラグが残っていないことを確認した
-- [ ] 初期仕様を統一モデルの現在契約へ更新した
+- [x] 新モデルへ切り替えた後に旧モデル、旧 API、旧テストを削除した
+- [x] 旧モデルの import、互換ラッパー、fallback、切替フラグが残っていないことを確認した
+- [x] 初期仕様を統一モデルの現在契約へ更新した

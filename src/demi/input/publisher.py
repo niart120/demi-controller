@@ -1,5 +1,6 @@
 """Evaluate normalized input state and publish controller frames."""
 
+from math import radians
 from typing import ClassVar, Protocol
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
@@ -11,12 +12,13 @@ from demi.domain.settings import MouseSettings
 from .mapper import (
     aggregate_buttons,
     is_accel_zero_active,
-    synthesize_diagnostic_gyro,
+    synthesize_diagnostic_rotation_intent,
     synthesize_stick,
 )
 from .mouse_motion_resampler import MouseMotionResampler
+from .mouse_rotation_mapper import MouseRotationMapper
+from .rotation_pose_model import RotationPoseModel
 from .timing import InputEvaluationMetrics, InputTimingSnapshot
-from .yaw_pitch_model import YawPitchModel
 
 
 class Clock(Protocol):
@@ -68,8 +70,10 @@ class InputPublisher:
         self._clock = clock
         self._sink = sink
         self._profile = profile if profile is not None else default_profile()
-        self._model = YawPitchModel(
-            mouse_settings if mouse_settings is not None else MouseSettings()
+        active_mouse_settings = mouse_settings if mouse_settings is not None else MouseSettings()
+        self._mouse_rotation_mapper = MouseRotationMapper(active_mouse_settings)
+        self._rotation_pose_model = RotationPoseModel(
+            radians(active_mouse_settings.pitch_limit_degrees)
         )
         self._circular_limit = circular_limit
         self._evaluation_interval_ms = self._validate_interval(evaluation_interval_ms)
@@ -112,7 +116,8 @@ class InputPublisher:
             evaluation_interval_ms: Scheduled evaluation interval from settings.
         """
         self._profile = profile
-        self._model = YawPitchModel(mouse_settings)
+        self._mouse_rotation_mapper = MouseRotationMapper(mouse_settings)
+        self._rotation_pose_model = RotationPoseModel(radians(mouse_settings.pitch_limit_degrees))
         self._circular_limit = circular_limit
         self._evaluation_interval_ms = self._validate_interval(evaluation_interval_ms)
         self._state.clear()
@@ -136,11 +141,11 @@ class InputPublisher:
         first_evaluation = self._last_monotonic_ns is None
         if epoch_changed:
             self._state.clear()
-            self._model.reset()
+            self._rotation_pose_model.reset()
             self._mouse_motion_resampler.reset()
         if not capture_active:
             self._state.clear()
-            self._model.reset()
+            self._rotation_pose_model.reset()
             self._mouse_motion_resampler.reset()
 
         if first_evaluation or epoch_changed:
@@ -170,26 +175,18 @@ class InputPublisher:
                 "right",
                 circular_limit=self._circular_limit,
             )
-            diagnostic_gyro_rate = synthesize_diagnostic_gyro(self._profile, self._state)
-            mouse_gyro_rate, accel_g = self._model.update(
-                dx=dx,
-                dy=dy,
+            mouse_rotation_intent = self._mouse_rotation_mapper.map(dx=dx, dy=dy)
+            diagnostic_rotation_intent = synthesize_diagnostic_rotation_intent(
+                self._profile,
+                self._state,
                 dt_seconds=dt_seconds,
-                additional_pitch_rate_radians_per_second=(
-                    diagnostic_gyro_rate.y_radians_per_second
-                ),
+            )
+            gyro_rate, accel_g = self._rotation_pose_model.update(
+                intent=mouse_rotation_intent + diagnostic_rotation_intent,
+                dt_seconds=dt_seconds,
             )
             if is_accel_zero_active(self._profile, self._state):
                 accel_g = AccelG(0.0, 0.0, 0.0)
-            gyro_rate = GyroRate(
-                x_radians_per_second=mouse_gyro_rate.x_radians_per_second,
-                y_radians_per_second=(
-                    mouse_gyro_rate.y_radians_per_second + diagnostic_gyro_rate.y_radians_per_second
-                ),
-                z_radians_per_second=(
-                    mouse_gyro_rate.z_radians_per_second + diagnostic_gyro_rate.z_radians_per_second
-                ),
-            )
         else:
             buttons = frozenset()
             left_stick = StickVector(x=0.0, y=0.0)
