@@ -12,11 +12,11 @@ from typing import Any, cast
 from PySide6.QtCore import QCoreApplication, QEvent, QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QWidget
 
-_FRAME_NAME = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
+_STATE_NAME = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 
 
 class CaptureContext:
-    """Settle Qt events and save ordered widget images for one scenario."""
+    """Settle Qt events and save named widget states for one review scenario."""
 
     def __init__(self, application: QApplication, output_dir: Path) -> None:
         """Create one capture run in a PNG-free output directory."""
@@ -45,20 +45,20 @@ class CaptureContext:
         event_loop.exec()
         self._application.processEvents()
 
-    def frame(self, name: str, widget: QWidget) -> Path:
-        """Show one widget and save its rendered client area as an ordered PNG."""
-        if not _FRAME_NAME.fullmatch(name):
-            raise ValueError("frame name must match [a-z0-9][a-z0-9_-]*")
+    def state(self, name: str, widget: QWidget) -> Path:
+        """Show one widget and save its rendered client area as a named state."""
+        if not _STATE_NAME.fullmatch(name):
+            raise ValueError("state name must match [a-z0-9][a-z0-9_-]*")
         if name in self._names:
-            raise ValueError(f"duplicate frame name: {name}")
+            raise ValueError(f"duplicate state name: {name}")
         if not isinstance(widget, QWidget):
-            raise TypeError("frame widget must be a QWidget")
+            raise TypeError("state widget must be a QWidget")
 
         widget.show()
         self.settle()
         pixmap = widget.grab()
         if pixmap.isNull():
-            raise RuntimeError(f"captured a null pixmap: {name}")
+            raise RuntimeError(f"captured a null state pixmap: {name}")
 
         path = self._output_dir / f"{len(self._paths):02d}-{name}.png"
         if path.exists():
@@ -74,7 +74,7 @@ class CaptureContext:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Capture ordered PySide6 widget images from a Python scenario."
+        description="Capture named PySide6 widget states from a Python scenario."
     )
     parser.add_argument("--scenario", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -109,7 +109,7 @@ def _dispose_widgets(application: QApplication) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one scenario and require at least one captured frame."""
+    """Run one scenario and require at least one captured GUI state."""
     args = _parser().parse_args(argv)
     application = _application()
     if application.platformName().casefold() != "windows":
@@ -122,7 +122,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         scenario(capture)
         if not capture.paths:
-            raise RuntimeError("scenario completed without capturing a frame")
+            raise RuntimeError("scenario completed without capturing a GUI state")
         return 0
     finally:
         _dispose_widgets(application)
