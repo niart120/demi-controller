@@ -70,6 +70,27 @@ def test_publisher_uses_elapsed_clock_time_and_current_input_state() -> None:
     assert frame.accel_g == AccelG(0.0, 0.0, 1.0)
 
 
+def test_operational_keyboard_is_evaluated_while_pointer_capture_is_inactive() -> None:
+    clock = FakeClock()
+    sink = FakeSink()
+    publisher = InputPublisher(clock=clock, sink=sink)
+    publisher.publish(capture_active=True, pointer_capture_active=False, capture_epoch=1)
+    publisher.state.press_key("F")
+    publisher.state.press_mouse_button("LEFT")
+    publisher.state.add_mouse_motion(2.0, 0.0)
+    clock.now_ns += 10_000_000
+
+    frame = publisher.publish(
+        capture_active=True,
+        pointer_capture_active=False,
+        capture_epoch=1,
+    )
+
+    assert frame.buttons == frozenset({LogicalButton.A})
+    assert frame.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert frame.accel_g == AccelG(0.0, 0.0, 1.0)
+
+
 @pytest.mark.parametrize(
     ("symbol", "target", "expected_gyro"),
     [

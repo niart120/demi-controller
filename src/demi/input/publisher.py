@@ -125,17 +125,27 @@ class InputPublisher:
         self._capture_epoch = None
         self._mouse_motion_resampler.reset()
 
-    def publish(self, *, capture_active: bool, capture_epoch: int) -> ControllerFrame:
+    def publish(
+        self,
+        *,
+        capture_active: bool,
+        capture_epoch: int,
+        pointer_capture_active: bool | None = None,
+    ) -> ControllerFrame:
         """Evaluate current input and offer one controller frame.
 
         Args:
             capture_active: Whether keyboard and mouse mappings are enabled.
             capture_epoch: Session identifier attached to the generated frame.
+            pointer_capture_active: Whether mouse sources are enabled. Defaults
+                to ``capture_active`` for callers using the legacy combined
+                capture boundary.
 
         Returns:
             The same frame offered to the configured sink.
         """
         now_ns = self._clock.monotonic_ns()
+        mouse_active = capture_active if pointer_capture_active is None else pointer_capture_active
         self._timing_metrics.note_evaluation(now_ns)
         epoch_changed = self._capture_epoch is not None and capture_epoch != self._capture_epoch
         first_evaluation = self._last_monotonic_ns is None
@@ -160,32 +170,36 @@ class InputPublisher:
 
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
-            if dt_seconds > 0.0:
+            evaluation_state = self._state
+            if not mouse_active:
+                dx, dy = 0.0, 0.0
+                evaluation_state = PhysicalInputState(held_keys=set(self._state.held_keys))
+            if mouse_active and dt_seconds > 0.0:
                 dx, dy = self._mouse_motion_resampler.resample(dx, dy, dt_seconds)
-            buttons = aggregate_buttons(self._profile, self._state, capture_active=True)
+            buttons = aggregate_buttons(self._profile, evaluation_state, capture_active=True)
             left_stick = synthesize_stick(
                 self._profile,
-                self._state,
+                evaluation_state,
                 "left",
                 circular_limit=self._circular_limit,
             )
             right_stick = synthesize_stick(
                 self._profile,
-                self._state,
+                evaluation_state,
                 "right",
                 circular_limit=self._circular_limit,
             )
             mouse_rotation_intent = self._mouse_rotation_mapper.map(dx=dx, dy=dy)
             diagnostic_rotation_intent = synthesize_diagnostic_rotation_intent(
                 self._profile,
-                self._state,
+                evaluation_state,
                 dt_seconds=dt_seconds,
             )
             gyro_rate, accel_g = self._rotation_pose_model.update(
                 intent=mouse_rotation_intent + diagnostic_rotation_intent,
                 dt_seconds=dt_seconds,
             )
-            if is_accel_zero_active(self._profile, self._state):
+            if is_accel_zero_active(self._profile, evaluation_state):
                 accel_g = AccelG(0.0, 0.0, 0.0)
         else:
             buttons = frozenset()
