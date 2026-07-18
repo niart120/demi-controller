@@ -39,7 +39,7 @@ CI の応答性 probe で、GUI スレッドが command ごとに新しい worke
 
 - `spec/initial/requirements.md`
 - `spec/initial/testing.md`
-- `spec/wip/unit_021/CI_RESPONSE_TIMER_PRECISION.md`
+- `spec/complete/unit_021/CI_RESPONSE_TIMER_PRECISION.md`
 - `src/demi/controller/runtime.py`
 
 ## 5. 振る舞い仕様
