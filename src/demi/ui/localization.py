@@ -1,11 +1,14 @@
 """Process-wide Qt translation loading for the desktop user interface."""
 
+import logging
 from importlib.resources import as_file, files
 
 from PySide6.QtCore import QLibraryInfo, QTranslator
 from PySide6.QtWidgets import QApplication
 
 from demi.domain.settings import UiLanguage
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def install_translators(
@@ -36,6 +39,7 @@ def install_translators(
         QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath),
     )
     if not app_loaded or not qt_loaded:
+        _LOGGER.warning("UI translation unavailable; using English")
         return ()
 
     application.installTranslator(app_translator)
