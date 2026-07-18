@@ -134,7 +134,7 @@ def test_profile_diagnostic_keys_emit_constant_gyro_without_regular_mapping(
         assert frame.right_stick == StickVector(x=0.0, y=0.0)
 
 
-def test_opposed_ijkl_keys_cancel_and_release_without_residual_gyro() -> None:
+def test_pointer_epoch_preserves_opposed_ijkl_keys_without_residual_gyro() -> None:
     clock = FakeClock()
     publisher = InputPublisher(
         clock=clock,
@@ -163,7 +163,7 @@ def test_opposed_ijkl_keys_cancel_and_release_without_residual_gyro() -> None:
     epoch_reset = publisher.publish(capture_active=True, capture_epoch=2)
 
     assert epoch_reset.gyro_rate == GyroRate(0.0, 0.0, 0.0)
-    assert publisher.state.held_keys == set()
+    assert {source.symbol for source in publisher.state.held_keys} == {"I", "J"}
 
     publisher.state.press_key("I")
     released = publisher.publish(capture_active=False, capture_epoch=3)
@@ -221,7 +221,7 @@ def test_keyboard_pitch_pose_persists_after_release_and_projects_yaw_keys() -> N
     assert yaw_only.accel_g == released.accel_g
 
 
-def test_keyboard_pitch_pose_resets_at_capture_boundaries() -> None:
+def test_keyboard_pitch_pose_survives_pointer_epoch_and_resets_when_inactive() -> None:
     clock = FakeClock()
     publisher = InputPublisher(
         clock=clock,
@@ -240,7 +240,7 @@ def test_keyboard_pitch_pose_resets_at_capture_boundaries() -> None:
     capture_released = publisher.publish(capture_active=False, capture_epoch=3)
 
     assert tilted.accel_g != AccelG(0.0, 0.0, 1.0)
-    assert epoch_reset.accel_g == AccelG(0.0, 0.0, 1.0)
+    assert epoch_reset.accel_g == tilted.accel_g
     assert epoch_reset.gyro_rate == GyroRate(0.0, 0.0, 0.0)
     assert capture_released.accel_g == AccelG(0.0, 0.0, 1.0)
     assert capture_released.gyro_rate == GyroRate(0.0, 0.0, 0.0)

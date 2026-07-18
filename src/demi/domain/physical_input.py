@@ -148,3 +148,12 @@ class PhysicalInputState:
         self.accumulated_dy = 0.0
         if changed:
             self.revision += 1
+
+    def clear_mouse(self) -> None:
+        """Clear held mouse sources and pending motion while preserving keys."""
+        changed = bool(self.held_mouse_buttons or self.accumulated_dx or self.accumulated_dy)
+        self.held_mouse_buttons.clear()
+        self.accumulated_dx = 0.0
+        self.accumulated_dy = 0.0
+        if changed:
+            self.revision += 1

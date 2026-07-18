@@ -150,8 +150,11 @@ class InputPublisher:
         epoch_changed = self._capture_epoch is not None and capture_epoch != self._capture_epoch
         first_evaluation = self._last_monotonic_ns is None
         if epoch_changed:
-            self._state.clear()
-            self._rotation_pose_model.reset()
+            if capture_active:
+                self._state.clear_mouse()
+            else:
+                self._state.clear()
+                self._rotation_pose_model.reset()
             self._mouse_motion_resampler.reset()
         if not capture_active:
             self._state.clear()
