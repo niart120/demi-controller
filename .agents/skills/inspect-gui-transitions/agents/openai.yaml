@@ -1,0 +1,4 @@
+interface:
+  display_name: "GUI Transition Inspector"
+  short_description: "PySide6 GUI の画面遷移を PNG 画像で確認"
+  default_prompt: "$inspect-gui-transitions を使って指定した GUI 状態へ遷移し、PNG を確認する。"
