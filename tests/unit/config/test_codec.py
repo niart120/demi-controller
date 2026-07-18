@@ -8,7 +8,14 @@ from demi.config.codec import decode_settings, dumps_settings, encode_settings, 
 from demi.config.errors import ConfigurationError, UnsupportedSchemaError
 from demi.config.migrations import migrate_settings
 from demi.domain.mapping import Binding, BindingTarget, InputProfile
-from demi.domain.settings import AppSettings, ControllerColorSettings, InputSettings, MouseSettings
+from demi.domain.settings import (
+    AppSettings,
+    ControllerColorSettings,
+    InputSettings,
+    MouseSettings,
+    UiLanguage,
+    UiSettings,
+)
 
 
 def test_default_settings_round_trip_through_toml() -> None:
@@ -34,6 +41,24 @@ def test_codec_supplies_connection_shortcuts_for_existing_v1_settings() -> None:
     restored = decode_settings(raw)
 
     assert restored.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
+
+
+def test_codec_supplies_english_for_existing_v1_settings_and_round_trips_languages() -> None:
+    raw = encode_settings(AppSettings.default())
+    raw.pop("ui")
+
+    restored = decode_settings(raw)
+
+    assert restored.ui.language is UiLanguage.ENGLISH
+
+    for language in UiLanguage:
+        settings = replace(AppSettings.default(), ui=UiSettings(language=language))
+
+        encoded = encode_settings(settings)
+        decoded = decode_settings(encoded)
+
+        assert encoded["ui"] == {"language": language.value}
+        assert decoded == settings
 
 
 def test_codec_supplies_disabled_horizontal_inversion_for_existing_v1_settings() -> None:
