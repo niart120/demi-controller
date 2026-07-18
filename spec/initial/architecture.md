@@ -66,7 +66,10 @@ src/
     │   ├── relative_pointer.py
     │   ├── state_tracker.py
     │   ├── mapper.py
-    │   ├── yaw_pitch_model.py
+    │   ├── mouse_motion_resampler.py
+    │   ├── mouse_rotation_mapper.py
+    │   ├── rotation_intent.py
+    │   ├── rotation_pose_model.py
     │   └── publisher.py
     ├── platform/
     │   └── windows_raw_input.py
@@ -322,7 +325,11 @@ PhysicalInputState
   accumulated_dx/dy
            │ 8ms target
            ▼
-InputMapper + YawPitchModel
+InputMapper + MouseMotionResampler + MouseRotationMapper
+  マウス由来RotationIntent + 診断キー由来RotationIntent
+           │ 軸ごとに加算
+           ▼
+RotationPoseModel
   GyroRate + AccelG
            │
            ├── ControllerFrame ──► ControllerPreviewWidget

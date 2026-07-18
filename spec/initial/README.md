@@ -159,7 +159,7 @@ ApplicationPresenter
 | `roadmap.md` | 実装順序 |
 | `risks.md` | リスクと未検証事項 |
 | `naming.md` | 公開名、コード上の名称 |
-| `appendix/aim-model.md` | YawPitchModelの選定理由と代替案。非規範 |
+| `appendix/aim-model.md` | 統一回転姿勢モデルの選定理由と代替案。非規範 |
 
 ## 8. 外部事実とプロジェクト判断
 
@@ -170,7 +170,7 @@ ApplicationPresenter
 | 外部事実 | 実機接続にはBumbleが直接利用する専用USB Bluetoothアダプターが必要である |
 | プロジェクト判断 | GUIはPySide6のQt Widgets、key/mouse event、Qt event loopを使う |
 | プロジェクト判断 | Project_Demiの入力評価周期は8ミリ秒、描画目標は60Hzとする |
-| プロジェクト判断 | マウスジャイロはYawPitchModelを使い、pitchを既定±75度に制限する。内部角度はラジアン、水平・垂直感度は独立した無次元倍率とする |
+| プロジェクト判断 | マウスと診断キーを周期内のyaw / pitch角変位へ正規化してRotationPoseModelへ渡し、合成pitchを既定±75度に制限する。内部角度はラジアン、水平・垂直感度は独立した無次元倍率とする |
 | プロジェクト判断 | ボタン割り当ては任意に反転でき、反転判定を特定の入力や対象へ直書きしない |
 | 外部事実 | Pro Controllerおよび左Joy-Conの共通IMU正方向は、+Xがトリガー方向、+Yが左、+Zがボタン・スティック面から外向きである。右Joy-Conのraw Y/Zは逆向きである |
 | プロジェクト判断 | ドメイン層はPro Controller基準の右手座標系を使い、水平静止時の加速度を `(0, 0, +1) G` とする |

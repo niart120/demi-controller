@@ -6,7 +6,55 @@ from demi.domain.controller import LogicalButton, StickVector
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import Binding, BindingTarget, InputProfile, default_profile
 from demi.domain.physical_input import PhysicalInputState
-from demi.input.mapper import aggregate_buttons, synthesize_stick
+from demi.input.mapper import (
+    aggregate_buttons,
+    synthesize_diagnostic_rotation_intent,
+    synthesize_stick,
+)
+from demi.input.rotation_intent import RotationIntent
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        ("I", RotationIntent(0.0, -0.25)),
+        ("K", RotationIntent(0.0, 0.25)),
+        ("J", RotationIntent(0.25, 0.0)),
+        ("L", RotationIntent(-0.25, 0.0)),
+    ],
+)
+def test_diagnostic_gyro_keys_integrate_to_rotation_intent(
+    key: str,
+    expected: RotationIntent,
+) -> None:
+    state = PhysicalInputState()
+    state.press_key(key)
+
+    intent = synthesize_diagnostic_rotation_intent(
+        default_profile(),
+        state,
+        dt_seconds=0.25,
+    )
+
+    assert intent == expected
+
+
+def test_opposing_diagnostic_rotation_and_capture_outside_are_zero() -> None:
+    state = PhysicalInputState()
+    for key in ("I", "K", "J", "L"):
+        state.press_key(key)
+
+    assert synthesize_diagnostic_rotation_intent(
+        default_profile(),
+        state,
+        dt_seconds=0.25,
+    ) == RotationIntent(0.0, 0.0)
+    assert synthesize_diagnostic_rotation_intent(
+        default_profile(),
+        state,
+        dt_seconds=0.25,
+        capture_active=False,
+    ) == RotationIntent(0.0, 0.0)
 
 
 def test_default_button_sources_are_aggregated_and_release_is_independent() -> None:

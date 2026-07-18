@@ -1,7 +1,9 @@
 import asyncio
 from dataclasses import dataclass, field
+from math import cos, hypot, radians, sin
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import QByteArray
 from swbt import InputState
 
@@ -12,7 +14,8 @@ from demi.config.paths import SettingsPaths
 from demi.config.repository import SettingsLoadResult, SettingsLoadStatus
 from demi.controller.swbt_adapter import SwbtControllerAdapter, frame_to_input_state
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings, ControllerColorSettings
+from demi.domain.settings import AppSettings, ControllerColorSettings, MouseSettings
+from demi.input.mouse_rotation_mapper import BASE_YAW_RADIANS_PER_INPUT_UNIT
 from demi.input.publisher import InputPublisher
 from demi.platform.windows_raw_input import (
     MOUSE_MOVE_ABSOLUTE,
@@ -440,6 +443,95 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
     assert len(set(gyro_z_rates)) == 1, gyro_z_rates
     assert all(
         len({imu.to_gyro_rate()[2] for imu in state.imu_frames}) == 1
+        for state in gamepad.applied_states
+    )
+
+
+def test_sparse_raw_mouse_and_keyboard_rotation_reach_limited_three_slot_imu() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(
+        clock=clock,
+        sink=RecordingFrameSink(),
+        mouse_settings=MouseSettings(pitch_limit_degrees=10.0),
+    )
+    messages = FakeNativeMessageReader(
+        {
+            index: NativeWindowsMessage(
+                message=WM_INPUT,
+                l_param=500 + index,
+                window_handle=0x1234,
+            )
+            for index in range(1, 4)
+        }
+    )
+    packets = FakeRawInputReader(
+        {500 + index: RawMousePacket(flags=0, dx=1, dy=0) for index in range(1, 4)}
+    )
+    backend = WindowsRawInputBackend(
+        registrar=FakeRawInputRegistrar(),
+        on_relative_motion=publisher.state.add_mouse_motion,
+        message_reader=messages,
+        raw_input_reader=packets,
+    )
+    backend.start_capture(0x1234, capture_epoch=1)
+    publisher.publish(capture_active=True, capture_epoch=1)
+    publisher.state.press_key("K")
+
+    frames: list[ControllerFrame] = []
+    raw_event_index = 0
+    for tick in range(1, 26):
+        if tick in {1, 3, 5}:
+            raw_event_index += 1
+            assert (
+                backend.handle_native_event(
+                    QByteArray(b"windows_generic_MSG"),
+                    raw_event_index,
+                    capture_epoch=1,
+                )
+                is False
+            )
+        clock.now_ns += 8_000_000
+        frames.append(publisher.publish(capture_active=True, capture_epoch=1))
+
+    gamepad = RecordingGamepad()
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=lambda **_kwargs: gamepad,
+        adapter_lister=lambda: (),
+    )
+
+    async def apply_frames() -> None:
+        await adapter.connect_saved(
+            "usb:0",
+            Path("bonds/default.json"),
+            1.0,
+            ControllerColorSettings(),
+        )
+        for frame in frames:
+            await adapter.apply_frame(frame)
+        await adapter.close()
+
+    asyncio.run(apply_frames())
+
+    converted_imu = [state.imu_frames[0] for state in gamepad.applied_states]
+    total_yaw = sum(
+        -hypot(gyro_x, gyro_z) * 0.008
+        for gyro_x, _gyro_y, gyro_z in (imu.to_gyro_rate() for imu in converted_imu)
+        if gyro_z < 0.0
+    )
+    total_pitch = sum(imu.to_gyro_rate()[1] * 0.008 for imu in converted_imu)
+    final_accel = converted_imu[-1].to_accel_g()
+
+    assert total_yaw == pytest.approx(
+        -3.0 * BASE_YAW_RADIANS_PER_INPUT_UNIT,
+        abs=5e-5,
+    )
+    assert total_pitch == pytest.approx(radians(10.0), abs=3e-4)
+    assert final_accel == pytest.approx(
+        (-sin(radians(10.0)), 0.0, cos(radians(10.0))),
+        abs=5e-4,
+    )
+    assert all(
+        len({(imu.to_gyro_rate(), imu.to_accel_g()) for imu in state.imu_frames}) == 1
         for state in gamepad.applied_states
     )
 

@@ -43,8 +43,8 @@ from demi.domain.settings import (
     InputSettings,
     WindowSettings,
 )
+from demi.input.mouse_rotation_mapper import BASE_YAW_RADIANS_PER_INPUT_UNIT
 from demi.input.publisher import InputPublisher
-from demi.input.yaw_pitch_model import BASE_YAW_RADIANS_PER_INPUT_UNIT
 
 if TYPE_CHECKING:
     from demi.controller.adapter import ControllerAdapterFactory

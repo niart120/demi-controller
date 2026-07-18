@@ -224,7 +224,7 @@ target = "ACCEL:ZERO"
 
 `local_actions.connection` は主キーボードとテンキーの Ctrl+Enter を表す。項目追加前の `demi.settings/v1` では欠落を許可し、`["CTRL+RETURN", "CTRL+ENTER"]` をメモリ上の既定値とする。次回の明示保存では項目を出力する。
 
-`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。角度は設定境界でラジアンへ変換し、`YawPitchModel` 内ではラジアン、ラジアン毎秒、Gだけを使う。静的加速度は通常経路で仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。完全な0Gはprofileの診断targetで一時的に上書きする。
+`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。マウス差分は `MouseRotationMapper` でラジアンへ変換し、`RotationPoseModel` はラジアン、ラジアン毎秒、Gだけを扱う。静的加速度は通常経路で仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。完全な0Gはprofileの診断targetで一時的に上書きする。
 
 `inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
 

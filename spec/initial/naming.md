@@ -153,7 +153,9 @@ UI表示では日本語へ変換してよいが、設定値は英大文字の正
 - `Command` という名前を入力状態へ使わない。接続操作コマンドと混同するためである。
 - `InputState` はswbt型と衝突するため、ドメインでは使わない。
 - `Gamepad` と `Controller` を混在させず、Project_Demi側は `Controller` に揃える。
-- マウスから仮想姿勢とIMU値を生成するクラスは `YawPitchModel` とする。実装ファイル名は `yaw_pitch_model.py` とする。
+- 1評価周期のyaw / pitch角変位は `RotationIntent` とする。
+- マウス差分から回転意図を生成するクラスは `MouseRotationMapper` とする。
+- 入力元非依存の仮想姿勢とIMU値を生成するクラスは `RotationPoseModel` とする。
 - 角速度のドメイン値は `GyroRate`、G単位加速度のドメイン値は `AccelG` とする。
 - `AccelG` は静止時の比力を含む加速度センサー値であり、下向き重力ベクトルを意味する `GravityVector` は使わない。
 - `GyroRate` と `AccelG` をまとめるだけの `MotionSample` は追加せず、`ControllerFrame` に直接保持する。

@@ -60,7 +60,7 @@ SwbtControllerAdapter
 
 ドメイン座標は +Xトリガー、+Y左、+Zボタン・スティック面外向きの右手系とする。0.1.0のPro Controllerではこの座標をそのままswbtへ渡す。
 
-右Joy-Conのraw Y/ZはPro Controller・左Joy-Conと逆である。将来Joy-Conを対象へ加える場合、デバイス固有の軸反転はprofile-awareなアダプター境界で処理し、`YawPitchModel` や `ControllerFrame` の意味を変更しない。
+右Joy-Conのraw Y/ZはPro Controller・左Joy-Conと逆である。将来Joy-Conを対象へ加える場合、デバイス固有の軸反転はprofile-awareなアダプター境界で処理し、`RotationPoseModel` や `ControllerFrame` の意味を変更しない。
 
 ## 3. ライフサイクル
 
