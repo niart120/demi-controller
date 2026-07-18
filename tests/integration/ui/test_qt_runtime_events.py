@@ -174,7 +174,7 @@ def test_f4_pointer_release_refreshes_the_bound_toolbar(
 
     window.main_toolbar.capture_action.trigger()
     assert coordinator.app_state is AppState.CAPTURED
-    assert window.main_toolbar.capture_action.text() == "Stop input"
+    assert window.main_toolbar.capture_action.text() == "Stop mouse"
     assert window.main_toolbar.capture_action.isChecked()
 
     QCoreApplication.sendEvent(
@@ -184,7 +184,7 @@ def test_f4_pointer_release_refreshes_the_bound_toolbar(
     qt_application.processEvents()
 
     assert coordinator.app_state is AppState.IDLE
-    assert window.main_toolbar.capture_action.text() == "Start input"
+    assert window.main_toolbar.capture_action.text() == "Start mouse"
     assert not window.main_toolbar.capture_action.isChecked()
 
 

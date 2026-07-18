@@ -25,7 +25,7 @@ def test_status_bar_exposes_all_runtime_categories_as_text(qt_application: objec
 
     assert status_bar.adapter_label.text() == "Adapter: USB Bluetooth adapter"
     assert status_bar.connection_label.text() == "Connection: Connected"
-    assert status_bar.capture_label.text() == "Input: Captured"
+    assert status_bar.capture_label.text() == "Mouse capture: On"
     assert status_bar.pointer_label.text() == "Pointer: Raw Input"
     assert status_bar.preview_label.text() == "Preview: only"
     assert status_bar.notice_label.text() == "Error: Connection lost"
@@ -43,7 +43,7 @@ def test_status_bar_exposes_all_runtime_categories_as_text(qt_application: objec
     )
 
     assert status_bar.connection_label.text() == "Connection: Ready"
-    assert status_bar.capture_label.text() == "Input: Stopped"
+    assert status_bar.capture_label.text() == "Mouse capture: Off"
     assert status_bar.pointer_label.text() == "Pointer: Unavailable"
     assert status_bar.preview_label.text() == "Preview: transmitting"
     assert status_bar.notice_label.text() == "Warning: Select a USB adapter"

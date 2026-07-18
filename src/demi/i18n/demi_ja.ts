@@ -5,8 +5,8 @@
     <name>MainToolBar</name>
     <message><source>Connect</source><translation>接続</translation></message>
     <message><source>Disconnect</source><translation>切断</translation></message>
-    <message><source>Start input</source><translation>入力開始</translation></message>
-    <message><source>Stop input</source><translation>入力解除</translation></message>
+    <message><source>Start mouse</source><translation>マウス捕捉開始</translation></message>
+    <message><source>Stop mouse</source><translation>マウス捕捉解除</translation></message>
     <message><source>Mappings</source><translation>割り当て</translation></message>
     <message><source>Connection settings</source><translation>接続設定</translation></message>
     <message><source>Colors</source><translation>色</translation></message>
@@ -89,14 +89,14 @@
     <message><source>Buttons</source><translation>ボタン</translation></message>
     <message><source>Gyro</source><translation>ジャイロ</translation></message>
     <message><source>Acceleration</source><translation>加速度</translation></message>
-    <message><source>Input captured</source><translation>入力捕捉中</translation></message>
-    <message><source>Waiting for input</source><translation>入力待機中</translation></message>
+    <message><source>Mouse captured</source><translation>マウス捕捉中</translation></message>
+    <message><source>Mouse not captured</source><translation>マウス捕捉なし</translation></message>
   </context>
   <context>
     <name>MainStatusBar</name>
     <message><source>Adapter: {adapter}</source><translation>アダプター: {adapter}</translation></message>
     <message><source>Connection: {state}</source><translation>接続: {state}</translation></message>
-    <message><source>Input: {state}</source><translation>入力: {state}</translation></message>
+    <message><source>Mouse capture: {state}</source><translation>マウス捕捉: {state}</translation></message>
     <message><source>Pointer: {quality}</source><translation>ポインター: {quality}</translation></message>
     <message><source>Preview: only</source><translation>プレビュー: のみ</translation></message>
     <message><source>Preview: transmitting</source><translation>プレビュー: 送信あり</translation></message>
@@ -112,7 +112,8 @@
     <message><source>Disconnecting</source><translation>切断中</translation></message>
     <message><source>Error</source><translation>エラー</translation></message>
     <message><source>Stopping</source><translation>停止中</translation></message>
-    <message><source>Captured</source><translation>捕捉中</translation></message>
+    <message><source>On</source><translation>あり</translation></message>
+    <message><source>Off</source><translation>なし</translation></message>
     <message><source>OS accelerated</source><translation>OS補正あり</translation></message>
     <message><source>Unavailable</source><translation>利用不可</translation></message>
     <message><source>None</source><translation>なし</translation></message>

@@ -34,11 +34,11 @@ def test_main_window_refreshes_toolbar_and_status_bar_from_application_snapshot(
 
     assert window.main_toolbar.connection_action.text() == "Disconnect"
     assert window.main_toolbar.connection_action.isEnabled()
-    assert window.main_toolbar.capture_action.text() == "Stop input"
+    assert window.main_toolbar.capture_action.text() == "Stop mouse"
     assert window.main_toolbar.capture_action.isChecked()
     assert window.status_bar.adapter_label.text() == "Adapter: Bluetooth adapter"
     assert window.status_bar.connection_label.text() == "Connection: Connected"
-    assert window.status_bar.capture_label.text() == "Input: Captured"
+    assert window.status_bar.capture_label.text() == "Mouse capture: On"
     assert window.status_bar.preview_label.text() == "Preview: transmitting"
 
 

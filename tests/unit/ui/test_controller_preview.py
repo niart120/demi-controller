@@ -54,6 +54,7 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
         gyro_rate=GyroRate(1.25, -2.5, 0.5),
         accel_g=AccelG(0.1, -0.2, 1.05),
         capture_active=True,
+        pointer_capture_active=True,
     )
     colors = ControllerColorSettings(
         body="#102030",
@@ -74,6 +75,7 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     assert model.gyro_rate == GyroRate(1.25, -2.5, 0.5)
     assert model.accel_g == AccelG(0.1, -0.2, 1.05)
     assert model.capture_active is True
+    assert model.pointer_capture_active is True
 
     widget = ControllerPreviewWidget(colors=colors)
     widget.resize(640, 360)

@@ -38,7 +38,7 @@ class MainToolBar(QToolBar):
         super().__init__(parent)
         self.setObjectName("main-toolbar")
         self.connection_action = QAction(self.tr("Connect"), self)
-        self.capture_action = QAction(self.tr("Start input"), self)
+        self.capture_action = QAction(self.tr("Start mouse"), self)
         self.capture_action.setCheckable(True)
         self.mapping_action = QAction(self.tr("Mappings"), self)
         self.connection_settings_action = QAction(self.tr("Connection settings"), self)
@@ -81,7 +81,7 @@ class MainToolBar(QToolBar):
         )
         self.connection_action.setEnabled(connection_available)
         self.capture_action.setText(
-            self.tr("Stop input") if is_captured else self.tr("Start input")
+            self.tr("Stop mouse") if is_captured else self.tr("Start mouse")
         )
         self.capture_action.setChecked(is_captured)
         self.capture_action.setEnabled(capture_available)

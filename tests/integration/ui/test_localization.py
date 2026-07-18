@@ -32,7 +32,7 @@ def test_default_user_interface_uses_english_source_text(
         on_reconnect=lambda: None,
     )
     assert window.main_toolbar.connection_action.text() == "Connect"
-    assert window.main_toolbar.capture_action.text() == "Start input"
+    assert window.main_toolbar.capture_action.text() == "Start mouse"
     assert window.status_bar.adapter_label.text() == "Adapter: None"
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"

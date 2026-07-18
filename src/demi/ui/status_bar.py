@@ -72,7 +72,9 @@ class MainStatusBar(QStatusBar):
             )
         )
         self.capture_label.setText(
-            self.tr("Input: {state}").format(state=self.tr(_capture_text(state.application_state)))
+            self.tr("Mouse capture: {state}").format(
+                state=self.tr(_capture_text(state.application_state))
+            )
         )
         self.pointer_label.setText(
             self.tr("Pointer: {quality}").format(
@@ -109,7 +111,7 @@ def _connection_text(state: ConnectionState) -> str:
 
 
 def _capture_text(state: AppState) -> str:
-    return "Captured" if state is AppState.CAPTURED else "Stopped"
+    return "On" if state is AppState.CAPTURED else "Off"
 
 
 def _pointer_text(quality: RelativePointerQuality) -> str:

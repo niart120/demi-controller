@@ -222,6 +222,7 @@ class InputPublisher:
             gyro_rate=gyro_rate,
             accel_g=accel_g,
             capture_active=capture_active,
+            pointer_capture_active=mouse_active,
         )
         self._last_monotonic_ns = now_ns
         self._capture_epoch = capture_epoch

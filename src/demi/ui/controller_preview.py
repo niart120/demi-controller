@@ -73,6 +73,7 @@ class ControllerPreviewModel:
     gyro_rate: GyroRate
     accel_g: AccelG
     capture_active: bool
+    pointer_capture_active: bool
 
 
 def controller_preview_model(
@@ -99,6 +100,7 @@ def controller_preview_model(
         gyro_rate=frame.gyro_rate,
         accel_g=frame.accel_g,
         capture_active=frame.capture_active,
+        pointer_capture_active=frame.pointer_capture_active,
     )
 
 
@@ -195,7 +197,7 @@ class ControllerPreviewWidget(QWidget):
         self._draw_stick(painter, right_grip_center, model.right_stick)
         self._draw_buttons(painter, body, model)
         self._draw_diagnostics(painter, bounds, model)
-        self._draw_capture_overlay(painter, body, model.capture_active)
+        self._draw_capture_overlay(painter, body, model.pointer_capture_active)
 
     def _request_widget_repaint(self) -> None:
         self.update()
@@ -265,15 +267,17 @@ class ControllerPreviewWidget(QWidget):
         painter.drawText(diagnostics, Qt.AlignmentFlag.AlignLeft, text)
 
     @staticmethod
-    def _draw_capture_overlay(painter: QPainter, body: QRectF, capture_active: bool) -> None:
+    def _draw_capture_overlay(
+        painter: QPainter, body: QRectF, pointer_capture_active: bool
+    ) -> None:
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#167A4C") if capture_active else QColor("#4A4A4A"))
+        painter.setBrush(QColor("#167A4C") if pointer_capture_active else QColor("#4A4A4A"))
         overlay = QRectF(body.center().x() - 64.0, body.bottom() - 36.0, 128.0, 24.0)
         painter.drawRoundedRect(overlay, 8.0, 8.0)
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
         label = QCoreApplication.translate(
             "ControllerPreviewWidget",
-            "Input captured" if capture_active else "Waiting for input",
+            "Mouse captured" if pointer_capture_active else "Mouse not captured",
         )
         painter.drawText(overlay, Qt.AlignmentFlag.AlignCenter, label)
 
