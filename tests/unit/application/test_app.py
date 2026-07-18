@@ -599,7 +599,7 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
     session.connection_action()
 
     assert coordinator.is_captured is False
-    assert runtime.frames[-1].capture_active is False
+    assert runtime.frames[-1].capture_active is True
     disconnects = [command for command in runtime.commands if isinstance(command, Disconnect)]
     assert len(disconnects) == 1
     assert session.presentation.model.connection_state is ConnectionState.DISCONNECTING

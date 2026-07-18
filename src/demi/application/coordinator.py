@@ -176,7 +176,17 @@ class CaptureCoordinator:
         """
         if not self.is_captured:
             return None
-        return self._leave_capture(AppState.IDLE)
+        return self._leave_pointer_capture()
+
+    def neutralize_input(self) -> ControllerFrame:
+        """Stop pointer capture, clear all held input, and publish neutral once."""
+        self._app_state = AppState.IDLE
+        self._capture_epoch += 1
+        self._stop_relative_pointer_capture()
+        with suppress(OSError, RuntimeError):
+            self._pointer_capture.set_pointer_capture(False)
+        self._publisher.state.clear()
+        return self._publish_frame(capture_active=False)
 
     def open_configuration(self) -> bool:
         """Enter configuration state after publishing a neutral frame."""
@@ -260,6 +270,18 @@ class CaptureCoordinator:
             self._pointer_capture.set_pointer_capture(False)
         self._publisher.state.clear()
         return self._publish_frame(capture_active=False)
+
+    def _leave_pointer_capture(self) -> ControllerFrame:
+        self._app_state = AppState.IDLE
+        self._capture_epoch += 1
+        self._stop_relative_pointer_capture()
+        with suppress(OSError, RuntimeError):
+            self._pointer_capture.set_pointer_capture(False)
+        self._publisher.state.clear_mouse()
+        return self._publish_frame(
+            capture_active=True,
+            pointer_capture_active=False,
+        )
 
     def _stop_relative_pointer_capture(self) -> None:
         relative_pointer_capture = self._relative_pointer_capture

@@ -64,3 +64,28 @@ def test_pointer_capture_start_preserves_keyboard_and_adds_mouse_input() -> None
     assert captured.buttons == frozenset({LogicalButton.A, LogicalButton.ZR})
     assert captured.gyro_rate.z_radians_per_second < 0.0
     assert pointer_capture.calls == [True]
+
+
+def test_pointer_capture_stop_clears_mouse_but_preserves_keyboard() -> None:
+    clock = FakeClock()
+    sink = FakeSink()
+    pointer_capture = FakePointerCapture()
+    publisher = InputPublisher(clock=clock, sink=sink)
+    coordinator = CaptureCoordinator(
+        publisher=publisher,
+        pointer_capture=pointer_capture,
+    )
+    publisher.state.press_key("F")
+    assert coordinator.start_capture() is True
+    publisher.state.press_mouse_button("LEFT")
+    publisher.state.add_mouse_motion(2.0, 0.0)
+
+    released = coordinator.stop_capture()
+
+    assert released is not None
+    assert released.buttons == frozenset({LogicalButton.A})
+    assert released.gyro_rate.z_radians_per_second == 0.0
+    assert publisher.state.held_keys
+    assert publisher.state.held_mouse_buttons == set()
+    assert coordinator.evaluate().buttons == frozenset({LogicalButton.A})
+    assert pointer_capture.calls == [True, False]

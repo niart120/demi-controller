@@ -35,7 +35,7 @@ class QtInputAdapter(QObject):
         Args:
             state: Mutable held-source state for the current capture session.
             is_captured: Returns whether controller input capture is active.
-            on_stop_capture: Handles an F12 capture-release request.
+            on_stop_capture: Handles an F4 pointer-capture release request.
             on_focus_lost: Handles a window or application focus loss.
             on_focus_gained: Handles a window or application focus gain.
             on_dialog_opened: Neutralizes capture before a dialog opens.
@@ -64,7 +64,7 @@ class QtInputAdapter(QObject):
         if event_type in _FOCUS_GAIN_EVENTS and self._accepts_focus_event(watched):
             _invoke(self._on_focus_gained)
             return False
-        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F12:
+        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F4:
             if self._is_captured():
                 _invoke(self._on_stop_capture)
             return False

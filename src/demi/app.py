@@ -294,7 +294,7 @@ class ApplicationSession:
             if event.state is ConnectionState.READY and self._startup_reconnect_discovery_complete:
                 self._start_saved_reconnect_once()
         elif isinstance(event, ControllerError):
-            self._coordinator.stop_capture()
+            self._coordinator.neutralize_input()
             self._connection_retryable = event.retryable
             self._presentation.set_connection(ConnectionState.ERROR)
             self._presentation.set_error(_safe_error_message(event.category))
@@ -305,7 +305,7 @@ class ApplicationSession:
                 self._coordinator.is_captured
                 and event.capture_epoch == self._coordinator.capture_epoch
             ):
-                self._coordinator.stop_capture()
+                self._coordinator.neutralize_input()
                 self._presentation.set_warning("Input monitoring timed out")
         elif isinstance(event, PairingProgress):
             self._presentation.set_warning(event.summary)
