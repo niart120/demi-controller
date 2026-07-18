@@ -6,7 +6,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QObject, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox, QWidget
 
 from demi.app import ApplicationSession, SystemClock, WindowSpec
 from demi.application.coordinator import CaptureCoordinator
@@ -93,14 +93,15 @@ class _Repository:
     """Settings fake used only to assemble an application session."""
 
     result: SettingsLoadResult
+    saved: list[AppSettings] = field(default_factory=list)
 
     def load(self) -> SettingsLoadResult:
         """Return the configured settings result."""
         return self.result
 
     def save(self, settings: AppSettings) -> None:
-        """Accept a validated settings snapshot."""
-        del settings
+        """Record a validated settings snapshot."""
+        self.saved.append(settings)
 
 
 @dataclass
@@ -237,6 +238,60 @@ def test_router_binds_each_settings_action_to_a_session_owned_dialog(
     assert session.dialogs.model.kind is DialogKind.NONE
     assert session.settings_modal.editor is None
     assert action.isEnabled()
+
+
+def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
+    qt_application: QApplication,
+) -> None:
+    """Exercise mouse settings through the production GUI save and cancel routes."""
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    repository = _Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN))
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=repository,
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+
+    window.main_toolbar.mapping_action.trigger()
+    qt_application.processEvents()
+    save_dialog = window.active_settings_dialog
+    assert isinstance(save_dialog, MappingDialog)
+    save_dialog.invert_x_checkbox.setChecked(True)
+    save_dialog.invert_y_checkbox.setChecked(False)
+    save_button = save_dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+
+    assert repository.saved[-1].input.mouse.invert_x is True
+    assert repository.saved[-1].input.mouse.invert_y is False
+    assert session.settings.input.mouse.invert_x is True
+    assert session.settings.input.mouse.invert_y is False
+
+    window.main_toolbar.mapping_action.trigger()
+    qt_application.processEvents()
+    cancel_dialog = window.active_settings_dialog
+    assert isinstance(cancel_dialog, MappingDialog)
+    cancel_dialog.invert_x_checkbox.setChecked(False)
+    cancel_dialog.invert_y_checkbox.setChecked(True)
+    cancel_button = cancel_dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+
+    assert len(repository.saved) == 1
+    assert session.settings.input.mouse.invert_x is True
+    assert session.settings.input.mouse.invert_y is False
 
 
 def test_router_routes_connection_dialog_actions_through_the_application_session(

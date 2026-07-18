@@ -252,6 +252,32 @@ def test_ijkl_gyro_is_added_to_mouse_gyro() -> None:
     assert mouse_and_keys.accel_g != mouse_only.accel_g
 
 
+@pytest.mark.parametrize(
+    ("dy", "key"),
+    [
+        (-2.0, "I"),
+        (2.0, "K"),
+    ],
+)
+def test_default_mouse_vertical_direction_matches_ijkl(dy: float, key: str) -> None:
+    clock = FakeClock()
+    mouse = InputPublisher(clock=clock, sink=FakeSink())
+    keyboard = InputPublisher(clock=clock, sink=FakeSink())
+    mouse.publish(capture_active=True, capture_epoch=1)
+    keyboard.publish(capture_active=True, capture_epoch=1)
+    mouse.state.add_mouse_motion(0.0, dy)
+    keyboard.state.press_key(key)
+    clock.now_ns += 8_000_000
+
+    mouse_frame = mouse.publish(capture_active=True, capture_epoch=1)
+    keyboard_frame = keyboard.publish(capture_active=True, capture_epoch=1)
+
+    assert (
+        mouse_frame.gyro_rate.y_radians_per_second * keyboard_frame.gyro_rate.y_radians_per_second
+        > 0.0
+    )
+
+
 def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
     clock = FakeClock()
     profile = InputProfile(

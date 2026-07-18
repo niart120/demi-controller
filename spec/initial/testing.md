@@ -69,7 +69,8 @@ markers = [
 
 - dx=0, dy=0でジャイロ0、加速度 `(0, 0, +1) G`
 - yawとpitchのジャイロ符号
-- Y反転
+- 水平反転がyawだけ、垂直反転がpitchだけへ作用する
+- 水平反転と垂直反転をともに無効にしたマウス上下がI/Kと同じ符号になる
 - 感度 `1.0` が標準変換量になる
 - 水平感度の変更がyawだけへ作用する
 - 垂直感度の変更がpitchだけへ作用する
@@ -113,6 +114,7 @@ markers = [
 - 旧Default profileの既存bindingを保持した診断target補完と `MIGRATED`
 - 診断targetのTOML往復、`amount = 1.0` 固定、反転拒否
 - 接続ローカル操作の Ctrl+Return / Ctrl+Enter 往復と、項目追加前のv1設定に対する既定値補完
+- 現行schema v1の `invert_x` 欠落を `false` で補完し、保存済みの `invert_y` 明示値を保持する
 - binding競合
 
 ### 3.6 状態遷移
@@ -174,6 +176,8 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - 色変更プレビュー
 - エラー分類からユーザー向け文
 - モーダル排他
+- キー割り当てダイアログでマウスジャイロの有効、水平・垂直感度、水平・垂直反転、pitch上限を現在値から編集する
+- マウスジャイロ設定の保存がrepository、session、実行中のPublisherへ反映され、取消では編集前の値を維持する
 - 捕捉中の Ctrl+Return / Ctrl+Enter が保持入力を解除せず、状態依存の接続actionを1回発行
 
 ### 4.4 Qt入力アダプター

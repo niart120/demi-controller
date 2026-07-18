@@ -623,11 +623,22 @@ def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
 
     assert session.open_settings(DialogKind.MAPPING) is True
     assert session.settings_modal.editor is not None
-    session.settings_modal.editor.update_mouse(horizontal_sensitivity=2.5, invert_y=True)
+    session.settings_modal.editor.update_mouse(
+        horizontal_sensitivity=2.5,
+        invert_x=True,
+        invert_y=True,
+    )
     assert session.save_settings() is True
     assert session.settings.input.mouse.horizontal_sensitivity == 2.5
+    assert session.settings.input.mouse.invert_x is True
     assert session.settings.input.mouse.invert_y is True
     assert coordinator.publisher.evaluation_interval_ms == 16
+    assert coordinator.start_capture() is True
+    coordinator.publisher.state.add_mouse_motion(12, 0)
+
+    frame = coordinator.evaluate()
+
+    assert frame.gyro_rate.z_radians_per_second > 0.0
 
 
 def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect() -> None:

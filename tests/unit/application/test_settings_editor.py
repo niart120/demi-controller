@@ -74,12 +74,18 @@ def test_editor_reports_connection_shortcut_conflicts(source: str) -> None:
 def test_editor_updates_mouse_settings_without_changing_other_mouse_fields() -> None:
     editor = SettingsEditor(AppSettings.default())
 
-    editor.update_mouse(gyro_enabled=False, horizontal_sensitivity=2.5, invert_y=True)
+    editor.update_mouse(
+        gyro_enabled=False,
+        horizontal_sensitivity=2.5,
+        invert_x=True,
+        invert_y=True,
+    )
 
     mouse = editor.draft.input.mouse
     assert mouse.gyro_enabled is False
     assert mouse.horizontal_sensitivity == 2.5
     assert mouse.vertical_sensitivity == 1.0
+    assert mouse.invert_x is True
     assert mouse.invert_y is True
     assert mouse.pitch_limit_degrees == 75.0
 
@@ -90,6 +96,7 @@ def test_editor_updates_input_settings_without_changing_mouse_settings() -> None
         gyro_enabled=False,
         horizontal_sensitivity=2.5,
         vertical_sensitivity=1.5,
+        invert_x=True,
         invert_y=True,
         pitch_limit_degrees=60.0,
     )

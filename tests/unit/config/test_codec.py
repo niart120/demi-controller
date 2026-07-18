@@ -8,7 +8,7 @@ from demi.config.codec import decode_settings, dumps_settings, encode_settings, 
 from demi.config.errors import ConfigurationError, UnsupportedSchemaError
 from demi.config.migrations import migrate_settings
 from demi.domain.mapping import Binding, BindingTarget, InputProfile
-from demi.domain.settings import AppSettings, ControllerColorSettings
+from demi.domain.settings import AppSettings, ControllerColorSettings, InputSettings, MouseSettings
 
 
 def test_default_settings_round_trip_through_toml() -> None:
@@ -34,6 +34,35 @@ def test_codec_supplies_connection_shortcuts_for_existing_v1_settings() -> None:
     restored = decode_settings(raw)
 
     assert restored.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
+
+
+def test_codec_supplies_disabled_horizontal_inversion_for_existing_v1_settings() -> None:
+    raw = encode_settings(AppSettings.default())
+    input_settings = cast("dict[str, object]", raw["input"])
+    mouse = cast("dict[str, object]", input_settings["mouse"])
+    mouse.pop("invert_x", None)
+    mouse["invert_y"] = True
+
+    restored = decode_settings(raw)
+
+    assert restored.input.mouse.invert_x is False
+    assert restored.input.mouse.invert_y is True
+
+
+def test_codec_round_trips_independent_mouse_axis_inversions() -> None:
+    settings = replace(
+        AppSettings.default(),
+        input=InputSettings(mouse=MouseSettings(invert_x=True, invert_y=True)),
+    )
+
+    encoded = encode_settings(settings)
+    restored = decode_settings(encoded)
+    input_settings = cast("dict[str, object]", encoded["input"])
+    mouse = cast("dict[str, object]", input_settings["mouse"])
+
+    assert mouse["invert_x"] is True
+    assert mouse["invert_y"] is True
+    assert restored == settings
 
 
 def test_codec_preserves_custom_colors_and_inverted_binding() -> None:
