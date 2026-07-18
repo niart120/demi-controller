@@ -86,7 +86,7 @@ class MappingTableModel(QAbstractTableModel):
         values = (
             binding.target.value,
             binding.source,
-            "はい" if binding.inverted else "いいえ",
+            self.tr("Yes") if binding.inverted else self.tr("No"),
             self._conflict_text(index.row()),
         )
         return values[index.column()]

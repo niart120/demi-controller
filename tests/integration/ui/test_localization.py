@@ -1,8 +1,11 @@
+from typing import cast
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QColorDialog, QDialogButtonBox
 
 from demi.app import WindowSpec
 from demi.application.settings_editor import SettingsEditor
+from demi.config.codec import encode_settings
 from demi.domain.settings import AppSettings, UiLanguage
 from demi.ui.application import QtApplicationRunner
 from demi.ui.dialogs.colors import ControllerColorsDialog
@@ -16,7 +19,8 @@ def test_default_user_interface_uses_english_source_text(
 ) -> None:
     assert qt_application is not None
     window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
-    mapping = MappingDialog(SettingsEditor(AppSettings.default()))
+    mapping_editor = SettingsEditor(AppSettings.default())
+    mapping = MappingDialog(mapping_editor)
     connection = ConnectionDialog(SettingsEditor(AppSettings.default()), on_rescan=lambda: None)
     colors = ControllerColorsDialog(
         SettingsEditor(AppSettings.default()),
@@ -31,6 +35,7 @@ def test_default_user_interface_uses_english_source_text(
     assert window.main_toolbar.capture_action.text() == "Start input"
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"
+    assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "No"
     assert connection.windowTitle() == "Connection settings"
     assert connection.rescan_button.text() == "Rescan"
     assert colors.windowTitle() == "Controller colors"
@@ -66,7 +71,8 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
             language=UiLanguage.JAPANESE,
         )
     )
-    mapping = MappingDialog(SettingsEditor(AppSettings.default()))
+    mapping_editor = SettingsEditor(AppSettings.default())
+    mapping = MappingDialog(mapping_editor)
     connection = ConnectionDialog(SettingsEditor(AppSettings.default()), on_rescan=lambda: None)
     colors = ControllerColorsDialog(
         SettingsEditor(AppSettings.default()),
@@ -81,9 +87,22 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
 
     assert window.main_toolbar.connection_action.text() == "接続"
     assert mapping.windowTitle() == "キー割り当て"
+    assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
     assert connection.windowTitle() == "接続設定"
     assert colors.windowTitle() == "コントローラーカラー"
     assert color_picker.windowTitle() == "色を選択"
+
+    encoded = encode_settings(mapping_editor.draft)
+    profiles = encoded["profiles"]
+    assert isinstance(profiles, list)
+    profile = cast("dict[str, object]", profiles[0])
+    bindings = profile["bindings"]
+    assert isinstance(bindings, list)
+    binding = cast("dict[str, object]", bindings[0])
+    connection_settings = cast("dict[str, object]", encoded["connection"])
+    assert binding["source"] == "KEY:F"
+    assert binding["target"] == "BUTTON:A"
+    assert connection_settings["diagnostic_level"] == "INFO"
 
     for dialog in (mapping, colors):
         save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)

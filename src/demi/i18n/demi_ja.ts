@@ -17,6 +17,8 @@
     <message><source>Input</source><translation>入力</translation></message>
     <message><source>Inverted</source><translation>反転</translation></message>
     <message><source>Conflict</source><translation>競合</translation></message>
+    <message><source>Yes</source><translation>はい</translation></message>
+    <message><source>No</source><translation>いいえ</translation></message>
   </context>
   <context>
     <name>MappingDialog</name>

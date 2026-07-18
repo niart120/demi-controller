@@ -261,7 +261,7 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
     assert editor.draft.profiles[0].bindings[0].inverted is True
     model = dialog.table.model()
     assert model is not None
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "はい"
+    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "Yes"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None

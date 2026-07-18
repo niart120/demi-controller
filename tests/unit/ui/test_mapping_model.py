@@ -15,7 +15,7 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.columnCount() == 4
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DisplayRole) == "BUTTON:A"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "KEY:F"
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "いいえ"
+    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "No"
     assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "重複: KEY:F"
     assert model.data(model.index(1, 3), Qt.ItemDataRole.DisplayRole) == "重複: KEY:F"
     assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
