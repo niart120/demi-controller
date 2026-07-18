@@ -104,21 +104,22 @@ class ControllerColorSettings:
 
 @dataclass(frozen=True, slots=True)
 class MouseSettings:
-    """Mouse-to-IMU settings used by the later input model."""
+    """Mouse-to-IMU settings applied by the input publisher."""
 
     gyro_enabled: bool = True
     horizontal_sensitivity: float = 1.0
     vertical_sensitivity: float = 1.0
     invert_y: bool = False
     pitch_limit_degrees: float = 75.0
+    invert_x: bool = False
 
     def __post_init__(self) -> None:
-        """Validate independent sensitivities and pitch limit."""
+        """Validate mouse-to-IMU fields."""
         if not isinstance(self.gyro_enabled, bool):
             raise DomainValueError
         _require_float_range(self.horizontal_sensitivity, 0.1, 10.0)
         _require_float_range(self.vertical_sensitivity, 0.1, 10.0)
-        if not isinstance(self.invert_y, bool):
+        if not isinstance(self.invert_x, bool) or not isinstance(self.invert_y, bool):
             raise DomainValueError
         _require_float_range(self.pitch_limit_degrees, 1.0, 89.0)
 

@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
     QHeaderView,
     QLabel,
     QMessageBox,
@@ -214,6 +217,35 @@ class MappingDialog(QDialog):
         self.capture_label = QLabel("入力を取得していません", self)
         self.inverted_checkbox = QCheckBox("反転", self)
         self.inverted_checkbox.setEnabled(False)
+        mouse_settings = editor.draft.input.mouse
+        self.mouse_gyro_group = QGroupBox("マウスジャイロ設定", self)
+        mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
+        self.mouse_gyro_enabled_checkbox = QCheckBox("有効", self.mouse_gyro_group)
+        self.mouse_gyro_enabled_checkbox.setChecked(mouse_settings.gyro_enabled)
+        self.horizontal_sensitivity_spinbox = _sensitivity_spinbox(
+            self.mouse_gyro_group,
+            mouse_settings.horizontal_sensitivity,
+        )
+        self.vertical_sensitivity_spinbox = _sensitivity_spinbox(
+            self.mouse_gyro_group,
+            mouse_settings.vertical_sensitivity,
+        )
+        self.invert_x_checkbox = QCheckBox("水平反転", self.mouse_gyro_group)
+        self.invert_x_checkbox.setChecked(mouse_settings.invert_x)
+        self.invert_y_checkbox = QCheckBox("垂直反転", self.mouse_gyro_group)
+        self.invert_y_checkbox.setChecked(mouse_settings.invert_y)
+        self.pitch_limit_spinbox = QDoubleSpinBox(self.mouse_gyro_group)
+        self.pitch_limit_spinbox.setRange(1.0, 89.0)
+        self.pitch_limit_spinbox.setDecimals(1)
+        self.pitch_limit_spinbox.setSingleStep(1.0)
+        self.pitch_limit_spinbox.setSuffix(" °")
+        self.pitch_limit_spinbox.setValue(mouse_settings.pitch_limit_degrees)
+        mouse_gyro_form.addRow(self.mouse_gyro_enabled_checkbox)
+        mouse_gyro_form.addRow("水平感度", self.horizontal_sensitivity_spinbox)
+        mouse_gyro_form.addRow("垂直感度", self.vertical_sensitivity_spinbox)
+        mouse_gyro_form.addRow(self.invert_x_checkbox)
+        mouse_gyro_form.addRow(self.invert_y_checkbox)
+        mouse_gyro_form.addRow("pitch上限", self.pitch_limit_spinbox)
         self.save_error_label = QLabel("", self)
         self.restore_button = QPushButton("標準に戻す", self)
         self.button_box = QDialogButtonBox(
@@ -226,6 +258,7 @@ class MappingDialog(QDialog):
         layout.addWidget(self.inverted_checkbox)
         layout.addWidget(self.capture_button)
         layout.addWidget(self.capture_label)
+        layout.addWidget(self.mouse_gyro_group)
         layout.addWidget(self.save_error_label)
         layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
@@ -234,7 +267,19 @@ class MappingDialog(QDialog):
 
         QWidget.setTabOrder(self.table, self.inverted_checkbox)
         QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
-        QWidget.setTabOrder(self.capture_button, self.restore_button)
+        QWidget.setTabOrder(self.capture_button, self.mouse_gyro_enabled_checkbox)
+        QWidget.setTabOrder(
+            self.mouse_gyro_enabled_checkbox,
+            self.horizontal_sensitivity_spinbox,
+        )
+        QWidget.setTabOrder(
+            self.horizontal_sensitivity_spinbox,
+            self.vertical_sensitivity_spinbox,
+        )
+        QWidget.setTabOrder(self.vertical_sensitivity_spinbox, self.invert_x_checkbox)
+        QWidget.setTabOrder(self.invert_x_checkbox, self.invert_y_checkbox)
+        QWidget.setTabOrder(self.invert_y_checkbox, self.pitch_limit_spinbox)
+        QWidget.setTabOrder(self.pitch_limit_spinbox, self.restore_button)
 
         self.capture_button.clicked.connect(self.begin_capture)
         self.restore_button.clicked.connect(self.restore_default_profile)
@@ -244,6 +289,24 @@ class MappingDialog(QDialog):
         if selection_model is not None:
             selection_model.currentRowChanged.connect(self._sync_inverted_checkbox)
         self.inverted_checkbox.toggled.connect(self.set_inverted)
+        self.mouse_gyro_enabled_checkbox.toggled.connect(
+            lambda enabled: editor.update_mouse(gyro_enabled=enabled)
+        )
+        self.horizontal_sensitivity_spinbox.valueChanged.connect(
+            lambda value: editor.update_mouse(horizontal_sensitivity=value)
+        )
+        self.vertical_sensitivity_spinbox.valueChanged.connect(
+            lambda value: editor.update_mouse(vertical_sensitivity=value)
+        )
+        self.invert_x_checkbox.toggled.connect(
+            lambda enabled: editor.update_mouse(invert_x=enabled)
+        )
+        self.invert_y_checkbox.toggled.connect(
+            lambda enabled: editor.update_mouse(invert_y=enabled)
+        )
+        self.pitch_limit_spinbox.valueChanged.connect(
+            lambda value: editor.update_mouse(pitch_limit_degrees=value)
+        )
 
     @property
     def conflict_confirmation(self) -> QMessageBox | None:
@@ -427,3 +490,12 @@ class MappingDialog(QDialog):
 def _invoke(callback: CaptureTransition | None) -> None:
     if callback is not None:
         callback()
+
+
+def _sensitivity_spinbox(parent: QWidget, value: float) -> QDoubleSpinBox:
+    spinbox = QDoubleSpinBox(parent)
+    spinbox.setRange(0.1, 10.0)
+    spinbox.setDecimals(2)
+    spinbox.setSingleStep(0.1)
+    spinbox.setValue(value)
+    return spinbox

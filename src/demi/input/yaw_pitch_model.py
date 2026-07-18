@@ -66,8 +66,12 @@ class YawPitchModel:
             return self._zero_gyro(), self._acceleration()
 
         if self._settings.gyro_enabled:
+            yaw_direction = 1.0 if self._settings.invert_x else -1.0
             yaw_delta = (
-                -dx * BASE_YAW_RADIANS_PER_INPUT_UNIT * self._settings.horizontal_sensitivity
+                dx
+                * BASE_YAW_RADIANS_PER_INPUT_UNIT
+                * self._settings.horizontal_sensitivity
+                * yaw_direction
             )
             pitch_direction = -1.0 if self._settings.invert_y else 1.0
             requested_pitch_delta = (

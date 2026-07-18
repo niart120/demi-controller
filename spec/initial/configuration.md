@@ -63,6 +63,7 @@ circular_stick_limit = false
 gyro_enabled = true
 horizontal_sensitivity = 1.0
 vertical_sensitivity = 1.0
+invert_x = false
 invert_y = false
 pitch_limit_degrees = 75.0
 
@@ -243,6 +244,7 @@ target = "ACCEL:ZERO"
 | evaluation_interval_ms | 4..32。0.1.0 UIでは8固定 |
 | horizontal_sensitivity | 0.1..10.0。独立した無次元倍率 |
 | vertical_sensitivity | 0.1..10.0。独立した無次元倍率 |
+| invert_x / invert_y | 真偽値。初回設定はともに `false` |
 | pitch_limit_degrees | 1.0..89.0 |
 | stick amount | 0.0..1.0 |
 | binding.inverted | 真偽値。ボタンターゲットだけで使用可能 |
@@ -282,6 +284,8 @@ invalid syntax or semantic error
 ```
 
 破損ファイルを削除しない。退避コピーが失敗した場合も元ファイルを上書きしない。
+
+現行schema v1で `input.mouse.invert_x` だけが欠落している設定は、`false` を補完して読み込む。保存済みの `invert_y` は明示値を保持し、初回既定値の `false` で上書きしない。保存時は `invert_x` を常に出力する。
 
 ## 5. 保存
 

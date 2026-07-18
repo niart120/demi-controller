@@ -13,7 +13,8 @@
 | user observation | キーボード由来の姿勢加速度は直感的だが、pitch 制限を厳しくし、同じモデルをマウスへ適用したい | 対話 |
 | user request | モデル置き換え後の旧モデル削除を作業工程と完了条件へ含める | 対話 |
 | completed work | キー由来 Y 軸角速度を別の pitch 状態へ積分して静的加速度へ反映した | `spec/complete/unit_028/KEYBOARD_GYRO_ACCELERATION.md` |
-| prerequisite | 現行マウス再標本化を Publisher から分離し、振る舞いを固定する | `spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` |
+| prerequisite | 現行マウス再標本化を Publisher から分離し、振る舞いを固定する | `spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` |
+| prerequisite | マウスジャイロのX/Y反転設定とGUI保存経路を確定する | `spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` |
 | initial design | マウス yaw / pitch、区間中央 pitch 投影、静的1G、pitch 上限 | `spec/initial/input.md` |
 
 ### 1.3 use case
@@ -29,13 +30,14 @@
 
 ## 2. 前提条件
 
-- `spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` が完了し、マウス再標本化の現行出力が専用部品と回帰試験で固定されていること。
+- `spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md` の完了仕様により、マウス再標本化の現行出力が専用部品と回帰試験で固定されていること。
+- `spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` の完了仕様により、マウスのX/Y反転設定と保存経路が固定されていること。
 - `spec/complete/unit_028/KEYBOARD_GYRO_ACCELERATION.md` の完了仕様と回帰試験から、キー由来加速度の baseline を再現できること。
 
 ## 3. 対象範囲
 
 - 1評価周期の回転要求を表す入力装置非依存の `RotationIntent` を導入する。
-- 再標本化済みマウス差分を感度、Y 反転、基準角度で yaw / pitch 角変位へ変換する。
+- 再標本化済みマウス差分を感度、X/Y反転、基準角度で yaw / pitch 角変位へ変換する。
 - キーボードの固定 yaw / pitch 角速度を `dt_seconds` 倍して角変位へ変換する。
 - 同じ周期のマウスとキーの角変位を軸ごとに加算する。
 - 統一姿勢モデルが合成 pitch へ1つの設定上限を適用し、実適用角変位からジャイロと静的1Gを生成する。
@@ -64,13 +66,14 @@
 - `spec/complete/unit_025/IJKL_GYRO_DIAGNOSTIC.md`
 - `spec/complete/unit_026/CONFIGURABLE_IMU_DIAGNOSTICS.md`
 - `spec/complete/unit_028/KEYBOARD_GYRO_ACCELERATION.md`
-- `spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md`
+- `spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md`
+- `spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md`
 
 ## 6. 振る舞い仕様
 
 | 振る舞い | 入力・状態 | 期待結果 | 備考 |
 |---|---|---|---|
-| マウスを角変位へ変換する | 再標本化済み `dx`, `dy` とマウス設定 | 感度と Y 反転を適用した yaw / pitch 角変位を生成する | `gyro_enabled = false` ならマウス由来は 0 |
+| マウスを角変位へ変換する | 再標本化済み `dx`, `dy` とマウス設定 | 感度とX/Y反転を独立して適用した yaw / pitch 角変位を生成する | `gyro_enabled = false` ならマウス由来は 0 |
 | キーを角変位へ変換する | Y/Z 軸の固定角速度と正の `dt_seconds` | `rate * dt_seconds` の pitch / yaw 角変位を生成する | 評価周期の分割によらず積分値を保つ |
 | 回転意図を合成する | 同じ周期のマウスとキー | yaw / pitch ごとに角変位を加算する | source の評価順に依存しない |
 | pitch を制限する | 現在 pitch と合成 pitch 角変位 | 次の pitch を `-limit..+limit` に制限し、実適用 pitch 角変位を求める | マウスとキーに同じ上限を適用する |
@@ -101,7 +104,7 @@
 ### 8.1 Tidy First 判定
 
 - classification: behavior
-- action: split after Unit 029
+- action: split after Unit 029 and Unit 031
 - reason: 回転意図の統一、共通 pitch 制限、キー yaw 投影は観測可能な出力を変える。再標本化の責務移動と混ぜない。
 - verification: 角変位、実効角速度、姿勢、静的1Gを入力源ごとと合成時に確認する。
 
@@ -141,7 +144,7 @@
 | `src/demi/input/publisher.py` | modify | 回転意図の合成、新モデル接続、旧モデル import の削除 |
 | `src/demi/input/yaw_pitch_model.py` | delete | マウス依存モデルと移行用二重姿勢の撤去 |
 | `tests/unit/input/test_rotation_pose_model.py` | new | 合成、上限、投影、静的1G、reset |
-| `tests/unit/input/test_mouse_rotation_mapper.py` | new | 感度、反転、無効化、基準角度 |
+| `tests/unit/input/test_mouse_rotation_mapper.py` | new | 感度、X/Y反転、無効化、基準角度 |
 | `tests/unit/input/test_mapper.py` | modify | キー由来 yaw / pitch 角速度要求 |
 | `tests/unit/input/test_publisher.py` | modify | 入力源の合成、0G、捕捉境界、旧経路なしの回帰 |
 | `tests/unit/input/test_yaw_pitch_model.py` | delete | 振る舞いを新しい所有者のテストへ移植後に撤去 |
@@ -156,7 +159,7 @@
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | spec 作成時、1 passed |
-| `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/wip/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md` | passed | 該当なし |
+| `rg -n "T[O]DO\|T[B]D\|x[x]x\|前[回]\|今[回]\|一[旦]\|上[述]\|適[宜]\|必要に応じ[て]" spec/complete/unit_029/MOUSE_MOTION_RESAMPLER_EXTRACTION.md spec/wip/unit_030/UNIFIED_ROTATION_POSE_MODEL.md spec/complete/unit_031/MOUSE_GYRO_SETTINGS_GUI.md` | passed | Unit 031完了後、該当なし |
 | `uv run pytest tests/unit/input/test_rotation_pose_model.py tests/unit/input/test_mouse_rotation_mapper.py tests/unit/input/test_mapper.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | not run | 回転意図、姿勢、入力変換、Publisher |
 | `uv run pytest tests/integration/ui/test_windows_raw_input_capture.py -q -p no:cacheprovider` | not run | Raw Input から偽 gamepad |
 | `rg -n "YawPitchModel|additional_pitch_rate_radians_per_second|_mouse_pitch_radians|_additional_pitch_radians|yaw_pitch_model" src tests` | not run | 完了時は参照なしを期待 |
@@ -182,7 +185,7 @@
 
 - [x] 対象範囲、前提条件、対象外を確認した
 - [x] TDD Test List を更新した
-- [ ] Unit 029 完了後に着手した
+- [ ] Unit 029とUnit 031の完了後に実装へ着手した
 - [x] 検証結果または未実行理由を記録した
 - [x] package / release / public API は変更対象外と確認した
 - [ ] 新モデルへ切り替えた後に旧モデル、旧 API、旧テストを削除した

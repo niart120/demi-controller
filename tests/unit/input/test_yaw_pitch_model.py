@@ -109,6 +109,19 @@ def test_invert_y_reverses_pitch_direction() -> None:
     assert accel.x_g > 0.0
 
 
+def test_invert_x_reverses_yaw_without_changing_pitch_or_acceleration() -> None:
+    normal = YawPitchModel(MouseSettings())
+    inverted = YawPitchModel(MouseSettings(invert_x=True))
+
+    normal_gyro, normal_accel = normal.update(dx=2.0, dy=1.0, dt_seconds=0.01)
+    inverted_gyro, inverted_accel = inverted.update(dx=2.0, dy=1.0, dt_seconds=0.01)
+
+    assert inverted_gyro.x_radians_per_second == pytest.approx(-normal_gyro.x_radians_per_second)
+    assert inverted_gyro.y_radians_per_second == pytest.approx(normal_gyro.y_radians_per_second)
+    assert inverted_gyro.z_radians_per_second == pytest.approx(-normal_gyro.z_radians_per_second)
+    assert inverted_accel == normal_accel
+
+
 def test_pitch_limit_stops_pitch_but_does_not_stop_yaw() -> None:
     model = YawPitchModel(MouseSettings(pitch_limit_degrees=1.0))
 

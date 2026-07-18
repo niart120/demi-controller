@@ -158,6 +158,7 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
                 "gyro_enabled": settings.input.mouse.gyro_enabled,
                 "horizontal_sensitivity": settings.input.mouse.horizontal_sensitivity,
                 "vertical_sensitivity": settings.input.mouse.vertical_sensitivity,
+                "invert_x": settings.input.mouse.invert_x,
                 "invert_y": settings.input.mouse.invert_y,
                 "pitch_limit_degrees": settings.input.mouse.pitch_limit_degrees,
             },
@@ -258,6 +259,7 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
                 "pitch_limit_degrees",
             }
         ),
+        frozenset({"invert_x"}),
     )
     local_actions = _require_table(raw["local_actions"])
     _check_keys(
@@ -296,6 +298,7 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
                     gyro_enabled=_require_bool(mouse["gyro_enabled"]),
                     horizontal_sensitivity=_require_float(mouse["horizontal_sensitivity"]),
                     vertical_sensitivity=_require_float(mouse["vertical_sensitivity"]),
+                    invert_x=_require_bool(mouse.get("invert_x", False)),
                     invert_y=_require_bool(mouse["invert_y"]),
                     pitch_limit_degrees=_require_float(mouse["pitch_limit_degrees"]),
                 ),

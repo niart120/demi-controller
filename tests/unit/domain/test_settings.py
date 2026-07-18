@@ -42,9 +42,12 @@ def test_default_settings_match_the_initial_configuration() -> None:
         gyro_enabled=True,
         horizontal_sensitivity=1.0,
         vertical_sensitivity=1.0,
+        invert_x=False,
         invert_y=False,
         pitch_limit_degrees=75.0,
     )
+    assert settings.input.mouse.invert_x is False
+    assert settings.input.mouse.invert_y is False
     assert settings.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
     assert settings.profiles[0].name == "Default"
     assert len(settings.profiles[0].bindings) == 33
@@ -71,6 +74,8 @@ def test_color_values_are_normalized_to_uppercase_hex() -> None:
         lambda: ConnectionSettings(bond_slot="../escape"),
         lambda: ControllerColorSettings(body="#12345"),
         lambda: MouseSettings(horizontal_sensitivity=0.09),
+        lambda: MouseSettings(invert_x=cast("bool", 1)),
+        lambda: MouseSettings(invert_y=cast("bool", 1)),
         lambda: MouseSettings(pitch_limit_degrees=89.1),
         lambda: InputSettings(evaluation_interval_ms=33),
         lambda: ConnectionSettings(controller=cast("ControllerType", "joy_con")),

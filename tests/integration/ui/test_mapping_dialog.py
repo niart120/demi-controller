@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
@@ -11,7 +11,7 @@ from demi.application.settings_modal import SettingsModalController
 from demi.application.state import AppState
 from demi.config.errors import SettingsPersistenceError
 from demi.domain.controller import ControllerFrame
-from demi.domain.settings import AppSettings
+from demi.domain.settings import AppSettings, InputSettings, MouseSettings
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
 from demi.ui.dialogs.mapping import MappingDialog
@@ -294,6 +294,62 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
     assert not dialog.inverted_checkbox.isEnabled()
     assert dialog.set_source(32, "KEY:P") is True
     assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
+
+    dialog.close()
+    qt_application.processEvents()
+
+
+def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
+    qt_application: QApplication,
+) -> None:
+    settings = replace(
+        AppSettings.default(),
+        input=InputSettings(
+            mouse=MouseSettings(
+                gyro_enabled=False,
+                horizontal_sensitivity=2.5,
+                vertical_sensitivity=1.5,
+                invert_x=True,
+                invert_y=True,
+                pitch_limit_degrees=60.0,
+            )
+        ),
+    )
+    editor = SettingsEditor(settings)
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.mouse_gyro_group.title() == "マウスジャイロ設定"
+    assert not dialog.mouse_gyro_enabled_checkbox.isChecked()
+    assert dialog.horizontal_sensitivity_spinbox.value() == 2.5
+    assert dialog.vertical_sensitivity_spinbox.value() == 1.5
+    assert dialog.invert_x_checkbox.isChecked()
+    assert dialog.invert_y_checkbox.isChecked()
+    assert dialog.pitch_limit_spinbox.value() == 60.0
+    assert dialog.horizontal_sensitivity_spinbox.minimum() == 0.1
+    assert dialog.horizontal_sensitivity_spinbox.maximum() == 10.0
+    assert dialog.vertical_sensitivity_spinbox.minimum() == 0.1
+    assert dialog.vertical_sensitivity_spinbox.maximum() == 10.0
+    assert dialog.pitch_limit_spinbox.minimum() == 1.0
+    assert dialog.pitch_limit_spinbox.maximum() == 89.0
+
+    dialog.mouse_gyro_enabled_checkbox.setChecked(True)
+    dialog.horizontal_sensitivity_spinbox.setValue(3.0)
+    dialog.vertical_sensitivity_spinbox.setValue(4.0)
+    dialog.invert_x_checkbox.setChecked(False)
+    dialog.invert_y_checkbox.setChecked(False)
+    dialog.pitch_limit_spinbox.setValue(45.0)
+    qt_application.processEvents()
+
+    assert editor.draft.input.mouse == MouseSettings(
+        gyro_enabled=True,
+        horizontal_sensitivity=3.0,
+        vertical_sensitivity=4.0,
+        invert_x=False,
+        invert_y=False,
+        pitch_limit_degrees=45.0,
+    )
 
     dialog.close()
     qt_application.processEvents()

@@ -135,6 +135,7 @@ class SettingsEditor:
         gyro_enabled: bool | None = None,
         horizontal_sensitivity: float | None = None,
         vertical_sensitivity: float | None = None,
+        invert_x: bool | None = None,
         invert_y: bool | None = None,
         pitch_limit_degrees: float | None = None,
     ) -> None:
@@ -144,6 +145,7 @@ class SettingsEditor:
             gyro_enabled: Whether mouse motion contributes controller IMU values.
             horizontal_sensitivity: Independent yaw sensitivity multiplier.
             vertical_sensitivity: Independent pitch sensitivity multiplier.
+            invert_x: Whether horizontal mouse motion reverses yaw direction.
             invert_y: Whether vertical mouse motion reverses pitch direction.
             pitch_limit_degrees: Maximum absolute virtual pitch in degrees.
         """
@@ -161,6 +163,7 @@ class SettingsEditor:
                 if vertical_sensitivity is None
                 else vertical_sensitivity
             ),
+            invert_x=current_mouse.invert_x if invert_x is None else invert_x,
             invert_y=current_mouse.invert_y if invert_y is None else invert_y,
             pitch_limit_degrees=(
                 current_mouse.pitch_limit_degrees
