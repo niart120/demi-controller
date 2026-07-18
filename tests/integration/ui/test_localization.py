@@ -96,9 +96,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
     assert mapping.capture_button.text() == "次の入力を取得"
     assert mapping.mouse_gyro_group.title() == "マウスジャイロ設定"
-    assert "ピッチ上限" in {
-        label.text() for label in mapping.findChildren(QLabel)
-    }
+    assert "ピッチ上限" in {label.text() for label in mapping.findChildren(QLabel)}
     assert connection.windowTitle() == "接続設定"
     assert connection.pairing_button.text() == "新規ペアリング"
     assert connection.discovery_label.text() == "USBアダプターを検索してください"
