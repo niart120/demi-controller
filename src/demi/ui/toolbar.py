@@ -37,12 +37,12 @@ class MainToolBar(QToolBar):
         """
         super().__init__(parent)
         self.setObjectName("main-toolbar")
-        self.connection_action = QAction("Connect", self)
-        self.capture_action = QAction("Start input", self)
+        self.connection_action = QAction(self.tr("Connect"), self)
+        self.capture_action = QAction(self.tr("Start input"), self)
         self.capture_action.setCheckable(True)
-        self.mapping_action = QAction("Mappings", self)
-        self.connection_settings_action = QAction("Connection settings", self)
-        self.colors_action = QAction("Colors", self)
+        self.mapping_action = QAction(self.tr("Mappings"), self)
+        self.connection_settings_action = QAction(self.tr("Connection settings"), self)
+        self.colors_action = QAction(self.tr("Colors"), self)
         for action in (
             self.connection_action,
             self.capture_action,
@@ -76,9 +76,13 @@ class MainToolBar(QToolBar):
             AppState.CAPTURED,
         }
 
-        self.connection_action.setText("Disconnect" if is_connected else "Connect")
+        self.connection_action.setText(
+            self.tr("Disconnect") if is_connected else self.tr("Connect")
+        )
         self.connection_action.setEnabled(connection_available)
-        self.capture_action.setText("Stop input" if is_captured else "Start input")
+        self.capture_action.setText(
+            self.tr("Stop input") if is_captured else self.tr("Start input")
+        )
         self.capture_action.setChecked(is_captured)
         self.capture_action.setEnabled(capture_available)
         for action in (

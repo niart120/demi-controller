@@ -61,7 +61,7 @@ class ControllerColorsDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("Controller colors")
+        self.setWindowTitle(self.tr("Controller colors"))
         self._editor = editor
         self._saved_colors = editor.draft.controller_colors
         self._connected = connected

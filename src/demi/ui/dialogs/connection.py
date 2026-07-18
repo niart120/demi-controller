@@ -112,7 +112,7 @@ class ConnectionDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("Connection settings")
+        self.setWindowTitle(self.tr("Connection settings"))
         self._editor = editor
         self._on_rescan = on_rescan
         self._on_request_pairing = on_request_pairing
@@ -124,7 +124,7 @@ class ConnectionDialog(QDialog):
 
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
-        self.rescan_button = QPushButton("Rescan", self)
+        self.rescan_button = QPushButton(self.tr("Rescan"), self)
         self.pairing_button = QPushButton("新規ペアリング", self)
         self.discovery_label = QLabel("USBアダプターを検索してください", self)
         self.controller_type_label = QLabel("Pro Controller", self)
@@ -145,7 +145,7 @@ class ConnectionDialog(QDialog):
         if connect_button is None:
             raise RuntimeError
         self.connect_button = connect_button
-        self.connect_button.setText("Save and connect")
+        self.connect_button.setText(self.tr("Save and connect"))
         self.connect_button.setEnabled(False)
         self.pairing_button.setEnabled(False)
 

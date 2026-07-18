@@ -15,11 +15,13 @@ from demi.controller.events import RuntimeStopped
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 from demi.ui.dialogs.mapping import MappingDialog
+from demi.ui.localization import install_translators
 from demi.ui.main_window import MainWindow
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from PySide6.QtCore import QTranslator
     from PySide6.QtWidgets import QWidget
 
     from demi.app import ApplicationSession, WindowPort, WindowSpec
@@ -45,6 +47,7 @@ class QtApplicationRunner:
             else QApplication(list(sys.argv if argv is None else argv))
         )
         self._window: MainWindow | None = None
+        self._translators: tuple[QTranslator, ...] = ()
 
     @property
     def application(self) -> QApplication:
@@ -97,6 +100,9 @@ class QtApplicationRunner:
         Args:
             spec: Validated saved dimensions selected by the application layer.
         """
+        for translator in self._translators:
+            self._application.removeTranslator(translator)
+        self._translators = install_translators(self._application, spec.language)
         return MainWindow(spec)
 
 

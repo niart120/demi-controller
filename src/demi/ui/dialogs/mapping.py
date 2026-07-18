@@ -104,7 +104,7 @@ class MappingTableModel(QAbstractTableModel):
             and role == Qt.ItemDataRole.DisplayRole
             and 0 <= section < len(self._HEADERS)
         ):
-            return self._HEADERS[section]
+            return self.tr(self._HEADERS[section])
         return super().headerData(section, orientation, role)
 
     def update_source(self, row: int, source: str) -> None:
@@ -193,7 +193,7 @@ class MappingDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("Key mappings")
+        self.setWindowTitle(self.tr("Key mappings"))
         self._mapping_model = MappingTableModel(editor, self)
         self._on_dialog_opened = on_dialog_opened
         self._on_release_capture = on_release_capture

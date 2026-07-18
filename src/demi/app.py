@@ -49,7 +49,7 @@ from demi.controller.events import (
 from demi.controller.runtime import ControllerRuntime
 from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.errors import DomainValueError
-from demi.domain.settings import DiagnosticLevel
+from demi.domain.settings import DiagnosticLevel, UiLanguage
 from demi.input.publisher import InputPublisher
 
 if TYPE_CHECKING:
@@ -112,6 +112,7 @@ class WindowSpec:
     width: int
     height: int
     maximized: bool
+    language: UiLanguage = UiLanguage.ENGLISH
 
 
 class WindowPort(PointerCapturePort, Protocol):
@@ -899,6 +900,7 @@ def _window_spec_for(settings: AppSettings) -> WindowSpec:
         width=settings.window.width,
         height=settings.window.height,
         maximized=settings.window.maximized,
+        language=settings.ui.language,
     )
 
 
