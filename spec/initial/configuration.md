@@ -41,6 +41,9 @@ width = 960
 height = 640
 maximized = false
 
+[ui]
+language = "en"
+
 [connection]
 adapter_id = ""
 controller = "pro_controller"
@@ -241,6 +244,7 @@ target = "ACCEL:ZERO"
 | timeout_seconds | 1.0..120.0 |
 | diagnostic_level | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | 色 | `#[0-9A-Fa-f]{6}` |
+| ui.language | `en` または `ja`。項目がない schema v1 は `en` として読む |
 | evaluation_interval_ms | 4..32。0.1.0 UIでは8固定 |
 | horizontal_sensitivity | 0.1..10.0。独立した無次元倍率 |
 | vertical_sensitivity | 0.1..10.0。独立した無次元倍率 |

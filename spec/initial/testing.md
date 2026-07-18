@@ -197,6 +197,14 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 
 実ウィンドウ試験は `ui` マーカーへ分離する。
 
+### 4.5 UI言語
+
+- 設定項目がないschema v1では英語を補完し、`en`と`ja`をTOML往復する。
+- 英語と日本語の代表Widgetで、アプリ固有文言とQt標準ボタンが同じ言語になることを確認する。
+- app catalogまたはQt catalogがない場合、translatorを部分適用せず英語へ戻ることを確認する。
+- 翻訳後もbinding、diagnostic level、TOML keyがcanonical値を維持することを確認する。
+- sdistとwheelに`.ts`と`.qm`が入り、展開したwheelから`QTranslator`で読み込めることを確認する。
+
 ## 5. 契約試験
 
 `SwbtControllerAdapter` の変換契約を、実Bluetoothなしで確認する。
