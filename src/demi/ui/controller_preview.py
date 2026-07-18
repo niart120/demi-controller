@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QCoreApplication, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -248,13 +248,18 @@ class ControllerPreviewWidget(QWidget):
         model: ControllerPreviewModel,
     ) -> None:
         painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
-        pressed = ", ".join(sorted(button.value for button in model.pressed_buttons)) or "なし"
+        translate = QCoreApplication.translate
+        pressed = ", ".join(sorted(button.value for button in model.pressed_buttons)) or translate(
+            "ControllerPreviewWidget", "None"
+        )
         text = (
-            f"ボタン: {pressed}\n"
-            f"ジャイロ: {model.gyro_rate.x_radians_per_second:.2f}, "
+            f"{translate('ControllerPreviewWidget', 'Buttons')}: {pressed}\n"
+            f"{translate('ControllerPreviewWidget', 'Gyro')}: "
+            f"{model.gyro_rate.x_radians_per_second:.2f}, "
             f"{model.gyro_rate.y_radians_per_second:.2f}, "
             f"{model.gyro_rate.z_radians_per_second:.2f}\n"
-            f"加速度: {model.accel_g.x_g:.2f}, {model.accel_g.y_g:.2f}, {model.accel_g.z_g:.2f}"
+            f"{translate('ControllerPreviewWidget', 'Acceleration')}: "
+            f"{model.accel_g.x_g:.2f}, {model.accel_g.y_g:.2f}, {model.accel_g.z_g:.2f}"
         )
         diagnostics = QRectF(bounds.left(), bounds.bottom() - 58.0, bounds.width(), 58.0)
         painter.drawText(diagnostics, Qt.AlignmentFlag.AlignLeft, text)
@@ -266,7 +271,10 @@ class ControllerPreviewWidget(QWidget):
         overlay = QRectF(body.center().x() - 64.0, body.bottom() - 36.0, 128.0, 24.0)
         painter.drawRoundedRect(overlay, 8.0, 8.0)
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
-        label = "入力捕捉中" if capture_active else "入力待機中"
+        label = QCoreApplication.translate(
+            "ControllerPreviewWidget",
+            "Input captured" if capture_active else "Waiting for input",
+        )
         painter.drawText(overlay, Qt.AlignmentFlag.AlignCenter, label)
 
 

@@ -433,7 +433,7 @@ def test_session_does_not_reconnect_for_a_missing_adapter_or_when_disabled() -> 
     missing_session.handle_runtime_event(ConnectionChanged(ConnectionState.READY))
 
     assert not any(isinstance(command, ConnectSaved) for command in missing_runtime.commands)
-    assert missing_session.presentation.model.warning == "保存済みの USB アダプターが見つかりません"
+    assert missing_session.presentation.model.warning == "Saved USB adapter not found"
 
     disabled_settings = replace(
         AppSettings.default(),
@@ -503,7 +503,7 @@ def test_session_preserves_an_error_and_ignores_a_stale_watchdog_event() -> None
     session.handle_runtime_event(WatchdogNeutralized(capture_epoch=current_epoch))
     assert coordinator.is_captured is False
     assert runtime.frames[-1].capture_active is False
-    assert session.presentation.model.warning == "入力監視タイムアウト"
+    assert session.presentation.model.warning == "Input monitoring timed out"
 
     assert coordinator.start_capture() is True
 
@@ -523,7 +523,7 @@ def test_session_preserves_an_error_and_ignores_a_stale_watchdog_event() -> None
 
     assert coordinator.is_captured is False
     assert session.presentation.model.connection_state is ConnectionState.READY
-    assert session.presentation.model.error == "保存済み接続に失敗しました"
+    assert session.presentation.model.error == "Could not reconnect saved connection"
 
 
 def test_session_save_applies_mouse_settings_to_the_live_input_publisher() -> None:

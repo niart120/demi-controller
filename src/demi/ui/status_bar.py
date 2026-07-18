@@ -63,42 +63,58 @@ class MainStatusBar(QStatusBar):
         Args:
             state: Main-thread state snapshot for the status bar.
         """
-        self.adapter_label.setText(f"アダプター: {state.adapter_label}")
-        self.connection_label.setText(f"接続: {_connection_text(state.connection_state)}")
-        self.capture_label.setText(f"入力: {_capture_text(state.application_state)}")
-        self.pointer_label.setText(f"ポインター: {_pointer_text(state.pointer_quality)}")
+        self.adapter_label.setText(
+            self.tr("Adapter: {adapter}").format(adapter=self.tr(state.adapter_label))
+        )
+        self.connection_label.setText(
+            self.tr("Connection: {state}").format(
+                state=self.tr(_connection_text(state.connection_state))
+            )
+        )
+        self.capture_label.setText(
+            self.tr("Input: {state}").format(state=self.tr(_capture_text(state.application_state)))
+        )
+        self.pointer_label.setText(
+            self.tr("Pointer: {quality}").format(
+                quality=self.tr(_pointer_text(state.pointer_quality))
+            )
+        )
         self.preview_label.setText(
-            "プレビュー: のみ" if state.preview_only else "プレビュー: 送信あり"
+            self.tr("Preview: only") if state.preview_only else self.tr("Preview: transmitting")
         )
         if state.error is not None:
-            self.notice_label.setText(f"エラー: {state.error}")
+            self.notice_label.setText(
+                self.tr("Error: {message}").format(message=self.tr(state.error))
+            )
         elif state.warning:
-            self.notice_label.setText(f"警告: {state.warning}")
+            self.notice_label.setText(
+                self.tr("Warning: {message}").format(message=self.tr(state.warning))
+            )
         else:
-            self.notice_label.setText("通知: なし")
+            self.notice_label.setText(self.tr("Notice: none"))
 
 
 def _connection_text(state: ConnectionState) -> str:
     return {
-        ConnectionState.STOPPED: "停止",
-        ConnectionState.STARTING: "開始中",
-        ConnectionState.READY: "準備完了",
-        ConnectionState.DISCOVERING: "検索中",
-        ConnectionState.CONNECTING: "接続中",
-        ConnectionState.CONNECTED: "接続済み",
-        ConnectionState.DISCONNECTING: "切断中",
-        ConnectionState.ERROR: "エラー",
-        ConnectionState.STOPPING: "停止中",
+        ConnectionState.STOPPED: "Stopped",
+        ConnectionState.STARTING: "Starting",
+        ConnectionState.READY: "Ready",
+        ConnectionState.DISCOVERING: "Discovering",
+        ConnectionState.CONNECTING: "Connecting",
+        ConnectionState.CONNECTED: "Connected",
+        ConnectionState.DISCONNECTING: "Disconnecting",
+        ConnectionState.ERROR: "Error",
+        ConnectionState.STOPPING: "Stopping",
     }[state]
 
 
 def _capture_text(state: AppState) -> str:
-    return "捕捉中" if state is AppState.CAPTURED else "停止中"
+    return "Captured" if state is AppState.CAPTURED else "Stopped"
 
 
 def _pointer_text(quality: RelativePointerQuality) -> str:
     return {
         RelativePointerQuality.RAW_UNACCELERATED: "Raw Input",
-        RelativePointerQuality.RELATIVE_ACCELERATED: "OS補正あり",
-        RelativePointerQuality.UNAVAILABLE: "利用不可",
+        RelativePointerQuality.RELATIVE_ACCELERATED: "OS accelerated",
+        RelativePointerQuality.UNAVAILABLE: "Unavailable",
     }[quality]

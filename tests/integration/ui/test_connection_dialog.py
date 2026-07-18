@@ -60,7 +60,7 @@ def test_connection_dialog_with_no_adapters_keeps_only_rescan_available(
     assert not dialog.pairing_button.isEnabled()
     assert dialog.rescan_button.isEnabled()
     assert dialog.discovery_label.text() == (
-        "利用可能なUSBアダプターがありません。接続機器を確認して再検索してください"
+        "No USB adapters are available. Check the device and rescan."
     )
 
 
@@ -87,7 +87,7 @@ def test_connection_dialog_requires_explicit_selection_when_saved_adapter_is_mis
     assert not dialog.connect_button.isEnabled()
     assert not dialog.pairing_button.isEnabled()
     assert dialog.discovery_label.text() == (
-        "保存済みのUSBアダプターが見つかりません。アダプターを選択してください"
+        "The saved USB adapter was not found. Select an adapter."
     )
 
     dialog.adapter_combo.setCurrentIndex(1)
@@ -242,4 +242,4 @@ def test_connection_dialog_saves_all_connection_fields_before_requesting_connect
     qt_application.processEvents()
 
     assert failed.isVisible()
-    assert failed.connection_error_label.text() == "設定を保存できませんでした"
+    assert failed.connection_error_label.text() == "Could not save settings"

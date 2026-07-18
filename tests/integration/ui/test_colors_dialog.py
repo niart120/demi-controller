@@ -79,7 +79,7 @@ def test_colors_dialog_previews_draft_restores_saved_colors_and_requests_reconne
 
     confirmation = saving.reconnect_confirmation
     assert confirmation is not None
-    assert confirmation.text() == "表示色を対象機器へ反映するには再接続が必要です。"
+    assert confirmation.text() == "Reconnect to apply the display colors to the target device."
     assert saved[-1].buttons == "#123456"
     assert saving.isVisible()
 

@@ -32,14 +32,14 @@ def test_main_window_refreshes_toolbar_and_status_bar_from_application_snapshot(
         )
     )
 
-    assert window.main_toolbar.connection_action.text() == "切断"
+    assert window.main_toolbar.connection_action.text() == "Disconnect"
     assert window.main_toolbar.connection_action.isEnabled()
-    assert window.main_toolbar.capture_action.text() == "入力解除"
+    assert window.main_toolbar.capture_action.text() == "Stop input"
     assert window.main_toolbar.capture_action.isChecked()
-    assert window.status_bar.adapter_label.text() == "アダプター: Bluetooth adapter"
-    assert window.status_bar.connection_label.text() == "接続: 接続済み"
-    assert window.status_bar.capture_label.text() == "入力: 捕捉中"
-    assert window.status_bar.preview_label.text() == "プレビュー: 送信あり"
+    assert window.status_bar.adapter_label.text() == "Adapter: Bluetooth adapter"
+    assert window.status_bar.connection_label.text() == "Connection: Connected"
+    assert window.status_bar.capture_label.text() == "Input: Captured"
+    assert window.status_bar.preview_label.text() == "Preview: transmitting"
 
 
 def test_main_window_disables_busy_connection_and_reenables_a_retryable_error(
@@ -56,15 +56,15 @@ def test_main_window_disables_busy_connection_and_reenables_a_retryable_error(
             adapters=(),
             dialog_open=False,
             preview_only=True,
-            warning="ペアリング処理中",
+            warning="Pairing in progress",
             error=None,
             color_reconnect_pending=False,
         )
     )
 
     assert not window.main_toolbar.connection_action.isEnabled()
-    assert window.status_bar.connection_label.text() == "接続: 接続中"
-    assert window.status_bar.notice_label.text() == "警告: ペアリング処理中"
+    assert window.status_bar.connection_label.text() == "Connection: Connecting"
+    assert window.status_bar.notice_label.text() == "Warning: Pairing in progress"
 
     window.refresh(
         ApplicationUiSnapshot(
@@ -74,15 +74,15 @@ def test_main_window_disables_busy_connection_and_reenables_a_retryable_error(
             adapters=(),
             dialog_open=False,
             preview_only=True,
-            warning="接続に失敗しました",
-            error="接続に失敗しました",
+            warning="Connection failed",
+            error="Connection failed",
             color_reconnect_pending=False,
         )
     )
 
     assert window.main_toolbar.connection_action.isEnabled()
-    assert window.status_bar.connection_label.text() == "接続: エラー"
-    assert window.status_bar.notice_label.text() == "エラー: 接続に失敗しました"
+    assert window.status_bar.connection_label.text() == "Connection: Error"
+    assert window.status_bar.notice_label.text() == "Error: Connection failed"
 
     window.refresh(
         ApplicationUiSnapshot(

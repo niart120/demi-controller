@@ -125,12 +125,12 @@ class ConnectionDialog(QDialog):
         self.adapter_combo = QComboBox(self)
         self.adapter_combo.setModel(self._adapter_model)
         self.rescan_button = QPushButton(self.tr("Rescan"), self)
-        self.pairing_button = QPushButton("新規ペアリング", self)
-        self.discovery_label = QLabel("USBアダプターを検索してください", self)
+        self.pairing_button = QPushButton(self.tr("Pair new controller"), self)
+        self.discovery_label = QLabel(self.tr("Search for USB adapters"), self)
         self.controller_type_label = QLabel("Pro Controller", self)
         self.bond_slot_edit = QLineEdit(editor.draft.connection.bond_slot, self)
         self.timeout_edit = QLineEdit(str(editor.draft.connection.timeout_seconds), self)
-        self.reconnect_on_start_checkbox = QCheckBox("有効にする", self)
+        self.reconnect_on_start_checkbox = QCheckBox(self.tr("Enabled"), self)
         self.reconnect_on_start_checkbox.setChecked(editor.draft.connection.reconnect_on_start)
         self.diagnostic_level_combo = QComboBox(self)
         for diagnostic_level in DiagnosticLevel:
@@ -150,11 +150,11 @@ class ConnectionDialog(QDialog):
         self.pairing_button.setEnabled(False)
 
         connection_form = QFormLayout()
-        connection_form.addRow("コントローラー種別", self.controller_type_label)
-        connection_form.addRow("ボンドスロット", self.bond_slot_edit)
-        connection_form.addRow("接続タイムアウト (秒)", self.timeout_edit)
-        connection_form.addRow("起動時の再接続", self.reconnect_on_start_checkbox)
-        connection_form.addRow("診断ログ水準", self.diagnostic_level_combo)
+        connection_form.addRow(self.tr("Controller type"), self.controller_type_label)
+        connection_form.addRow(self.tr("Bond slot"), self.bond_slot_edit)
+        connection_form.addRow(self.tr("Connection timeout (seconds)"), self.timeout_edit)
+        connection_form.addRow(self.tr("Reconnect on startup"), self.reconnect_on_start_checkbox)
+        connection_form.addRow(self.tr("Diagnostic log level"), self.diagnostic_level_combo)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.adapter_combo)
@@ -181,7 +181,7 @@ class ConnectionDialog(QDialog):
         if not self.rescan_button.isEnabled():
             return
         self.rescan_button.setEnabled(False)
-        self.discovery_label.setText("USBアダプターを検索中です")
+        self.discovery_label.setText(self.tr("Searching for USB adapters"))
         self._on_rescan()
 
     def request_pairing(self) -> None:
@@ -200,7 +200,7 @@ class ConnectionDialog(QDialog):
             return
         on_save_and_connect = self._on_save_and_connect
         if on_save_and_connect is not None and not on_save_and_connect():
-            self.connection_error_label.setText("設定を保存できませんでした")
+            self.connection_error_label.setText(self.tr("Could not save settings"))
             return
         self.connection_error_label.clear()
         self.accept()
@@ -228,7 +228,7 @@ class ConnectionDialog(QDialog):
                 diagnostic_level=self._selected_diagnostic_level(),
             )
         except (DomainValueError, ValueError):
-            self.connection_error_label.setText("接続設定の値が正しくありません")
+            self.connection_error_label.setText(self.tr("Connection settings are invalid"))
             return False
         self.connection_error_label.clear()
         return True
@@ -254,20 +254,24 @@ class ConnectionDialog(QDialog):
         if not has_adapters:
             self._set_connection_actions_enabled(False)
             self.discovery_label.setText(
-                "利用可能なUSBアダプターがありません。接続機器を確認して再検索してください"
+                self.tr("No USB adapters are available. Check the device and rescan.")
             )
             return
         if saved_adapter_index < 0:
             self._set_connection_actions_enabled(False)
             if self._editor.draft.connection.adapter_id:
                 self.discovery_label.setText(
-                    "保存済みのUSBアダプターが見つかりません。アダプターを選択してください"
+                    self.tr("The saved USB adapter was not found. Select an adapter.")
                 )
                 return
-            self.discovery_label.setText(f"{len(adapters)}件のUSBアダプターを検出しました")
+            self.discovery_label.setText(
+                self.tr("{count} USB adapters found").format(count=len(adapters))
+            )
             return
         self._set_connection_actions_enabled(True)
-        self.discovery_label.setText(f"{len(adapters)}件のUSBアダプターを検出しました")
+        self.discovery_label.setText(
+            self.tr("{count} USB adapters found").format(count=len(adapters))
+        )
 
     def select_adapter(self, index: int) -> None:
         """Store one explicit adapter selection in the application-owned draft.
@@ -284,7 +288,11 @@ class ConnectionDialog(QDialog):
             return
         self._editor.update_connection(adapter_id=adapter_id)
         self._set_connection_actions_enabled(True)
-        self.discovery_label.setText(f"選択中のUSBアダプター: {self.adapter_combo.itemText(index)}")
+        self.discovery_label.setText(
+            self.tr("Selected USB adapter: {adapter}").format(
+                adapter=self.adapter_combo.itemText(index)
+            )
+        )
 
     def _set_connection_actions_enabled(self, enabled: bool) -> None:
         self.connect_button.setEnabled(enabled)
@@ -317,7 +325,7 @@ class PairingConfirmationDialog(QDialog):
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("新規ペアリングの確認")
+        self.setWindowTitle(self.tr("Confirm new pairing"))
         self._on_confirm = on_confirm
         self._on_cancel = on_cancel
         self._busy = False
@@ -343,7 +351,7 @@ class PairingConfirmationDialog(QDialog):
         """
         self._busy = busy
         self.message_label.setText(
-            "ペアリング処理中です" if busy else "新規ペアリングを開始しますか?"
+            self.tr("Pairing in progress") if busy else self.tr("Start a new pairing?")
         )
         for button in (
             self.button_box.button(QDialogButtonBox.StandardButton.Ok),

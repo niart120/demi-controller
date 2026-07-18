@@ -33,11 +33,16 @@ def test_default_user_interface_uses_english_source_text(
     )
     assert window.main_toolbar.connection_action.text() == "Connect"
     assert window.main_toolbar.capture_action.text() == "Start input"
+    assert window.status_bar.adapter_label.text() == "Adapter: None"
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "No"
+    assert mapping.capture_button.text() == "Capture next input"
+    assert mapping.mouse_gyro_group.title() == "Mouse gyro settings"
     assert connection.windowTitle() == "Connection settings"
     assert connection.rescan_button.text() == "Rescan"
+    assert connection.pairing_button.text() == "Pair new controller"
+    assert connection.discovery_label.text() == "Search for USB adapters"
     assert colors.windowTitle() == "Controller colors"
 
     for dialog in (mapping, colors):
@@ -86,9 +91,14 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     color_picker = QColorDialog()
 
     assert window.main_toolbar.connection_action.text() == "接続"
+    assert window.status_bar.adapter_label.text() == "アダプター: なし"
     assert mapping.windowTitle() == "キー割り当て"
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
+    assert mapping.capture_button.text() == "次の入力を取得"
+    assert mapping.mouse_gyro_group.title() == "マウスジャイロ設定"
     assert connection.windowTitle() == "接続設定"
+    assert connection.pairing_button.text() == "新規ペアリング"
+    assert connection.discovery_label.text() == "USBアダプターを検索してください"
     assert colors.windowTitle() == "コントローラーカラー"
     assert color_picker.windowTitle() == "色を選択"
 

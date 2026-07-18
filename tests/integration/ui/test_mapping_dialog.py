@@ -106,7 +106,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
         )
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
-        assert dialog.capture_label.text() == "入力: KEY:A"
+        assert dialog.capture_label.text() == "Input: KEY:A"
         assert coordinator.publisher.state.held_keys == set()
 
         dialog.capture_button.click()
@@ -152,8 +152,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "重複: KEY:F"
-    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "ローカル操作: CTRL+C"
+    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
+    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -162,8 +162,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
 
     confirmation = dialog.conflict_confirmation
     assert confirmation is not None
-    assert confirmation.text() == "重複またはローカル操作との競合があります。"
-    assert confirmation.informativeText() == "重複: KEY:F\nローカル操作: CTRL+C"
+    assert confirmation.text() == "Mappings conflict with duplicates or local actions."
+    assert confirmation.informativeText() == "Duplicate: KEY:F\nLocal action: CTRL+C"
     assert dialog.isVisible()
 
     cancel_button = confirmation.button(QMessageBox.StandardButton.Cancel)
@@ -219,7 +219,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     qt_application.processEvents()
 
     assert dialog.isVisible()
-    assert dialog.save_error_label.text() == "設定を保存できませんでした"
+    assert dialog.save_error_label.text() == "Could not save settings"
     assert modal.editor is editor
     assert editor.draft.profiles[0].bindings[0].source == "KEY:P"
     assert repository.saved == original
@@ -320,7 +320,7 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     dialog.show()
     qt_application.processEvents()
 
-    assert dialog.mouse_gyro_group.title() == "マウスジャイロ設定"
+    assert dialog.mouse_gyro_group.title() == "Mouse gyro settings"
     assert not dialog.mouse_gyro_enabled_checkbox.isChecked()
     assert dialog.horizontal_sensitivity_spinbox.value() == 2.5
     assert dialog.vertical_sensitivity_spinbox.value() == 1.5

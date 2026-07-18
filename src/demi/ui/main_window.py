@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
         )
         self._status_bar.refresh(
             StatusBarState(
-                adapter_label="なし",
+                adapter_label="None",
                 connection_state=ConnectionState.STOPPED,
                 application_state=AppState.IDLE,
                 pointer_quality=RelativePointerQuality.UNAVAILABLE,

@@ -113,7 +113,7 @@ class ControllerColorsDialog(QDialog):
         try:
             self._editor.update_color(field, value)
         except DomainValueError:
-            self.save_error_label.setText("色の形式が正しくありません")
+            self.save_error_label.setText(self.tr("The color format is invalid"))
             return False
         colors = self._editor.draft.controller_colors
         self._refresh_color_buttons(colors)
@@ -141,7 +141,7 @@ class ControllerColorsDialog(QDialog):
     def request_save(self) -> None:
         """Persist the draft, then request a reconnect choice if connected."""
         if not self._on_save():
-            self.save_error_label.setText("設定を保存できませんでした")
+            self.save_error_label.setText(self.tr("Could not save settings"))
             return
         self.save_error_label.clear()
         if not self._connected:
@@ -167,18 +167,18 @@ class ControllerColorsDialog(QDialog):
             return
         confirmation = QMessageBox(self)
         confirmation.setIcon(QMessageBox.Icon.Information)
-        confirmation.setWindowTitle("表示色の反映")
-        confirmation.setText("表示色を対象機器へ反映するには再接続が必要です。")
+        confirmation.setWindowTitle(self.tr("Apply display colors"))
+        confirmation.setText(self.tr("Reconnect to apply the display colors to the target device."))
         confirmation.setStandardButtons(
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         confirmation.setDefaultButton(QMessageBox.StandardButton.No)
         reconnect_button = confirmation.button(QMessageBox.StandardButton.Yes)
         if reconnect_button is not None:
-            reconnect_button.setText("再接続する")
+            reconnect_button.setText(self.tr("Reconnect"))
         defer_button = confirmation.button(QMessageBox.StandardButton.No)
         if defer_button is not None:
-            defer_button.setText("後で")
+            defer_button.setText(self.tr("Later"))
         confirmation.buttonClicked.connect(self._handle_reconnect_choice)
         confirmation.finished.connect(self._clear_reconnect_confirmation)
         self._reconnect_confirmation = confirmation

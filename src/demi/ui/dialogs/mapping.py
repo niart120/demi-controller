@@ -5,6 +5,7 @@ from typing import Any, override
 
 from PySide6.QtCore import (
     QAbstractTableModel,
+    QCoreApplication,
     QEvent,
     QModelIndex,
     QObject,
@@ -160,8 +161,12 @@ class MappingTableModel(QAbstractTableModel):
     @staticmethod
     def _format_conflict(conflict: BindingConflict) -> str:
         if conflict.local_action is not None:
-            return f"ローカル操作: {conflict.local_action}"
-        return f"重複: {conflict.source}"
+            return QCoreApplication.translate("MappingTableModel", "Local action: {action}").format(
+                action=conflict.local_action
+            )
+        return QCoreApplication.translate("MappingTableModel", "Duplicate: {source}").format(
+            source=conflict.source
+        )
 
     def _reset_from_editor(self) -> None:
         self.beginResetModel()
@@ -213,14 +218,14 @@ class MappingDialog(QDialog):
         for column in range(3):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.capture_button = QPushButton("次の入力を取得", self)
-        self.capture_label = QLabel("入力を取得していません", self)
-        self.inverted_checkbox = QCheckBox("反転", self)
+        self.capture_button = QPushButton(self.tr("Capture next input"), self)
+        self.capture_label = QLabel(self.tr("No input captured"), self)
+        self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
         self.inverted_checkbox.setEnabled(False)
         mouse_settings = editor.draft.input.mouse
-        self.mouse_gyro_group = QGroupBox("マウスジャイロ設定", self)
+        self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
-        self.mouse_gyro_enabled_checkbox = QCheckBox("有効", self.mouse_gyro_group)
+        self.mouse_gyro_enabled_checkbox = QCheckBox(self.tr("Enabled"), self.mouse_gyro_group)
         self.mouse_gyro_enabled_checkbox.setChecked(mouse_settings.gyro_enabled)
         self.horizontal_sensitivity_spinbox = _sensitivity_spinbox(
             self.mouse_gyro_group,
@@ -230,9 +235,9 @@ class MappingDialog(QDialog):
             self.mouse_gyro_group,
             mouse_settings.vertical_sensitivity,
         )
-        self.invert_x_checkbox = QCheckBox("水平反転", self.mouse_gyro_group)
+        self.invert_x_checkbox = QCheckBox(self.tr("Invert horizontally"), self.mouse_gyro_group)
         self.invert_x_checkbox.setChecked(mouse_settings.invert_x)
-        self.invert_y_checkbox = QCheckBox("垂直反転", self.mouse_gyro_group)
+        self.invert_y_checkbox = QCheckBox(self.tr("Invert vertically"), self.mouse_gyro_group)
         self.invert_y_checkbox.setChecked(mouse_settings.invert_y)
         self.pitch_limit_spinbox = QDoubleSpinBox(self.mouse_gyro_group)
         self.pitch_limit_spinbox.setRange(1.0, 89.0)
@@ -241,13 +246,15 @@ class MappingDialog(QDialog):
         self.pitch_limit_spinbox.setSuffix(" °")
         self.pitch_limit_spinbox.setValue(mouse_settings.pitch_limit_degrees)
         mouse_gyro_form.addRow(self.mouse_gyro_enabled_checkbox)
-        mouse_gyro_form.addRow("水平感度", self.horizontal_sensitivity_spinbox)
-        mouse_gyro_form.addRow("垂直感度", self.vertical_sensitivity_spinbox)
+        mouse_gyro_form.addRow(
+            self.tr("Horizontal sensitivity"), self.horizontal_sensitivity_spinbox
+        )
+        mouse_gyro_form.addRow(self.tr("Vertical sensitivity"), self.vertical_sensitivity_spinbox)
         mouse_gyro_form.addRow(self.invert_x_checkbox)
         mouse_gyro_form.addRow(self.invert_y_checkbox)
-        mouse_gyro_form.addRow("pitch上限", self.pitch_limit_spinbox)
+        mouse_gyro_form.addRow(self.tr("Pitch limit"), self.pitch_limit_spinbox)
         self.save_error_label = QLabel("", self)
-        self.restore_button = QPushButton("標準に戻す", self)
+        self.restore_button = QPushButton(self.tr("Restore defaults"), self)
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
             self,
@@ -317,16 +324,16 @@ class MappingDialog(QDialog):
         """Arm the selected table row for exactly one supported input event."""
         selected = self.table.currentIndex()
         if not selected.isValid():
-            self.capture_label.setText("対象を選択してください")
+            self.capture_label.setText(self.tr("Select a target"))
             return
         self._capture_row = selected.row()
-        self.capture_label.setText("次のキーまたはマウスボタンを押してください")
+        self.capture_label.setText(self.tr("Press the next key or mouse button"))
 
     def restore_default_profile(self) -> None:
         """Restore the built-in profile through the application-owned editor."""
         self._mapping_model.restore_default_profile()
         self._capture_row = None
-        self.capture_label.setText("標準設定に戻しました")
+        self.capture_label.setText(self.tr("Defaults restored"))
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -341,10 +348,10 @@ class MappingDialog(QDialog):
         try:
             self._mapping_model.update_source(row, source)
         except DomainValueError:
-            self.capture_label.setText("入力を割り当てられません")
+            self.capture_label.setText(self.tr("Input cannot be assigned"))
             return False
         self.table.selectRow(row)
-        self.capture_label.setText(f"入力: {source}")
+        self.capture_label.setText(self.tr("Input: {source}").format(source=source))
         return True
 
     def set_inverted(self, inverted: bool) -> None:
@@ -376,8 +383,8 @@ class MappingDialog(QDialog):
             return
         confirmation = QMessageBox(
             QMessageBox.Icon.Warning,
-            "キー割り当ての競合",
-            "重複またはローカル操作との競合があります。",
+            self.tr("Key mapping conflicts"),
+            self.tr("Mappings conflict with duplicates or local actions."),
             QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
             self,
         )
@@ -420,7 +427,7 @@ class MappingDialog(QDialog):
         if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_F12:
                 self._capture_row = None
-                self.capture_label.setText("F12で入力捕捉を解除しました")
+                self.capture_label.setText(self.tr("Input capture released with F12"))
                 _invoke(self._on_release_capture)
                 event.accept()
                 return True
@@ -461,7 +468,7 @@ class MappingDialog(QDialog):
     def _save_or_accept(self) -> None:
         on_save = self._on_save
         if on_save is not None and not on_save():
-            self.save_error_label.setText("設定を保存できませんでした")
+            self.save_error_label.setText(self.tr("Could not save settings"))
             return
         self.save_error_label.clear()
         self.accept()
