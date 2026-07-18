@@ -2,6 +2,7 @@
 
 import tomllib
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import cast
 
 import tomli_w
@@ -283,7 +284,7 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
     )
 
     try:
-        return AppSettings(
+        settings = AppSettings(
             schema=schema,
             active_profile=_require_string(raw["active_profile"]),
             ui=UiSettings(language=_ui_language(ui["language"])),
@@ -339,8 +340,31 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             ),
             profiles=tuple(_decode_profile(item) for item in _require_list(raw["profiles"])),
         )
+        return _migrate_legacy_input_defaults(settings)
     except (TypeError, ValueError):
         raise ConfigurationError from None
+
+
+def _migrate_legacy_input_defaults(settings: AppSettings) -> AppSettings:
+    local_actions = settings.local_actions
+    if local_actions.release_capture == ("F12",):
+        local_actions = replace(local_actions, release_capture=("F4",))
+
+    profiles = tuple(
+        replace(
+            profile,
+            bindings=tuple(
+                replace(binding, source="KEY:F1")
+                if binding.source == "KEY:ESCAPE" and binding.target is BindingTarget.BUTTON_HOME
+                else binding
+                for binding in profile.bindings
+            ),
+        )
+        if profile.id == "default" and profile.name == "Default" and profile.builtin
+        else profile
+        for profile in settings.profiles
+    )
+    return replace(settings, local_actions=local_actions, profiles=profiles)
 
 
 def dumps_settings(settings: AppSettings) -> str:

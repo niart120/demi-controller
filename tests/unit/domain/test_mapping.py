@@ -30,7 +30,7 @@ def test_default_profile_contains_the_documented_bindings_in_order() -> None:
         ("KEY:LEFT_SHIFT", "BUTTON:ZL"),
         ("KEY:Z", "BUTTON:MINUS"),
         ("KEY:X", "BUTTON:PLUS"),
-        ("KEY:ESCAPE", "BUTTON:HOME"),
+        ("KEY:F1", "BUTTON:HOME"),
         ("KEY:T", "BUTTON:RIGHT_STICK"),
         ("KEY:G", "BUTTON:LEFT_STICK"),
         ("KEY:W", "LEFT_STICK:UP"),

@@ -182,7 +182,7 @@ def default_profile() -> InputProfile:
             Binding("KEY:LEFT_SHIFT", BindingTarget.BUTTON_ZL),
             Binding("KEY:Z", BindingTarget.BUTTON_MINUS),
             Binding("KEY:X", BindingTarget.BUTTON_PLUS),
-            Binding("KEY:ESCAPE", BindingTarget.BUTTON_HOME),
+            Binding("KEY:F1", BindingTarget.BUTTON_HOME),
             Binding("KEY:T", BindingTarget.BUTTON_RIGHT_STICK),
             Binding("KEY:G", BindingTarget.BUTTON_LEFT_STICK),
             Binding("KEY:W", BindingTarget.LEFT_STICK_UP),

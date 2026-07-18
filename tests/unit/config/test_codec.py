@@ -43,6 +43,54 @@ def test_codec_supplies_connection_shortcuts_for_existing_v1_settings() -> None:
     assert restored.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
 
 
+def test_codec_migrates_only_exact_legacy_home_and_release_defaults() -> None:
+    legacy = encode_settings(AppSettings.default())
+    legacy_actions = cast("dict[str, object]", legacy["local_actions"])
+    legacy_actions["release_capture"] = ["F12"]
+    legacy_profiles = cast("list[object]", legacy["profiles"])
+    legacy_profile = cast("dict[str, object]", legacy_profiles[0])
+    legacy_bindings = cast("list[object]", legacy_profile["bindings"])
+    legacy_home = next(
+        cast("dict[str, object]", binding)
+        for binding in legacy_bindings
+        if cast("dict[str, object]", binding)["target"] == "BUTTON:HOME"
+    )
+    legacy_home["source"] = "KEY:ESCAPE"
+
+    migrated = decode_settings(legacy)
+
+    migrated_home = next(
+        binding
+        for binding in migrated.profiles[0].bindings
+        if binding.target is BindingTarget.BUTTON_HOME
+    )
+    assert migrated_home.source == "KEY:F1"
+    assert migrated.local_actions.release_capture == ("F4",)
+
+    customized = encode_settings(AppSettings.default())
+    customized_actions = cast("dict[str, object]", customized["local_actions"])
+    customized_actions["release_capture"] = ["F8"]
+    customized_profiles = cast("list[object]", customized["profiles"])
+    customized_profile = cast("dict[str, object]", customized_profiles[0])
+    customized_bindings = cast("list[object]", customized_profile["bindings"])
+    customized_home = next(
+        cast("dict[str, object]", binding)
+        for binding in customized_bindings
+        if cast("dict[str, object]", binding)["target"] == "BUTTON:HOME"
+    )
+    customized_home["source"] = "KEY:F2"
+
+    preserved = decode_settings(customized)
+
+    preserved_home = next(
+        binding
+        for binding in preserved.profiles[0].bindings
+        if binding.target is BindingTarget.BUTTON_HOME
+    )
+    assert preserved_home.source == "KEY:F2"
+    assert preserved.local_actions.release_capture == ("F8",)
+
+
 def test_codec_supplies_english_for_existing_v1_settings_and_round_trips_languages() -> None:
     raw = encode_settings(AppSettings.default())
     raw.pop("ui")
