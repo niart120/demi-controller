@@ -65,6 +65,30 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
 
     model = controller_preview_model(frame, colors)
 
+    assert model.control_ids == frozenset(
+        {
+            "a",
+            "b",
+            "x",
+            "y",
+            "dpad_up",
+            "dpad_right",
+            "dpad_down",
+            "dpad_left",
+            "l",
+            "r",
+            "zl",
+            "zr",
+            "plus",
+            "minus",
+            "home",
+            "capture",
+            "left_stick",
+            "left_stick_click",
+            "right_stick",
+            "right_stick_click",
+        }
+    )
     assert model.body_color == "#102030"
     assert model.buttons_color == "#405060"
     assert model.left_grip_color == "#708090"

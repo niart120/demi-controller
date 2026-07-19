@@ -64,6 +64,7 @@ _RELATIVE_CONTROLS = {
     "right_stick": (0.61, 0.58, 0.16, 0.18),
     "right_stick_click": (0.665, 0.64, 0.05, 0.06),
 }
+CONTROL_IDS = frozenset(_RELATIVE_CONTROLS)
 
 
 def preview_layout(width: int, height: int) -> PreviewLayout:
