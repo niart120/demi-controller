@@ -168,6 +168,9 @@ class ControllerPreviewWidget(QWidget):
         """
         self._frame = frame
         self._model = controller_preview_model(frame, self._colors)
+        sensor_description = _sensor_description(frame)
+        self.setToolTip(sensor_description)
+        self.setAccessibleDescription(sensor_description)
         if self._repaint_limiter.allows_repaint():
             self._on_repaint_requested()
 
@@ -301,3 +304,19 @@ class ControllerPreviewWidget(QWidget):
 
 def _circle(center: QPointF, radius: float) -> QRectF:
     return QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+
+def _sensor_description(frame: ControllerFrame) -> str:
+    translate = QCoreApplication.translate
+    gyro = translate("ControllerPreviewWidget", "Gyro")
+    acceleration = translate("ControllerPreviewWidget", "Acceleration")
+    return "\n".join(
+        (
+            f"{gyro} X: {frame.gyro_rate.x_radians_per_second:.2f} rad/s",
+            f"{gyro} Y: {frame.gyro_rate.y_radians_per_second:.2f} rad/s",
+            f"{gyro} Z: {frame.gyro_rate.z_radians_per_second:.2f} rad/s",
+            f"{acceleration} X: {frame.accel_g.x_g:.2f} G",
+            f"{acceleration} Y: {frame.accel_g.y_g:.2f} G",
+            f"{acceleration} Z: {frame.accel_g.z_g:.2f} G",
+        )
+    )
