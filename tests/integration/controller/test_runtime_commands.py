@@ -92,6 +92,7 @@ class RecordingAdapter:
     active_frame_error: Exception | None = None
     send_started: Event | None = None
     send_release: Event | None = None
+    disconnect_neutral_values: list[bool] = field(default_factory=list)
 
     def _record(self, name: str) -> None:
         self.operations.append(name)
@@ -131,7 +132,7 @@ class RecordingAdapter:
 
     async def disconnect(self, *, neutral: bool = True) -> None:
         """Record a disconnect request."""
-        del neutral
+        self.disconnect_neutral_values.append(neutral)
         self._record("disconnect")
 
     async def recreate_with_colors(
@@ -150,9 +151,10 @@ class RecordingAdapter:
                 raise self.active_frame_error
             if self.send_started is not None:
                 self.send_started.set()
-            if self.send_release is not None:
-                if not await asyncio.to_thread(self.send_release.wait, 1.0):
-                    raise TimeoutError
+            if self.send_release is not None and not await asyncio.to_thread(
+                self.send_release.wait, 1.0
+            ):
+                raise TimeoutError
         self.applied_frames.append(frame)
         self.applied.set()
         if frame.capture_active:
@@ -193,6 +195,7 @@ def test_commands_are_ordered_on_worker_and_events_return_to_the_sink() -> None:
 
     assert adapter.operations[:4] == ["discover", "connect_saved", "send_frame", "send_frame"]
     assert "disconnect" in adapter.operations
+    assert adapter.disconnect_neutral_values == [False]
     assert adapter.operations[-1] == "close"
     assert len(set(adapter.thread_ids)) == 1
 
