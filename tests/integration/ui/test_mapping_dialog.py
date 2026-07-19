@@ -178,6 +178,34 @@ def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
     assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
 
 
+def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_and_round_trips(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved: list[AppSettings] = []
+    dialog = MappingDialog(editor, on_save=lambda: not saved.append(editor.draft))
+    dialog.show()
+    qt_application.processEvents()
+    dialog.table.selectRow(0)
+
+    assert dialog.assign_escape_action in dialog.table.actions()
+    assert dialog.assign_escape_action.text() == "Assign Escape"
+    assert not dialog.assign_escape_action.shortcut().isEmpty()
+
+    QTest.keySequence(dialog.table, dialog.assign_escape_action.shortcut())
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:ESCAPE"
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+    assert saved
+
+    reopened = MappingDialog(SettingsEditor(saved[-1]))
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:ESCAPE"
+
+
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
     qt_application: QApplication,
 ) -> None:

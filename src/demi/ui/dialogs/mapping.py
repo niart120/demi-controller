@@ -13,7 +13,7 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     Qt,
 )
-from PySide6.QtGui import QHideEvent, QKeyEvent, QMouseEvent, QShowEvent
+from PySide6.QtGui import QAction, QHideEvent, QKeyEvent, QKeySequence, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
@@ -293,6 +293,11 @@ class MappingDialog(QDialog):
         self.table.setModel(self._mapping_model)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self.assign_escape_action = QAction(self.tr("Assign Escape"), self.table)
+        self.assign_escape_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        self.assign_escape_action.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.table.addAction(self.assign_escape_action)
         self._mapping_action_delegate = MappingActionDelegate(
             on_activated=self._activate_row_action,
             parent=self.table,
@@ -374,6 +379,7 @@ class MappingDialog(QDialog):
         QWidget.setTabOrder(self.pitch_limit_spinbox, self.restore_button)
 
         self.capture_button.clicked.connect(self.begin_capture)
+        self.assign_escape_action.triggered.connect(self.assign_escape)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
@@ -428,6 +434,15 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self._mapping_model.cancel_capture()
         self.capture_label.setText(self.tr("Input capture cancelled"))
+
+    def assign_escape(self) -> None:
+        """Assign Escape to the selected row through an explicit action."""
+        selected = self.table.currentIndex()
+        if not selected.isValid():
+            self.capture_label.setText(self.tr("Select a target"))
+            return
+        self.cancel_capture()
+        self.set_source(selected.row(), "KEY:ESCAPE")
 
     def begin_capture(self) -> None:
         """Arm the selected table row for exactly one supported input event."""

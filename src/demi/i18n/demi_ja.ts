@@ -29,6 +29,7 @@
   <context>
     <name>MappingDialog</name>
     <message><source>Input capture cancelled</source><translation>入力待受を中止しました</translation></message>
+    <message><source>Assign Escape</source><translation>Escapeを割り当て</translation></message>
     <message><source>Key mappings</source><translation>キー割り当て</translation></message>
     <message><source>Capture next input</source><translation>次の入力を取得</translation></message>
     <message><source>No input captured</source><translation>入力を取得していません</translation></message>
