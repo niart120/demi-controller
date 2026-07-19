@@ -29,4 +29,6 @@ description: "この Python repo の spec/wip、spec/initial、TDD Test List か
 - red から green の途中で見つけた別の振る舞いは list に追加し、今の item に混ぜない。
 - refactor は green 後に行う。
 - formatter / linter だけを refactor と呼ばない。
+- docs item を pytest にするのは、機械的に観測できる契約があり、変更対象と失敗条件を示せる場合に限る。
+- prose review の結果は pytest の green と同一視せず、確認したファイルと方法を spec の検証欄へ記録する。
 - package metadata に触れたら `uv lock --check` と `uv build` を追加する。

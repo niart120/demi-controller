@@ -76,7 +76,8 @@
 - README は利用開始の入口として短く保ち、詳細な API 契約、実装ログ、agent 運用、作業履歴は `docs/`、`spec/`、`AGENTS.md`、`SKILLS.md` に分ける。
 - 公開 docs には、利用者が確認できる現在の仕様、手順、制約を書く。開発者向けメタ表現や対話内だけの文言を残さない。
 - public API、package metadata、release の挙動を変更したら、docstring と利用者向け docs の更新を完了条件に含める。
-- docs test が落ちた場合は、まず文言と配置のずれを直す。テストを弱めるのは期待値の古さを確認できた場合に限る。
+- docs / spec の品質は、対象ファイルの事実整合、読者、根拠、未検証、リンク、仮テキストを review する。自然言語の言い換え、見出し、説明順、禁止語、作業記録の状態語を固定する pytest は追加しない。
+- docs test が落ちた場合は、文書の誤りと、test が機械的契約を検査しているかを同列に確認する。変更対象を読まない test の pass は、その文書の検証結果に書かない。
 - docs site や Pages 公開を対象範囲に含めた場合、local build だけで完了にしない。remote workflow、deployment、公開 URL の確認を根拠に含める。
 - docs、spec、skill、PR 本文を変更した場合は `$docs-quality-review` を使って、仮テキスト、未検証事項、`not run` / `not applicable` の混同を確認する。
 - 公開 API の型注釈、`py.typed`、`# type: ignore`、`cast()` を変更した場合は `$type-boundary-review` を使う。

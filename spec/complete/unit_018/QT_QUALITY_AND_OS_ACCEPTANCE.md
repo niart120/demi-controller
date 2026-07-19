@@ -164,8 +164,8 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `src/demi/THIRD_PARTY_NOTICES.md` | new | wheelに同梱するProject、PySide6、Qtのnotice導線 |
 | `src/demi/app.py` | verify / modify | safe diagnosticsとsource runner契約 |
 | `README.md` | modify | source起動、支援範囲、standalone停止、license導線 |
-| `tests/unit/test_documentation.py` | new | READMEと初期仕様の現在向け実行・配布説明を回帰検査 |
-| `tests/unit/test_work_unit_records.py` | new | unit_013〜018のTDD、checklist、未完了表記を回帰検査 |
+| `tests/unit/test_documentation.py` | delete (unit_038) | 固定文言を検査していたため、意味上の文書品質の根拠にしない。 |
+| `tests/unit/test_work_unit_records.py` | delete (unit_038) | 状態語と checkbox を検査していたため、作業実態の根拠にしない。 |
 | `spec/hardware-test-log.md` | modify | 実機記録で収集するGUI runtime版をPySide6 / Qtへ更新 |
 | `spec/initial/README.md` | modify | 採用UIと実行model |
 | `spec/initial/requirements.md` | modify | PySide6 / Qt、診断、応答性のcurrent契約 |
@@ -212,17 +212,17 @@ milestone 0とunit_013〜017の完了を着手条件とする。本unitは既存
 | `uv run pytest tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/unit/application/test_app.py tests/unit/application/test_logging.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py tests/integration/ui/test_application_lifecycle.py -q -p no:cacheprovider` | passed | 38 passed。safe support snapshot、起動／終了ログ、test root、source / wheel GUI smoke、既存lifecycleを確認した |
 | `uv run ruff format --check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | 7 files already formatted |
 | `uv run ruff check src/demi/config/paths.py src/demi/app.py src/demi/ui/diagnostics.py tests/unit/config/test_paths.py tests/unit/ui/test_diagnostics.py tests/integration/ui/test_source_entry_points.py tests/integration/package/test_wheel_gui_smoke.py` | passed | All checks passed |
-| `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | 1 passed。READMEとinitial specのQt実装、3 entry point、source / wheel、単体配布停止の説明を確認した |
+| `uv run pytest tests/unit/test_documentation.py -q -p no:cacheprovider` | passed | 当時の固定文字列 assertion 1件が pass。README と initial spec の意味上の正しさを確認した根拠ではない。 |
 | `uv run ruff format --check tests/unit/test_documentation.py` | passed | 1 file already formatted |
 | `uv run ruff check tests/unit/test_documentation.py` | passed | All checks passed |
 | `uv run pytest tests/integration/package/test_wheel_license_notices.py -q -p no:cacheprovider` | passed | 1 passed。new wheelに`demi/THIRD_PARTY_NOTICES.md`とProject MIT licenseが同梱され、source inventoryとともにProject、PySide6、Qt、third-party noticeを案内することを確認した |
 | `uv run ruff format --check tests/integration/package/test_wheel_license_notices.py` | passed | 1 file already formatted |
 | `uv run ruff check tests/integration/package/test_wheel_license_notices.py` | passed | All checks passed |
-| `uv run pytest tests/unit/test_legacy_ui_removal.py tests/unit/test_packaging.py tests/unit/test_cli.py tests/unit/application/test_application_session.py -q -p no:cacheprovider` | passed | 18 passed。source / test AST、package metadata / lock / builder、README / initial specのlegacy GUI採用残存を確認した |
+| `uv run pytest tests/unit/test_legacy_ui_removal.py tests/unit/test_packaging.py tests/unit/test_cli.py tests/unit/application/test_application_session.py -q -p no:cacheprovider` | passed | 18 passed。source / test AST、package metadata / lock / builder、CLI と application session の機械的契約を確認した。 |
 | `uv run ruff format --check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | 2 files already formatted |
 | `uv run ruff check tests/unit/test_packaging.py tests/unit/application/test_application_session.py` | passed | All checks passed |
 | `rg -n -i "import[[:space:]]+pyglet|from[[:space:]]+pyglet|collect-all[[:space:]]+pyglet|pyglet[[:space:]]*[<=>]|pyglet[[:space:]]+input|pyglet.*(backend|window)" src tests pyproject.toml uv.lock packaging README.md spec/initial --glob "!tests/unit/test_legacy_ui_removal.py"` | passed | import /収集 /採用指示の該当なし。除外したfileは削除済み境界を検出する否定test |
-| `uv run pytest tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | 2 passed。unit_013〜019のcomplete recordにtodoと未完了checklistがなく、unit_018のTDD上のdeferredがmilestone 7 standaloneだけであることを確認した |
+| `uv run pytest tests/unit/test_work_unit_records.py -q -p no:cacheprovider` | passed | 当時の状態語・checkbox・特定文言を検査する assertion 2件が pass。complete record の作業実態を確認した根拠ではない。 |
 | macOS実display acceptance | not run | 現在の作業環境にmacOS host / desktop sessionがない。offscreen CIはsource-level証拠であり、実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | Linux実display acceptance | not run | 現在の作業環境にLinux host / desktop sessionがない。X11 / Wayland、compositorを含む実displayのwindow、DPI、font、focus、pointer capability、closeを確認していない |
 | `uv run pytest tests/unit -p no:cacheprovider` | passed | 197 passed。実行基盤では`.pytest_cache`のACLが終了時のcache保存だけを拒否するため、収集・実行範囲を変えずcache providerを無効化した |
