@@ -119,6 +119,25 @@ def test_modal_save_failure_keeps_draft_and_modal_open_until_cancel() -> None:
     assert dialogs.model.kind is DialogKind.NONE
 
 
+def test_color_modal_cancel_discards_multiple_color_changes_without_saving() -> None:
+    repository = FakeRepository()
+    controller, coordinator, _, dialogs = make_controller(repository)
+    original = AppSettings.default()
+
+    assert controller.open(DialogKind.COLORS, original, connected=True) is True
+    assert controller.editor is not None
+    controller.editor.update_color("body", "#ABCDEF")
+    controller.editor.update_color("right_grip", "#123456")
+
+    assert controller.cancel() is True
+
+    assert repository.saved is None
+    assert controller.editor is None
+    assert original.controller_colors == AppSettings.default().controller_colors
+    assert coordinator.app_state is AppState.IDLE
+    assert dialogs.model.kind is DialogKind.NONE
+
+
 def test_recovered_settings_notice_contains_only_the_backup_name() -> None:
     result = SettingsLoadResult(
         settings=AppSettings.default(),

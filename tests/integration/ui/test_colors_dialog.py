@@ -43,9 +43,12 @@ def test_colors_dialog_previews_draft_restores_saved_colors_and_requests_reconne
     cancelled.show()
     qt_application.processEvents()
     cancelled.set_color("body", "#abcdef")
+    cancelled.set_color("left_grip", "#123456")
 
     assert editor.draft.controller_colors.body == "#ABCDEF"
+    assert editor.draft.controller_colors.left_grip == "#123456"
     assert previews[-1].body == "#ABCDEF"
+    assert previews[-1].left_grip == "#123456"
     assert cancelled.color_buttons["body"].property("swatchColor") == "#ABCDEF"
 
     cancel_button = cancelled.button_box.button(QDialogButtonBox.StandardButton.Cancel)

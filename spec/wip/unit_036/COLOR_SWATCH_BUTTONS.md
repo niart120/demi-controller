@@ -83,7 +83,7 @@
 | refactor-skipped | picker rejectedはdraft、preview、swatch、dirty stateを変更しない | regression / edge | integration | 4 fieldをgreen化。colorSelectedだけを更新境界とする既存接続で無変更を確認 |
 | refactor-done | accessible name / descriptionとtooltipからfield名、hex値、操作を取得できる | new | integration | refresh境界でfield名、hex、Choose a colorを一括更新 |
 | refactor-done | 白、黒、theme背景と同色のfillでもfocus / hover / border用の独立state propertyが設定される | new / edge | unit / integration | palette mid / highlightによる独立枠とsemantic property、StrongFocusを検証 |
-| todo | dialog Cancelは複数swatch変更をrollbackし、Saveと再接続確認は既存の永続化契約を維持する | regression | integration | connected / disconnectedを含める |
+| refactor-skipped | dialog Cancelは複数swatch変更をrollbackし、Saveと再接続確認は既存の永続化契約を維持する | regression | integration | 複数色Cancel、disconnected Save、connected reconnect / laterを既存session境界でgreen化 |
 | todo | 英語と日本語でrow labelとaccessible textが切り替わり、hex値自体は変わらない | new / regression | integration | unit_032に依存する |
 | todo | Windows通常描画で各swatch、keyboard focus、light / dark fillの識別が不自然でない | new | manual | `$inspect-gui-states`でPNGを確認する |
 
