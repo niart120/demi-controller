@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 import demi.ui.controller_preview as preview_module
@@ -247,6 +247,48 @@ def test_grip_colors_fill_grip_regions_and_not_the_stick_surfaces(
     assert _sample_rect(image, layout.right_grip_bounds, 0.80, 0.80) == (32, 160, 32)
     assert _sample_rect(image, layout.controls["left_stick"], 0.50, 0.15) == (64, 80, 96)
     assert _sample_rect(image, layout.controls["right_stick"], 0.50, 0.15) == (64, 80, 96)
+
+
+def test_gyro_indicator_uses_signed_linear_tracks_instead_of_button_like_rings() -> None:
+    bounds = QRectF(0.0, 0.0, 384.0, 84.0)
+    display = gyro_display(GyroRate(2.0, -2.0, 0.0))
+
+    positive_track, positive_fill = preview_module._gyro_bar_geometry(bounds, 0, display.x)
+    negative_track, negative_fill = preview_module._gyro_bar_geometry(bounds, 1, display.y)
+    _, zero_fill = preview_module._gyro_bar_geometry(bounds, 2, display.z)
+
+    assert positive_track.width() >= positive_track.height() * 4
+    assert negative_track.width() >= negative_track.height() * 4
+    assert positive_fill.left() == pytest.approx(positive_track.center().x())
+    assert positive_fill.right() > positive_track.center().x()
+    assert negative_fill.right() == pytest.approx(negative_track.center().x())
+    assert negative_fill.left() < negative_track.center().x()
+    assert zero_fill.width() == 0.0
+
+
+def test_acceleration_indicator_composes_three_axes_into_one_vector() -> None:
+    bounds = QRectF(0.0, 0.0, 384.0, 84.0)
+    x_only = accel_display(AccelG(0.25, 0.0, 0.0))
+    y_only = accel_display(AccelG(0.0, 0.25, 0.0))
+    z_only = accel_display(AccelG(0.0, 0.0, 0.25))
+    combined = accel_display(AccelG(0.25, 0.25, 0.25))
+
+    center, x_end, guides = preview_module._accel_vector_geometry(bounds, x_only)
+    _, y_end, _ = preview_module._accel_vector_geometry(bounds, y_only)
+    _, z_end, _ = preview_module._accel_vector_geometry(bounds, z_only)
+    _, combined_end, _ = preview_module._accel_vector_geometry(bounds, combined)
+
+    assert len(guides) == 3
+    assert combined_end.x() - center.x() == pytest.approx(
+        (x_end.x() - center.x()) + (y_end.x() - center.x()) + (z_end.x() - center.x())
+    )
+    assert combined_end.y() - center.y() == pytest.approx(
+        (x_end.y() - center.y()) + (y_end.y() - center.y()) + (z_end.y() - center.y())
+    )
+    assert x_end.y() < center.y()  # +X: trigger direction
+    assert y_end.x() < center.x()  # +Y: controller-left direction
+    assert z_end.x() > center.x()  # +Z: face-outward
+    assert z_end.y() > center.y()
 
 
 def _frame(

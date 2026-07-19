@@ -65,6 +65,7 @@
 - スティック押下は独立円を廃止し、スティック外周リングで示す。
 - ボタンラベルは操作要素の短辺へ追従して拡大する。
 - 左右グリップ色は本体下部のグリップ領域へ反映し、スティック表面にはボタン色を使う。
+- ジャイロは円形ゲージを廃止して中央0の横棒3本とし、加速度は実機座標に対応する3軸補助線と1本の合成ベクトルで示す。
 
 ### 検証結果
 
@@ -88,6 +89,8 @@
 | T-037-09 | refactor-done | スティック押下はノブと重なる別円を描かず、スティック全体の状態変化として判別できる。 |
 | T-037-10 | refactor-skipped | ボタン内の文字はボタン短辺に追従して拡大し、最小表示でも識別できる。 |
 | T-037-11 | refactor-done | 左右グリップ色は本体の左右グリップ領域へ反映し、スティック表面にはボタン色を使う。 |
+| T-037-12 | refactor-done | ジャイロ3軸は操作ボタンと誤認しない横棒で示し、中央から左右へ符号と大きさを表現する。 |
+| T-037-13 | refactor-done | 加速度3軸を実機座標に対応する補助線と1本の合成ベクトルで示す。 |
 
 ## 予定する変更箇所
 
@@ -121,6 +124,9 @@
 | T-037-08～11 視覚意味 | pass | red では既定ボタン色の押下前後が `RGB(15,15,15)` と `RGB(25,25,25)`、コントラスト比1.09:1であり、stick clickの独立円、ラベル拡大関数とグリップ領域の欠落を確認した。`uv run pytest -p no:cacheprovider --basetemp tmp\\pytest\\unit037-grip-final-green tests\\unit\\ui\\test_controller_preview.py tests\\unit\\ui\\test_preview_layout.py -q` は24 passed。 |
 | 押下コントラスト改善後の通常描画 | pass | `tmp/gui-audit/unit-037-contrast-final2/` の neutral、複数ボタン押下、左stick click、左右グリップ別色、最小押下の5 PNGを原寸確認した。押下判別、文字サイズ、外周リング、色の反映先に問題なし。 |
 | 押下コントラスト改善後の標準品質ゲート | pass | `uv sync --dev`、`uv lock --check`、`uv run ruff format --check .`、`uv run ruff check .`、`uv run ty check --no-progress`、`uv build`、`git diff --check` は pass。unit test は 288 passed、integration test は非 UI 15 passed、UI 102 passed、source entry point 3 passed。仮テキスト検索は該当なし。 |
+| T-037-12 ジャイロ表示 | pass | red では横棒geometryが存在せず1 failed。greenでは中央0の符号付き横棒3本へ変更した。`tmp/gui-audit/unit-037-gyro-before/` と `tmp/gui-audit/unit-037-gyro-final/` の標準・最小表示を比較し、円形操作部品との区別と見出しの非重複を確認した。 |
+| T-037-13 加速度表示 | pass | red では合成vector geometryが存在せず1 failed。実機座標の正方向を `spec/initial/input.md`、`spec/initial/swbt-integration.md`、dekuNukem IMU notesと照合した。`tmp/gui-audit/unit-037-sensors-axis-check/` の混合・最小・+X・+Y・+Z状態で、+X＝上、+Y＝左下、+Z＝右下の補助軸と合成矢印を原寸確認した。 |
+| センサー表示改善後の標準品質ゲート | pass | `uv sync --dev`、`uv lock --check`、`uv run ruff format --check .`、`uv run ruff check .`、`uv run ty check --no-progress`、`uv build`、`git diff --check` は pass。unit testは290 passed、integration testは非UI 15 passed。UIはQt widgetの遅延削除後に循環GCを行う共通fixtureへ修正し、`uv run pytest tests\integration\ui -q -p no:cacheprovider --basetemp=tmp/pytest-verify-nocache-20260719` の単一プロセス逐次実行で105 passed。cache providerは管理環境に残った別所有者の `.pytest_cache` を避けるため無効化した。 |
 
 ## 先送り事項
 
@@ -139,3 +145,4 @@
 - [x] 実装、通常描画確認、品質ゲートを完了する。
 - [x] ボタン押下のコントラストとスティック押下表示を改善する。
 - [x] 改善後の通常描画と標準品質ゲートを完了する。
+- [x] センサー表示を操作部品と区別し、実機座標と画面投影の対応を確認する。

@@ -3,6 +3,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from math import hypot
 from typing import Protocol
 
 from PySide6.QtCore import QCoreApplication, QPointF, QRectF, Qt
@@ -17,7 +18,12 @@ from demi.ui.preview_layout import (
     normalized_stick_position,
     preview_layout,
 )
-from demi.ui.preview_sensor import SensorDisplay, accel_display, gyro_display
+from demi.ui.preview_sensor import (
+    SensorDisplay,
+    SignedAxisDisplay,
+    accel_display,
+    gyro_display,
+)
 
 type RepaintRequest = Callable[[], object]
 
@@ -350,39 +356,67 @@ class ControllerPreviewWidget(QWidget):
         colors = (QColor("#E25D5D"), QColor("#63B66F"), QColor("#5B8DEF"))
         axes = zip((display.x, display.y, display.z), colors, strict=True)
         for index, (axis, color) in enumerate(axes):
-            center = QPointF(
-                bounds.left() + bounds.width() * (0.32 + index * 0.24),
-                bounds.center().y() + 5.0,
+            track, fill = _gyro_bar_geometry(bounds, index, axis)
+            radius = track.height() / 2.0
+            painter.setPen(QPen(QColor("#707070"), 1.0))
+            painter.setBrush(QColor("#303030"))
+            painter.drawRoundedRect(track, radius, radius)
+            if fill.width() > 0.0:
+                painter.setPen(QPen(color, 1.0))
+                painter.setBrush(color)
+                painter.drawRoundedRect(fill, radius, radius)
+            painter.setPen(QPen(QColor("#B8B8B8"), 1.0))
+            painter.drawLine(
+                QPointF(track.center().x(), track.top() - 2.0),
+                QPointF(track.center().x(), track.bottom() + 2.0),
             )
-            radius = min(bounds.height() * 0.30, bounds.width() * 0.08)
-            painter.setPen(QPen(QColor("#555555"), 2.0))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(_circle(center, radius))
-            painter.setPen(QPen(color, 4.0))
-            span = int(axis.direction * axis.magnitude * 300.0 * 16.0)
-            painter.drawArc(_circle(center, radius), 90 * 16, span)
-            painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
-            painter.drawText(_circle(center, radius), Qt.AlignmentFlag.AlignCenter, "XYZ"[index])
+            label_bounds = QRectF(
+                bounds.left(),
+                track.center().y() - bounds.height() * 0.11,
+                bounds.width() * 0.17,
+                bounds.height() * 0.22,
+            )
+            painter.setPen(QPen(color, 1.0))
+            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, "XYZ"[index])
 
     @staticmethod
     def _draw_accel(painter: QPainter, bounds: QRectF, display: SensorDisplay) -> None:
-        center = QPointF(bounds.center().x(), bounds.center().y() + 5.0)
-        length = min(bounds.width() * 0.32, bounds.height() * 0.42)
-        axes = (
-            (display.x, QPointF(1.0, 0.0), QColor("#E25D5D"), "X"),
-            (display.y, QPointF(0.0, -1.0), QColor("#63B66F"), "Y"),
-            (display.z, QPointF(0.72, -0.72), QColor("#5B8DEF"), "Z"),
-        )
-        for axis, direction, color, label in axes:
-            signed_length = length * axis.magnitude * axis.direction
-            end = QPointF(
-                center.x() + direction.x() * signed_length,
-                center.y() + direction.y() * signed_length,
+        center, end, guides = _accel_vector_geometry(bounds, display)
+        colors = (QColor("#E25D5D"), QColor("#63B66F"), QColor("#5B8DEF"))
+        for index, ((guide_start, guide_end), color) in enumerate(zip(guides, colors, strict=True)):
+            painter.setPen(QPen(QColor("#626262"), 1.0))
+            painter.drawLine(guide_start, guide_end)
+            label_bounds = QRectF(guide_end.x() - 11.0, guide_end.y() - 7.0, 22.0, 14.0)
+            original_font = painter.font()
+            label_font = painter.font()
+            label_font.setPixelSize(max(8, round(bounds.height() * 0.13)))
+            painter.setFont(label_font)
+            painter.setPen(QPen(color, 1.0))
+            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, f"+{'XYZ'[index]}")
+            painter.setFont(original_font)
+
+        painter.setPen(QPen(QColor("#E8EEF4"), 4.0))
+        painter.drawLine(center, end)
+        vector_x = end.x() - center.x()
+        vector_y = end.y() - center.y()
+        vector_length = hypot(vector_x, vector_y)
+        if vector_length > 0.0:
+            unit_x = vector_x / vector_length
+            unit_y = vector_y / vector_length
+            head_length = min(9.0, bounds.height() * 0.12)
+            base = QPointF(
+                end.x() - unit_x * head_length,
+                end.y() - unit_y * head_length,
             )
-            painter.setPen(QPen(color, 4.0))
-            painter.drawLine(center, end)
-            label_bounds = QRectF(end.x() - 9.0, end.y() - 9.0, 18.0, 18.0)
-            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, label)
+            side = head_length * 0.45
+            painter.drawLine(
+                end,
+                QPointF(base.x() - unit_y * side, base.y() + unit_x * side),
+            )
+            painter.drawLine(
+                end,
+                QPointF(base.x() + unit_y * side, base.y() - unit_x * side),
+            )
         painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
         painter.setBrush(QColor("#F0F0F0"))
         painter.drawEllipse(_circle(center, 3.0))
@@ -398,6 +432,62 @@ def _qrect(bounds: PreviewRect) -> QRectF:
 
 def _control_label_pixel_size(bounds: PreviewRect) -> int:
     return max(11, round(min(bounds.width, bounds.height) * 0.42))
+
+
+def _gyro_bar_geometry(
+    bounds: QRectF,
+    index: int,
+    axis: SignedAxisDisplay,
+) -> tuple[QRectF, QRectF]:
+    track = QRectF(
+        bounds.left() + bounds.width() * 0.20,
+        bounds.top() + bounds.height() * (0.40 + index * 0.20),
+        bounds.width() * 0.76,
+        max(3.0, bounds.height() * 0.10),
+    )
+    center_x = track.center().x()
+    signed_width = track.width() * 0.5 * axis.magnitude * axis.direction
+    fill = QRectF(
+        min(center_x, center_x + signed_width),
+        track.top(),
+        abs(signed_width),
+        track.height(),
+    )
+    return track, fill
+
+
+def _accel_vector_geometry(
+    bounds: QRectF,
+    display: SensorDisplay,
+) -> tuple[QPointF, QPointF, tuple[tuple[QPointF, QPointF], ...]]:
+    center = QPointF(bounds.center().x(), bounds.top() + bounds.height() * 0.58)
+    axis_length = min(bounds.width() * 0.25, bounds.height() * 0.38)
+    basis = ((0.0, -1.0), (-0.78, 0.62), (0.78, 0.62))
+    guides = tuple(
+        (
+            QPointF(center.x() - x * axis_length, center.y() - y * axis_length),
+            QPointF(center.x() + x * axis_length, center.y() + y * axis_length),
+        )
+        for x, y in basis
+    )
+    components = tuple(
+        axis.direction * axis.magnitude for axis in (display.x, display.y, display.z)
+    )
+    projected_x = sum(
+        value * direction[0] for value, direction in zip(components, basis, strict=True)
+    )
+    projected_y = sum(
+        value * direction[1] for value, direction in zip(components, basis, strict=True)
+    )
+    projected_length = hypot(projected_x, projected_y)
+    if projected_length > 1.0:
+        projected_x /= projected_length
+        projected_y /= projected_length
+    end = QPointF(
+        center.x() + projected_x * axis_length,
+        center.y() + projected_y * axis_length,
+    )
+    return center, end, guides
 
 
 def _sensor_description(frame: ControllerFrame) -> str:

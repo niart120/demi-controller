@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import os
 from typing import TYPE_CHECKING
 
@@ -35,6 +36,7 @@ def close_qt_top_level_windows(application: QApplication) -> None:
         widget.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     application.processEvents()
+    gc.collect()
 
     assert application.topLevelWidgets() == []
 
