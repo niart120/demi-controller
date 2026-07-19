@@ -88,11 +88,6 @@
     <message><source>Left grip</source><translation>左グリップ</translation></message>
     <message><source>Right grip</source><translation>右グリップ</translation></message>
     <message><source>Choose a color</source><translation>色を選択</translation></message>
-    <message><source>Body</source><translation>本体</translation></message>
-    <message><source>Buttons</source><translation>ボタン</translation></message>
-    <message><source>Left grip</source><translation>左グリップ</translation></message>
-    <message><source>Right grip</source><translation>右グリップ</translation></message>
-    <message><source>Choose a color</source><translation>色を選択</translation></message>
     <message><source>The color format is invalid</source><translation>色の形式が正しくありません</translation></message>
     <message><source>Could not save settings</source><translation>設定を保存できませんでした</translation></message>
     <message><source>Apply display colors</source><translation>表示色の反映</translation></message>

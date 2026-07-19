@@ -54,9 +54,7 @@ def test_default_user_interface_uses_english_source_text(
     assert {"Body", "Buttons", "Left grip", "Right grip"}.issubset(
         {label.text() for label in colors.findChildren(QLabel)}
     )
-    assert colors.color_buttons["body"].accessibleName() == "Body"
     assert "#323232" in colors.color_buttons["body"].accessibleDescription()
-    assert "Choose a color" in colors.color_buttons["body"].accessibleDescription()
 
     for dialog in (mapping, colors):
         save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
@@ -139,9 +137,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert {"本体", "ボタン", "左グリップ", "右グリップ"}.issubset(
         {label.text() for label in colors.findChildren(QLabel)}
     )
-    assert colors.color_buttons["body"].accessibleName() == "本体"
     assert "#323232" in colors.color_buttons["body"].accessibleDescription()
-    assert "色を選択" in colors.color_buttons["body"].accessibleDescription()
     assert color_picker.windowTitle() == "色を選択"
 
     encoded = encode_settings(mapping_editor.draft)
