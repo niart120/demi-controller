@@ -20,9 +20,11 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
     mapping.show()
     qt_application.processEvents()
 
-    assert not mapping.set_source(0, "KEY:F12")
+    assert not mapping.set_source(0, "KEY:F4")
     assert mapping_editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert mapping.capture_label.text() == "入力を割り当てられません"
+    assert mapping.mapping_model.data(mapping.mapping_model.index(0, 3)) == (
+        "Input cannot be assigned"
+    )
     assert mapping.isVisible()
 
     connection_editor = SettingsEditor(AppSettings.default())
@@ -35,7 +37,7 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
     assert not connection.apply_connection_fields()
     assert connection_editor.draft.connection.bond_slot == "default"
     assert connection_editor.draft.connection.timeout_seconds == 30.0
-    assert connection.connection_error_label.text() == "接続設定の値が正しくありません"
+    assert connection.connection_error_label.text() == "Connection settings are invalid"
     assert connection.isVisible()
 
     colors_editor = SettingsEditor(AppSettings.default())
@@ -53,6 +55,6 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
 
     assert not colors.set_color("body", "#GGGGGG")
     assert colors_editor.draft.controller_colors.body == "#323232"
-    assert colors.save_error_label.text() == "色の形式が正しくありません"
+    assert colors.save_error_label.text() == "The color format is invalid"
     assert colors.color_buttons["body"].isEnabled()
     assert colors.isVisible()

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QPushButton
 from demi.app import WindowSpec
 from demi.application.coordinator import CaptureCoordinator, CaptureFailure
 from demi.application.state import AppState
-from demi.domain.controller import ControllerFrame
+from demi.domain.controller import ControllerFrame, LogicalButton
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
 from demi.platform.windows_mouse_hook import (
@@ -82,7 +82,7 @@ class RecordingButton(QPushButton):
         return super().event(event)
 
 
-def test_f12_focus_dialog_and_shutdown_neutralize_qt_capture(
+def test_f4_releases_pointer_while_focus_dialog_and_shutdown_neutralize_all_input(
     qt_application: object,
 ) -> None:
     assert qt_application is not None
@@ -105,12 +105,12 @@ def test_f12_focus_dialog_and_shutdown_neutralize_qt_capture(
     publisher.state.press_key("F")
     publisher.state.add_mouse_motion(4.0, -2.0)
 
-    adapter.eventFilter(target, _key_event(Qt.Key.Key_F12))
+    adapter.eventFilter(target, _key_event(Qt.Key.Key_F4))
 
     assert coordinator.app_state is AppState.IDLE
-    assert sink.frames[-1].capture_active is False
-    assert sink.frames[-1].buttons == frozenset()
-    assert publisher.state.held_keys == set()
+    assert sink.frames[-1].capture_active is True
+    assert sink.frames[-1].buttons == frozenset({LogicalButton.A})
+    assert publisher.state.held_keys
     assert publisher.state.consume_mouse_motion() == (0.0, 0.0)
 
     assert coordinator.start_capture() is True
@@ -228,7 +228,7 @@ def test_capture_suppresses_external_mouse_delivery_and_preserves_button_mapping
     assert suppressor.handle_message(WM_LBUTTONUP) is True
     assert publisher.state.is_source_active("MOUSE:LEFT") is False
 
-    QCoreApplication.sendEvent(window, _key_event(Qt.Key.Key_F12))
+    QCoreApplication.sendEvent(window, _key_event(Qt.Key.Key_F4))
 
     assert coordinator.app_state is AppState.IDLE
     assert suppressor.active is False

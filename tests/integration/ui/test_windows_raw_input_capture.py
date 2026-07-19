@@ -326,7 +326,7 @@ def test_raw_input_registration_failure_keeps_idle_and_reports_a_safe_warning() 
     assert pointer_capture.calls == []
     assert relative_pointer_capture.start_epochs == [1]
     assert relative_pointer_capture.stop_calls == 1
-    assert session.presentation.model.warning == "相対マウス入力を開始できませんでした"
+    assert session.presentation.model.warning == "Could not start relative mouse input"
     assert "0xC0FFEE" not in session.presentation.model.warning
 
 
@@ -373,7 +373,7 @@ def test_repeated_raw_input_read_failures_stop_capture_with_a_safe_warning() -> 
     assert relative_pointer_capture.start_epochs == [1]
     assert relative_pointer_capture.stop_calls == 1
     assert publisher.state.consume_mouse_motion() == (0.0, 0.0)
-    assert session.presentation.model.warning == "相対マウス入力を停止しました"
+    assert session.presentation.model.warning == "Relative mouse input stopped"
     assert "0xCAFE" not in session.presentation.model.warning
 
 

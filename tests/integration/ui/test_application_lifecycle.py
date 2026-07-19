@@ -604,7 +604,7 @@ def test_qt_runtime_factory_failure_closes_the_created_window_without_leaking_se
     captured = capsys.readouterr()
     assert timeline == ["window.close"]
     assert captured.out == ""
-    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert captured.err == "Project_Demi failed to start.\n"
     assert secret not in captured.err
 
 
@@ -651,7 +651,7 @@ def test_qt_runtime_start_failure_closes_started_resources_in_reverse_without_le
     assert timeline == ["runtime.start", "runtime.close", "repository.save", "window.close"]
     assert len(repository.saved) == 1
     assert captured.out == ""
-    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert captured.err == "Project_Demi failed to start.\n"
     assert secret not in captured.err
 
 
@@ -684,7 +684,7 @@ def test_qt_settings_load_failure_returns_a_safe_nonzero_status(
     captured = capsys.readouterr()
     assert not window_created
     assert captured.out == ""
-    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert captured.err == "Project_Demi failed to start.\n"
     assert secret not in captured.err
 
 
@@ -723,7 +723,7 @@ def test_qt_window_factory_failure_returns_a_safe_nonzero_status(
     captured = capsys.readouterr()
     assert not runtime_created
     assert captured.out == ""
-    assert captured.err == "Project_Demi の起動に失敗しました。\n"
+    assert captured.err == "Project_Demi failed to start.\n"
     assert secret not in captured.err
 
 
@@ -1032,7 +1032,7 @@ def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(
     assert runner.application is qt_application
     assert runtime.started == 1
     assert runtime.commands == [DiscoverAdapters()]
-    assert observed == [(True, True, "通知: なし")]
+    assert observed == [(True, True, "Notice: none")]
 
 
 def test_qt_reconnect_failure_keeps_window_interactive_and_safe(
@@ -1111,7 +1111,7 @@ def test_qt_reconnect_failure_keeps_window_interactive_and_safe(
     assert runtime.started == 1
     assert [command for command in runtime.commands if isinstance(command, ConnectSaved)]
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
-    assert observed == [(True, True, "エラー: 保存済み接続に失敗しました")]
+    assert observed == [(True, True, "Error: Could not reconnect saved connection")]
 
 
 def test_qt_event_loop_stays_responsive_during_slow_runtime_operations(

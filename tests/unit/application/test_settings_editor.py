@@ -29,12 +29,15 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     assert draft.controller_colors.body == "#ABCDEF"
 
 
-def test_editor_rejects_f12_binding_and_restores_the_default_profile() -> None:
+def test_editor_rejects_f4_allows_f12_and_restores_the_default_profile() -> None:
     editor = SettingsEditor(AppSettings.default())
     editor.update_binding(0, source="KEY:1", target=BindingTarget.BUTTON_B)
 
     with pytest.raises(DomainValueError):
-        editor.update_binding(0, source="KEY:F12")
+        editor.update_binding(0, source="KEY:F4")
+
+    editor.update_binding(0, source="KEY:F12")
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
 
     editor.reset_profile()
 
@@ -56,6 +59,15 @@ def test_editor_reports_duplicate_source_and_local_action_conflicts_only() -> No
     assert conflicts[1].binding_indices == (2,)
     assert conflicts[1].local_action == "CTRL+C"
     assert all(conflict.source != "KEY:V" for conflict in conflicts)
+
+
+def test_editor_replaces_a_duplicate_source_and_unassigns_the_old_row() -> None:
+    editor = SettingsEditor(AppSettings.default())
+
+    editor.replace_binding_source(0, "KEY:V")
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
+    assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
 
 
 @pytest.mark.parametrize("source", ["KEY:CTRL+RETURN", "KEY:CTRL+ENTER"])

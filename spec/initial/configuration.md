@@ -41,6 +41,9 @@ width = 960
 height = 640
 maximized = false
 
+[ui]
+language = "en"
+
 [connection]
 adapter_id = ""
 controller = "pro_controller"
@@ -71,7 +74,7 @@ pitch_limit_degrees = 75.0
 toggle_capture = ["CTRL+C"]
 quit = ["CTRL+Q"]
 connection = ["CTRL+RETURN", "CTRL+ENTER"]
-release_capture = ["F12"]
+release_capture = ["F4"]
 
 [[profiles]]
 id = "default"
@@ -132,7 +135,7 @@ source = "KEY:X"
 target = "BUTTON:PLUS"
 
 [[profiles.bindings]]
-source = "KEY:ESCAPE"
+source = "KEY:F1"
 target = "BUTTON:HOME"
 
 [[profiles.bindings]]
@@ -228,6 +231,8 @@ target = "ACCEL:ZERO"
 
 `inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
 
+キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示して確認し、置換を選んだ場合だけ既存行を未割り当てへ戻す。`KEY:F4` はマウス捕捉解除用のため保存できず、`KEY:F12` と `KEY:ESCAPE` は保存できる。
+
 診断targetは `GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`ACCEL:ZERO` とする。既定sourceは I/K/J/L/O だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
 
 ## 3. 型と制約
@@ -241,6 +246,7 @@ target = "ACCEL:ZERO"
 | timeout_seconds | 1.0..120.0 |
 | diagnostic_level | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | 色 | `#[0-9A-Fa-f]{6}` |
+| ui.language | `en` または `ja`。項目がない schema v1 は `en` として読む |
 | evaluation_interval_ms | 4..32。0.1.0 UIでは8固定 |
 | horizontal_sensitivity | 0.1..10.0。独立した無次元倍率 |
 | vertical_sensitivity | 0.1..10.0。独立した無次元倍率 |
@@ -297,7 +303,7 @@ invalid syntax or semantic error
 4. `os.replace()` で置換する。
 5. 一時ファイルを残さない。
 
-連続する色スライダー操作は、UIプレビューだけ即時更新し、最後の変更から300ミリ秒後または「保存」押下時に書く。
+色選択中はdraftとUIプレビューだけを即時更新し、設定ファイルへは「保存」押下時だけ書く。「取消」では複数色を変更済みでもdraftを破棄し、保存済みの4色をプレビューへ戻す。色見本には現在のcanonical `#RRGGBB` 値を保持するが、画面上へ常設表示しない。
 
 ## 6. 設定責務
 

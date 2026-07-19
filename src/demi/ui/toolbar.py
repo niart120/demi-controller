@@ -37,12 +37,12 @@ class MainToolBar(QToolBar):
         """
         super().__init__(parent)
         self.setObjectName("main-toolbar")
-        self.connection_action = QAction("接続", self)
-        self.capture_action = QAction("入力開始", self)
+        self.connection_action = QAction(self.tr("Connect"), self)
+        self.capture_action = QAction(self.tr("Start mouse"), self)
         self.capture_action.setCheckable(True)
-        self.mapping_action = QAction("割り当て", self)
-        self.connection_settings_action = QAction("接続設定", self)
-        self.colors_action = QAction("色", self)
+        self.mapping_action = QAction(self.tr("Mappings"), self)
+        self.connection_settings_action = QAction(self.tr("Connection settings"), self)
+        self.colors_action = QAction(self.tr("Colors"), self)
         for action in (
             self.connection_action,
             self.capture_action,
@@ -76,9 +76,13 @@ class MainToolBar(QToolBar):
             AppState.CAPTURED,
         }
 
-        self.connection_action.setText("切断" if is_connected else "接続")
+        self.connection_action.setText(
+            self.tr("Disconnect") if is_connected else self.tr("Connect")
+        )
         self.connection_action.setEnabled(connection_available)
-        self.capture_action.setText("入力解除" if is_captured else "入力開始")
+        self.capture_action.setText(
+            self.tr("Stop mouse") if is_captured else self.tr("Start mouse")
+        )
         self.capture_action.setChecked(is_captured)
         self.capture_action.setEnabled(capture_available)
         for action in (

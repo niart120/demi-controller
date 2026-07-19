@@ -65,6 +65,25 @@ def test_qt_input_adapter_normalizes_held_sources_only_while_captured(
     assert state.revision == 4
 
 
+def test_qt_input_adapter_routes_keyboard_without_pointer_capture() -> None:
+    state = PhysicalInputState()
+    adapter = QtInputAdapter(
+        state=state,
+        is_captured=lambda: False,
+        is_keyboard_active=lambda: True,
+    )
+    target = QObject()
+
+    adapter.eventFilter(target, _key_event(QEvent.Type.KeyPress, Qt.Key.Key_F))
+    adapter.eventFilter(
+        target,
+        _mouse_event(QEvent.Type.MouseButtonPress, Qt.MouseButton.LeftButton),
+    )
+
+    assert state.held_keys == {KeySource("F")}
+    assert state.held_mouse_buttons == set()
+
+
 def _key_event(event_type: QEvent.Type, key: Qt.Key, *, auto_repeat: bool = False) -> QKeyEvent:
     return QKeyEvent(event_type, key, Qt.KeyboardModifier.NoModifier, "", auto_repeat)
 

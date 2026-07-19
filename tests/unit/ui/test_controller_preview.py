@@ -15,6 +15,7 @@ from demi.ui.controller_preview import (
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
+from demi.ui.preview_sensor import accel_display, gyro_display
 
 
 @dataclass
@@ -48,12 +49,13 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
         sequence=4,
         capture_epoch=2,
         monotonic_ns=1_008_000_000,
-        buttons=frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT}),
+        buttons=frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT, LogicalButton.LEFT_STICK}),
         left_stick=StickVector(x=-0.5, y=0.25),
         right_stick=StickVector(x=0.75, y=-0.5),
         gyro_rate=GyroRate(1.25, -2.5, 0.5),
         accel_g=AccelG(0.1, -0.2, 1.05),
         capture_active=True,
+        pointer_capture_active=True,
     )
     colors = ControllerColorSettings(
         body="#102030",
@@ -64,16 +66,48 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
 
     model = controller_preview_model(frame, colors)
 
+    assert model.control_ids == frozenset(
+        {
+            "a",
+            "b",
+            "x",
+            "y",
+            "dpad_up",
+            "dpad_right",
+            "dpad_down",
+            "dpad_left",
+            "l",
+            "r",
+            "zl",
+            "zr",
+            "plus",
+            "minus",
+            "home",
+            "capture",
+            "left_stick",
+            "left_stick_click",
+            "right_stick",
+            "right_stick_click",
+        }
+    )
     assert model.body_color == "#102030"
     assert model.buttons_color == "#405060"
     assert model.left_grip_color == "#708090"
     assert model.right_grip_color == "#A0B0C0"
-    assert model.pressed_buttons == frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT})
+    assert model.pressed_buttons == frozenset(
+        {LogicalButton.A, LogicalButton.DPAD_LEFT, LogicalButton.LEFT_STICK}
+    )
+    assert model.pressed_control_ids == frozenset({"a", "dpad_left", "left_stick_click"})
     assert model.left_stick == StickVector(x=-0.5, y=0.25)
     assert model.right_stick == StickVector(x=0.75, y=-0.5)
+    assert model.left_stick_position == (-0.5, 0.25)
+    assert model.right_stick_position == (0.75, -0.5)
     assert model.gyro_rate == GyroRate(1.25, -2.5, 0.5)
     assert model.accel_g == AccelG(0.1, -0.2, 1.05)
+    assert model.gyro_display == gyro_display(frame.gyro_rate)
+    assert model.accel_display == accel_display(frame.accel_g)
     assert model.capture_active is True
+    assert model.pointer_capture_active is True
 
     widget = ControllerPreviewWidget(colors=colors)
     widget.resize(640, 360)
@@ -117,7 +151,22 @@ def test_preview_limits_repaint_requests_to_sixty_hz_but_keeps_the_latest_frame(
     assert widget.model == controller_preview_model(latest, ControllerColorSettings())
 
 
-def _frame(*, sequence: int) -> ControllerFrame:
+def test_preview_keeps_keyboard_operation_independent_from_pointer_capture() -> None:
+    model = controller_preview_model(
+        _frame(sequence=1, capture_active=True, pointer_capture_active=False),
+        ControllerColorSettings(),
+    )
+
+    assert model.capture_active is True
+    assert model.pointer_capture_active is False
+
+
+def _frame(
+    *,
+    sequence: int,
+    capture_active: bool = True,
+    pointer_capture_active: bool = False,
+) -> ControllerFrame:
     return ControllerFrame(
         sequence=sequence,
         capture_epoch=1,
@@ -127,5 +176,6 @@ def _frame(*, sequence: int) -> ControllerFrame:
         right_stick=StickVector(x=0.0, y=0.0),
         gyro_rate=GyroRate(0.0, 0.0, 0.0),
         accel_g=AccelG(0.0, 0.0, 1.0),
-        capture_active=True,
+        capture_active=capture_active,
+        pointer_capture_active=pointer_capture_active,
     )

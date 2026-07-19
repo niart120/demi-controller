@@ -2,6 +2,7 @@
 
 import tomllib
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import cast
 
 import tomli_w
@@ -17,6 +18,8 @@ from demi.domain.settings import (
     InputSettings,
     LocalActions,
     MouseSettings,
+    UiLanguage,
+    UiSettings,
     WindowSettings,
 )
 
@@ -84,6 +87,13 @@ def _diagnostic_level(value: object) -> DiagnosticLevel:
         raise ConfigurationError from None
 
 
+def _ui_language(value: object) -> UiLanguage:
+    try:
+        return UiLanguage(_require_string(value))
+    except (TypeError, ValueError):
+        raise ConfigurationError from None
+
+
 def _decode_binding(raw: object) -> Binding:
     table = _require_table(raw)
     _check_keys(table, frozenset({"source", "target"}), frozenset({"amount", "inverted"}))
@@ -130,6 +140,7 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
     return {
         "schema": settings.schema,
         "active_profile": settings.active_profile,
+        "ui": {"language": settings.ui.language.value},
         "window": {
             "width": settings.window.width,
             "height": settings.window.height,
@@ -218,10 +229,14 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
                 "profiles",
             }
         ),
+        frozenset({"ui"}),
     )
     schema = _require_string(raw["schema"])
     if schema != SCHEMA:
         raise UnsupportedSchemaError
+
+    ui = _require_table(raw.get("ui", {"language": UiLanguage.ENGLISH.value}))
+    _check_keys(ui, frozenset({"language"}))
 
     window = _require_table(raw["window"])
     _check_keys(window, frozenset({"width", "height", "maximized"}))
@@ -269,9 +284,10 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
     )
 
     try:
-        return AppSettings(
+        settings = AppSettings(
             schema=schema,
             active_profile=_require_string(raw["active_profile"]),
+            ui=UiSettings(language=_ui_language(ui["language"])),
             window=WindowSettings(
                 width=_require_int(window["width"]),
                 height=_require_int(window["height"]),
@@ -324,8 +340,31 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             ),
             profiles=tuple(_decode_profile(item) for item in _require_list(raw["profiles"])),
         )
+        return _migrate_legacy_input_defaults(settings)
     except (TypeError, ValueError):
         raise ConfigurationError from None
+
+
+def _migrate_legacy_input_defaults(settings: AppSettings) -> AppSettings:
+    local_actions = settings.local_actions
+    if local_actions.release_capture == ("F12",):
+        local_actions = replace(local_actions, release_capture=("F4",))
+
+    profiles = tuple(
+        replace(
+            profile,
+            bindings=tuple(
+                replace(binding, source="KEY:F1")
+                if binding.source == "KEY:ESCAPE" and binding.target is BindingTarget.BUTTON_HOME
+                else binding
+                for binding in profile.bindings
+            ),
+        )
+        if profile.id == "default" and profile.name == "Default" and profile.builtin
+        else profile
+        for profile in settings.profiles
+    )
+    return replace(settings, local_actions=local_actions, profiles=profiles)
 
 
 def dumps_settings(settings: AppSettings) -> str:

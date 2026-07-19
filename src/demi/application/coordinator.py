@@ -88,6 +88,11 @@ class CaptureCoordinator:
         return self._app_state is AppState.CAPTURED
 
     @property
+    def operational_input_active(self) -> bool:
+        """Return whether focused main-window keyboard input is active."""
+        return self._focused and self._app_state in {AppState.IDLE, AppState.CAPTURED}
+
+    @property
     def last_frame(self) -> ControllerFrame | None:
         """Return the latest frame published by this coordinator."""
         return self._last_frame
@@ -117,7 +122,6 @@ class CaptureCoordinator:
             return False
 
         self._capture_epoch += 1
-        self._publisher.state.clear()
         relative_pointer_capture = self._relative_pointer_capture
         if relative_pointer_capture is not None:
             try:
@@ -140,17 +144,26 @@ class CaptureCoordinator:
 
         self._app_state = AppState.CAPTURED
         self._capture_failure = None
-        self._publish_frame(capture_active=True)
+        self._publish_frame(capture_active=True, pointer_capture_active=True)
         return True
 
     def evaluate(self) -> ControllerFrame:
         """Publish the current capture state at one scheduled clock tick."""
-        return self._publish_frame(capture_active=self.is_captured)
+        return self._publish_frame(
+            capture_active=self.operational_input_active,
+            pointer_capture_active=self.is_captured,
+        )
 
-    def _publish_frame(self, *, capture_active: bool) -> ControllerFrame:
+    def _publish_frame(
+        self,
+        *,
+        capture_active: bool,
+        pointer_capture_active: bool = False,
+    ) -> ControllerFrame:
         self._last_frame = self._publisher.publish(
             capture_active=capture_active,
             capture_epoch=self._capture_epoch,
+            pointer_capture_active=pointer_capture_active,
         )
         return self._last_frame
 
@@ -163,7 +176,17 @@ class CaptureCoordinator:
         """
         if not self.is_captured:
             return None
-        return self._leave_capture(AppState.IDLE)
+        return self._leave_pointer_capture()
+
+    def neutralize_input(self) -> ControllerFrame:
+        """Stop pointer capture, clear all held input, and publish neutral once."""
+        self._app_state = AppState.IDLE
+        self._capture_epoch += 1
+        self._stop_relative_pointer_capture()
+        with suppress(OSError, RuntimeError):
+            self._pointer_capture.set_pointer_capture(False)
+        self._publisher.state.clear()
+        return self._publish_frame(capture_active=False)
 
     def open_configuration(self) -> bool:
         """Enter configuration state after publishing a neutral frame."""
@@ -196,7 +219,7 @@ class CaptureCoordinator:
     def on_focus_lost(self) -> ControllerFrame | None:
         """Suspend capture on focus loss and neutralize immediately."""
         self._focused = False
-        if not self.is_captured:
+        if self._app_state not in {AppState.IDLE, AppState.CAPTURED}:
             return None
         return self._leave_capture(AppState.SUSPENDED)
 
@@ -247,6 +270,18 @@ class CaptureCoordinator:
             self._pointer_capture.set_pointer_capture(False)
         self._publisher.state.clear()
         return self._publish_frame(capture_active=False)
+
+    def _leave_pointer_capture(self) -> ControllerFrame:
+        self._app_state = AppState.IDLE
+        self._capture_epoch += 1
+        self._stop_relative_pointer_capture()
+        with suppress(OSError, RuntimeError):
+            self._pointer_capture.set_pointer_capture(False)
+        self._publisher.state.clear_mouse()
+        return self._publish_frame(
+            capture_active=True,
+            pointer_capture_active=False,
+        )
 
     def _stop_relative_pointer_capture(self) -> None:
         relative_pointer_capture = self._relative_pointer_capture

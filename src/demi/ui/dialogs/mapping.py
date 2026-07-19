@@ -4,14 +4,16 @@ from collections.abc import Callable
 from typing import Any, override
 
 from PySide6.QtCore import (
+    QAbstractItemModel,
     QAbstractTableModel,
+    QCoreApplication,
     QEvent,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
     Qt,
 )
-from PySide6.QtGui import QHideEvent, QKeyEvent, QMouseEvent, QShowEvent
+from PySide6.QtGui import QAction, QHideEvent, QKeyEvent, QKeySequence, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
@@ -26,12 +28,19 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableView,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from demi.application.settings_editor import BindingConflict, SettingsEditor
+from demi.application.settings_editor import (
+    RESERVED_BINDING_SOURCES,
+    BindingConflict,
+    SettingsEditor,
+)
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import Binding, is_button_target
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
@@ -40,12 +49,59 @@ _ROOT_INDEX = QModelIndex()
 
 type CaptureTransition = Callable[[], object]
 type SettingsAction = Callable[[], bool]
+type RowAction = Callable[[int], object]
+
+
+class MappingActionDelegate(QStyledItemDelegate):
+    """Turn one painted action cell into a mouse and keyboard row command."""
+
+    def __init__(
+        self,
+        *,
+        on_activated: RowAction,
+        parent: QObject | None = None,
+    ) -> None:
+        """Create a delegate that reports the activated model row.
+
+        Args:
+            on_activated: Command receiving the activated binding row.
+            parent: Optional Qt owner.
+        """
+        super().__init__(parent)
+        self._on_activated = on_activated
+
+    @override
+    def editorEvent(
+        self,
+        event: QEvent,
+        model: QAbstractItemModel,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> bool:
+        """Activate the indexed row from a left click, Enter, or Space."""
+        del model
+        if isinstance(event, QMouseEvent):
+            if (
+                event.type() is QEvent.Type.MouseButtonRelease
+                and event.button() is Qt.MouseButton.LeftButton
+            ):
+                self._on_activated(index.row())
+                return True
+            return False
+        if (
+            isinstance(event, QKeyEvent)
+            and event.type() is QEvent.Type.KeyPress
+            and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
+        ):
+            self._on_activated(index.row())
+            return True
+        return False
 
 
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("対象", "入力", "反転", "競合")
+    _HEADERS = ("Target", "Input", "Inverted", "Conflict", "Action")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -56,6 +112,8 @@ class MappingTableModel(QAbstractTableModel):
         """
         super().__init__(parent)
         self._editor = editor
+        self._capture_row: int | None = None
+        self._row_status: dict[int, str] = {}
 
     @override
     def rowCount(
@@ -80,16 +138,61 @@ class MappingTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         """Return a textual value for a valid table cell."""
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid():
             return None
         binding = self._bindings()[index.row()]
+        if index.column() == 1 and role in {
+            Qt.ItemDataRole.UserRole,
+            Qt.ItemDataRole.ToolTipRole,
+            Qt.ItemDataRole.AccessibleDescriptionRole,
+        }:
+            return binding.source
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+        input_text = (
+            self.tr("Press a key or mouse button")
+            if index.row() == self._capture_row
+            else _friendly_source(binding.source)
+        )
+        action_text = self.tr("Cancel") if index.row() == self._capture_row else self.tr("Remap")
         values = (
             binding.target.value,
-            binding.source,
-            "はい" if binding.inverted else "いいえ",
-            self._conflict_text(index.row()),
+            input_text,
+            self.tr("Yes") if binding.inverted else self.tr("No"),
+            self._row_status.get(index.row()) or self._conflict_text(index.row()),
+            action_text,
         )
         return values[index.column()]
+
+    @property
+    def capture_row(self) -> int | None:
+        """Return the row currently waiting for an input source."""
+        return self._capture_row
+
+    def begin_capture(self, row: int) -> None:
+        """Mark one binding row as waiting for its replacement source."""
+        if not 0 <= row < self.rowCount():
+            raise DomainValueError
+        if self._capture_row is not None:
+            self._row_status.pop(self._capture_row, None)
+        self._capture_row = row
+        self._row_status.pop(row, None)
+        self._reset_from_editor()
+
+    def cancel_capture(self) -> None:
+        """Clear the waiting row without changing the settings draft."""
+        if self._capture_row is None:
+            return
+        self._row_status.pop(self._capture_row, None)
+        self._capture_row = None
+        self._reset_from_editor()
+
+    def set_row_status(self, row: int, message: str) -> None:
+        """Show transient feedback in the affected row's status column."""
+        if not 0 <= row < self.rowCount():
+            raise DomainValueError
+        self._row_status[row] = message
+        self._reset_from_editor()
 
     @override
     def headerData(
@@ -104,7 +207,7 @@ class MappingTableModel(QAbstractTableModel):
             and role == Qt.ItemDataRole.DisplayRole
             and 0 <= section < len(self._HEADERS)
         ):
-            return self._HEADERS[section]
+            return self.tr(self._HEADERS[section])
         return super().headerData(section, orientation, role)
 
     def update_source(self, row: int, source: str) -> None:
@@ -115,7 +218,28 @@ class MappingTableModel(QAbstractTableModel):
             source: Canonical source string selected by the dialog.
         """
         self._editor.update_binding(row, source=source)
+        self._capture_row = None
+        self._row_status.pop(row, None)
         self._reset_from_editor()
+
+    def replace_source(self, row: int, source: str) -> None:
+        """Assign a source and unassign every conflicting row atomically."""
+        self._editor.replace_binding_source(row, source)
+        self._capture_row = None
+        self._row_status.pop(row, None)
+        self._reset_from_editor()
+
+    def conflicting_rows(self, row: int, source: str) -> tuple[int, ...]:
+        """Return other binding rows that already use a source."""
+        return tuple(
+            candidate
+            for candidate, binding in enumerate(self._bindings())
+            if candidate != row and binding.source == source
+        )
+
+    def target_at(self, row: int) -> str:
+        """Return the canonical target for one binding row."""
+        return self._bindings()[row].target.value
 
     def update_inverted(self, row: int, inverted: bool) -> None:
         """Replace one binding inversion flag through the draft editor.
@@ -138,6 +262,7 @@ class MappingTableModel(QAbstractTableModel):
     def restore_default_profile(self) -> None:
         """Restore the standard profile through the application-owned editor."""
         self._editor.reset_profile()
+        self._row_status.clear()
         self._reset_from_editor()
 
     def conflict_summary(self) -> str:
@@ -160,8 +285,12 @@ class MappingTableModel(QAbstractTableModel):
     @staticmethod
     def _format_conflict(conflict: BindingConflict) -> str:
         if conflict.local_action is not None:
-            return f"ローカル操作: {conflict.local_action}"
-        return f"重複: {conflict.source}"
+            return QCoreApplication.translate("MappingTableModel", "Local action: {action}").format(
+                action=conflict.local_action
+            )
+        return QCoreApplication.translate("MappingTableModel", "Duplicate: {source}").format(
+            source=conflict.source
+        )
 
     def _reset_from_editor(self) -> None:
         self.beginResetModel()
@@ -187,13 +316,13 @@ class MappingDialog(QDialog):
             editor: Application-owned immutable settings draft editor.
             on_dialog_opened: Neutralizes controller capture before the dialog
                 accepts any input.
-            on_release_capture: Handles the fixed F12 capture-release action.
+            on_release_capture: Handles the fixed F4 capture-release action.
             on_save: Saves the application-owned draft and reports success.
             on_cancel: Discards the application-owned draft and reports success.
             parent: Optional Qt parent for dialog ownership.
         """
         super().__init__(parent)
-        self.setWindowTitle("キー割り当て")
+        self.setWindowTitle(self.tr("Key mappings"))
         self._mapping_model = MappingTableModel(editor, self)
         self._on_dialog_opened = on_dialog_opened
         self._on_release_capture = on_release_capture
@@ -204,23 +333,34 @@ class MappingDialog(QDialog):
         self._cancel_requested = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
+        self._binding_replacement_confirmation: QMessageBox | None = None
+        self._pending_binding_replacement: tuple[int, str] | None = None
 
         self.table = QTableView(self)
         self.table.setModel(self._mapping_model)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self.assign_escape_action = QAction(self.tr("Assign Escape"), self.table)
+        self.assign_escape_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        self.assign_escape_action.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.table.addAction(self.assign_escape_action)
+        self._mapping_action_delegate = MappingActionDelegate(
+            on_activated=self._activate_row_action,
+            parent=self.table,
+        )
+        self.table.setItemDelegateForColumn(4, self._mapping_action_delegate)
         table_header = self.table.horizontalHeader()
         for column in range(3):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.capture_button = QPushButton("次の入力を取得", self)
-        self.capture_label = QLabel("入力を取得していません", self)
-        self.inverted_checkbox = QCheckBox("反転", self)
+        table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
         self.inverted_checkbox.setEnabled(False)
         mouse_settings = editor.draft.input.mouse
-        self.mouse_gyro_group = QGroupBox("マウスジャイロ設定", self)
+        self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
-        self.mouse_gyro_enabled_checkbox = QCheckBox("有効", self.mouse_gyro_group)
+        self.mouse_gyro_enabled_checkbox = QCheckBox(self.tr("Enabled"), self.mouse_gyro_group)
         self.mouse_gyro_enabled_checkbox.setChecked(mouse_settings.gyro_enabled)
         self.horizontal_sensitivity_spinbox = _sensitivity_spinbox(
             self.mouse_gyro_group,
@@ -230,9 +370,9 @@ class MappingDialog(QDialog):
             self.mouse_gyro_group,
             mouse_settings.vertical_sensitivity,
         )
-        self.invert_x_checkbox = QCheckBox("水平反転", self.mouse_gyro_group)
+        self.invert_x_checkbox = QCheckBox(self.tr("Invert horizontally"), self.mouse_gyro_group)
         self.invert_x_checkbox.setChecked(mouse_settings.invert_x)
-        self.invert_y_checkbox = QCheckBox("垂直反転", self.mouse_gyro_group)
+        self.invert_y_checkbox = QCheckBox(self.tr("Invert vertically"), self.mouse_gyro_group)
         self.invert_y_checkbox.setChecked(mouse_settings.invert_y)
         self.pitch_limit_spinbox = QDoubleSpinBox(self.mouse_gyro_group)
         self.pitch_limit_spinbox.setRange(1.0, 89.0)
@@ -241,33 +381,43 @@ class MappingDialog(QDialog):
         self.pitch_limit_spinbox.setSuffix(" °")
         self.pitch_limit_spinbox.setValue(mouse_settings.pitch_limit_degrees)
         mouse_gyro_form.addRow(self.mouse_gyro_enabled_checkbox)
-        mouse_gyro_form.addRow("水平感度", self.horizontal_sensitivity_spinbox)
-        mouse_gyro_form.addRow("垂直感度", self.vertical_sensitivity_spinbox)
+        mouse_gyro_form.addRow(
+            self.tr("Horizontal sensitivity"), self.horizontal_sensitivity_spinbox
+        )
+        mouse_gyro_form.addRow(self.tr("Vertical sensitivity"), self.vertical_sensitivity_spinbox)
         mouse_gyro_form.addRow(self.invert_x_checkbox)
         mouse_gyro_form.addRow(self.invert_y_checkbox)
-        mouse_gyro_form.addRow("pitch上限", self.pitch_limit_spinbox)
+        mouse_gyro_form.addRow(self.tr("Pitch limit"), self.pitch_limit_spinbox)
         self.save_error_label = QLabel("", self)
-        self.restore_button = QPushButton("標準に戻す", self)
+        self.restore_button = QPushButton(self.tr("Restore defaults"), self)
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
 
+        bindings_page = QWidget(self)
+        bindings_layout = QVBoxLayout(bindings_page)
+        bindings_layout.addWidget(self.table)
+        bindings_layout.addWidget(self.inverted_checkbox)
+        bindings_layout.addWidget(self.restore_button)
+        mouse_page = QWidget(self)
+        mouse_layout = QVBoxLayout(mouse_page)
+        mouse_layout.addWidget(self.mouse_gyro_group)
+        mouse_layout.addStretch()
+        self.tabs = QTabWidget(self)
+        self.tabs.addTab(bindings_page, self.tr("Bindings"))
+        self.tabs.addTab(mouse_page, self.tr("Mouse gyro"))
+
         layout = QVBoxLayout(self)
-        layout.addWidget(self.table)
-        layout.addWidget(self.inverted_checkbox)
-        layout.addWidget(self.capture_button)
-        layout.addWidget(self.capture_label)
-        layout.addWidget(self.mouse_gyro_group)
+        layout.addWidget(self.tabs)
         layout.addWidget(self.save_error_label)
-        layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
-        self.setMinimumSize(640, 520)
-        self.resize(720, 640)
+        self.setMinimumSize(760, 520)
+        self.resize(840, 640)
 
         QWidget.setTabOrder(self.table, self.inverted_checkbox)
-        QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
-        QWidget.setTabOrder(self.capture_button, self.mouse_gyro_enabled_checkbox)
+        QWidget.setTabOrder(self.inverted_checkbox, self.restore_button)
+        QWidget.setTabOrder(self.restore_button, self.mouse_gyro_enabled_checkbox)
         QWidget.setTabOrder(
             self.mouse_gyro_enabled_checkbox,
             self.horizontal_sensitivity_spinbox,
@@ -279,9 +429,10 @@ class MappingDialog(QDialog):
         QWidget.setTabOrder(self.vertical_sensitivity_spinbox, self.invert_x_checkbox)
         QWidget.setTabOrder(self.invert_x_checkbox, self.invert_y_checkbox)
         QWidget.setTabOrder(self.invert_y_checkbox, self.pitch_limit_spinbox)
-        QWidget.setTabOrder(self.pitch_limit_spinbox, self.restore_button)
+        QWidget.setTabOrder(self.pitch_limit_spinbox, self.button_box)
 
-        self.capture_button.clicked.connect(self.begin_capture)
+        self.assign_escape_action.triggered.connect(self.assign_escape)
+        self.tabs.currentChanged.connect(self._handle_tab_changed)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
@@ -313,20 +464,50 @@ class MappingDialog(QDialog):
         """Return the currently visible binding-conflict confirmation, if any."""
         return self._conflict_confirmation
 
-    def begin_capture(self) -> None:
-        """Arm the selected table row for exactly one supported input event."""
+    @property
+    def binding_replacement_confirmation(self) -> QMessageBox | None:
+        """Return the visible per-source replacement confirmation, if any."""
+        return self._binding_replacement_confirmation
+
+    @property
+    def mapping_model(self) -> MappingTableModel:
+        """Return the binding table model for row-oriented dialog actions."""
+        return self._mapping_model
+
+    def begin_capture_row(self, row: int) -> None:
+        """Arm one explicit binding row for the next supported input event."""
+        self._capture_row = row
+        self._mapping_model.begin_capture(row)
+        self.table.selectRow(row)
+
+    def _activate_row_action(self, row: int) -> None:
+        if self._capture_row == row:
+            self.cancel_capture()
+            return
+        self.begin_capture_row(row)
+
+    def cancel_capture(self) -> None:
+        """Stop the active row remap without changing or closing the draft."""
+        self._capture_row = None
+        self._mapping_model.cancel_capture()
+
+    def _handle_tab_changed(self, index: int) -> None:
+        if index != 0 and self._capture_row is not None:
+            self.cancel_capture()
+
+    def assign_escape(self) -> None:
+        """Assign Escape to the selected row through an explicit action."""
         selected = self.table.currentIndex()
         if not selected.isValid():
-            self.capture_label.setText("対象を選択してください")
             return
-        self._capture_row = selected.row()
-        self.capture_label.setText("次のキーまたはマウスボタンを押してください")
+        self.cancel_capture()
+        self.set_source(selected.row(), "KEY:ESCAPE")
 
     def restore_default_profile(self) -> None:
         """Restore the built-in profile through the application-owned editor."""
         self._mapping_model.restore_default_profile()
         self._capture_row = None
-        self.capture_label.setText("標準設定に戻しました")
+        self._mapping_model.cancel_capture()
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -338,14 +519,67 @@ class MappingDialog(QDialog):
         Returns:
             Whether the draft accepted the candidate source.
         """
+        conflicting_rows = self._mapping_model.conflicting_rows(row, source)
+        if conflicting_rows:
+            self._open_binding_replacement(row, source, conflicting_rows)
+            return False
         try:
             self._mapping_model.update_source(row, source)
         except DomainValueError:
-            self.capture_label.setText("入力を割り当てられません")
+            self._mapping_model.set_row_status(row, self.tr("Input cannot be assigned"))
             return False
         self.table.selectRow(row)
-        self.capture_label.setText(f"入力: {source}")
         return True
+
+    def _open_binding_replacement(
+        self,
+        row: int,
+        source: str,
+        conflicting_rows: tuple[int, ...],
+    ) -> None:
+        if self._binding_replacement_confirmation is not None:
+            return
+        existing_targets = ", ".join(
+            self._mapping_model.target_at(conflicting_row) for conflicting_row in conflicting_rows
+        )
+        confirmation = QMessageBox(
+            QMessageBox.Icon.Warning,
+            self.tr("Replace existing binding?"),
+            self.tr("The input {source} is already assigned.").format(source=source),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            self,
+        )
+        confirmation.setInformativeText(
+            self.tr("{source}: replace {existing} with {target}").format(
+                source=source,
+                existing=existing_targets,
+                target=self._mapping_model.target_at(row),
+            )
+        )
+        confirmation.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        self._pending_binding_replacement = (row, source)
+        confirmation.buttonClicked.connect(self._handle_binding_replacement)
+        confirmation.finished.connect(self._clear_binding_replacement)
+        self._binding_replacement_confirmation = confirmation
+        confirmation.open()
+
+    def _handle_binding_replacement(self, button: QAbstractButton) -> None:
+        confirmation = self._binding_replacement_confirmation
+        pending = self._pending_binding_replacement
+        if (
+            confirmation is None
+            or pending is None
+            or confirmation.standardButton(button) != QMessageBox.StandardButton.Yes
+        ):
+            return
+        row, source = pending
+        self._mapping_model.replace_source(row, source)
+        self._capture_row = None
+        self.table.selectRow(row)
+
+    def _clear_binding_replacement(self, _result: int) -> None:
+        self._binding_replacement_confirmation = None
+        self._pending_binding_replacement = None
 
     def set_inverted(self, inverted: bool) -> None:
         """Update the selected binding inversion through the draft editor.
@@ -376,8 +610,8 @@ class MappingDialog(QDialog):
             return
         confirmation = QMessageBox(
             QMessageBox.Icon.Warning,
-            "キー割り当ての競合",
-            "重複またはローカル操作との競合があります。",
+            self.tr("Key mapping conflicts"),
+            self.tr("Mappings conflict with duplicates or local actions."),
             QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
             self,
         )
@@ -397,6 +631,7 @@ class MappingDialog(QDialog):
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt override name.
         """Stop listening for dialog input once this dialog is hidden."""
         self._capture_row = None
+        self._mapping_model.cancel_capture()
         self._remove_input_filter()
         super().hideEvent(event)
 
@@ -418,14 +653,33 @@ class MappingDialog(QDialog):
         if not self._belongs_to_dialog(watched):
             return False
         if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_F12:
-                self._capture_row = None
-                self.capture_label.setText("F12で入力捕捉を解除しました")
-                _invoke(self._on_release_capture)
+            current = self.table.currentIndex()
+            if (
+                watched is self.table
+                and current.column() == 4
+                and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
+            ):
+                self._activate_row_action(current.row())
+                event.accept()
+                return True
+            if event.key() == Qt.Key.Key_Escape and self._capture_row is not None:
+                self.cancel_capture()
+                event.accept()
+                return True
+            if event.key() == Qt.Key.Key_F4 and "KEY:F4" in RESERVED_BINDING_SOURCES:
+                if self._capture_row is not None:
+                    self._mapping_model.set_row_status(
+                        self._capture_row,
+                        self.tr("F4 is reserved for mouse capture release"),
+                    )
+                else:
+                    _invoke(self._on_release_capture)
                 event.accept()
                 return True
             return self._capture_source(key_source_for_event(event))
         if isinstance(event, QMouseEvent) and event.type() is QEvent.Type.MouseButtonPress:
+            if watched is self.table.viewport():
+                return False
             return self._capture_source(mouse_source_for_event(event))
         return False
 
@@ -461,7 +715,7 @@ class MappingDialog(QDialog):
     def _save_or_accept(self) -> None:
         on_save = self._on_save
         if on_save is not None and not on_save():
-            self.save_error_label.setText("設定を保存できませんでした")
+            self.save_error_label.setText(self.tr("Could not save settings"))
             return
         self.save_error_label.clear()
         self.accept()
@@ -490,6 +744,22 @@ class MappingDialog(QDialog):
 def _invoke(callback: CaptureTransition | None) -> None:
     if callback is not None:
         callback()
+
+
+def _friendly_source(source: str) -> str:
+    translate = QCoreApplication.translate
+    if source == "KEY:UNASSIGNED":
+        return translate("MappingTableModel", "Unassigned")
+    if source.startswith("KEY:"):
+        return " + ".join(part.replace("_", " ").title() for part in source[4:].split("+"))
+    mouse_name = {
+        "MOUSE:LEFT": "Left mouse",
+        "MOUSE:RIGHT": "Right mouse",
+        "MOUSE:MIDDLE": "Middle mouse",
+        "MOUSE:BUTTON_4": "Back mouse",
+        "MOUSE:BUTTON_5": "Forward mouse",
+    }.get(source, source.removeprefix("MOUSE:").replace("_", " ").title())
+    return translate("MappingTableModel", mouse_name)
 
 
 def _sensitivity_spinbox(parent: QWidget, value: float) -> QDoubleSpinBox:

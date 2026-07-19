@@ -13,7 +13,7 @@
 | user review | 表の外にある「次の入力を取得」では変更対象が分かりにくい | 対話、2026-07-19 |
 | user proposal | 各行にbuttonを置くか、現在の割り当てcellをclickして待受を始める | 対話、2026-07-19 |
 | user request | key mappingをescapeできる仕組みが必要 | 対話、2026-07-19 |
-| input redesign | `F4`をmouse capture解除に予約し、`F12`は通常入力へ戻す | `spec/wip/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md` |
+| input redesign | `F4`をmouse capture解除に予約し、`F12`は通常入力へ戻す | `spec/complete/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md` |
 | current implementation | 選択行、外部capture button、固定status labelで待受を操作する | `src/demi/ui/dialogs/mapping.py` |
 
 ### 1.3 use case
@@ -64,8 +64,8 @@
 - `spec/complete/unit_003/INPUT_PIPELINE.md`
 - `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
 - `spec/complete/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
-- `spec/wip/unit_032/UI_LOCALIZATION_FOUNDATION.md`
-- `spec/wip/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md`
+- `spec/complete/unit_032/UI_LOCALIZATION_FOUNDATION.md`
+- `spec/complete/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md`
 
 ## 5. 振る舞い仕様
 
@@ -84,16 +84,16 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | 全binding rowにdelegateのRemap actionがあり、clickとkeyboard activationが同じrow idで待受を開始する | new | unit / integration | `setIndexWidget()`は使わない |
-| todo | 待受中は対象input cellにinstruction、actionにCancelを表示し、他rowの表示は変えない | new | unit | model roleとdelegate stateを検証する |
-| todo | Escape keyとCancel actionは待受前のdraftを保持して待受だけを中止する | new / regression | integration | dialog rejectを発火しない |
-| todo | context menuとkeyboardからAssign Escapeを実行でき、KEY:ESCAPEを保存・再表示できる | new / regression | integration | accessibility action名も確認する |
-| todo | F4は理由付きで拒否され、F12は通常bindingとしてcapture、save、reloadできる | regression | unit / integration | unit_033の予約規則と共通化する |
-| todo | conflict dialogはsource、変更先、既存割り当て先を示し、cancel時はdraftを一切変更しない | regression | unit / integration | replace時だけ旧rowを解除する |
-| todo | canonical sourceとfriendly display roleを分離し、locale変更で永続値が変わらない | new / regression | unit | unit_032に依存する |
-| todo | Bindings / Mouse gyro間のtab移動は待受を残さず、Tab順がrow actionとSave / Cancelへ到達する | new / edge | integration | hidden capture stateを禁止する |
-| todo | mapping dialogから表外の「次の入力を取得」buttonと固定対象labelがなくなる | regression | integration | object treeと表示文言を確認する |
-| todo | Windows通常描画で選択、待受、reserved、conflict後の状態が不自然に見えない | new | manual | `$inspect-gui-states`で代表PNGを確認する |
+| refactor-skipped | 全binding rowにdelegateのRemap actionがあり、clickとkeyboard activationが同じrow idで待受を開始する | new | unit / integration | 11件green。列単位delegateと単一row commandで成立し追加の構造変更なし |
+| refactor-done | 待受中は対象input cellにinstruction、actionにCancelを表示し、他rowの表示は変えない | new | unit | 12件green。dialogとmodelの二重状態を同時resetする境界へ整理 |
+| refactor-done | Escape keyとCancel actionは待受前のdraftを保持して待受だけを中止する | new / regression | integration | 13件green。keyとactionを共通取消処理へ集約し、action clickをsource captureから除外 |
+| refactor-skipped | context menuとkeyboardからAssign Escapeを実行でき、KEY:ESCAPEを保存・再表示できる | new / regression | integration | 14件green。context menuとshortcutが単一QActionを共有し追加の構造変更なし |
+| refactor-skipped | F4は理由付きで拒否され、F12は通常bindingとしてcapture、save、reloadできる | regression | unit / integration | 20件green。SettingsEditorの予約規則を維持しdialog待受だけ理由表示を追加 |
+| refactor-done | conflict dialogはsource、変更先、既存割り当て先を示し、cancel時はdraftを一切変更しない | regression | unit / integration | 21件green。候補確認とatomic置換をapplication/editor境界へ分離 |
+| refactor-done | canonical sourceとfriendly display roleを分離し、locale変更で永続値が変わらない | new / regression | unit | 16件green。display変換をmodel境界へ分離しcanonical roleを保持 |
+| refactor-done | Bindings / Mouse gyro間のtab移動は待受を残さず、Tab順がrow actionとSave / Cancelへ到達する | new / edge | integration | 16件green。tab変更時の取消とAction列keyboard転送を追加 |
+| refactor-done | mapping dialogから表外の「次の入力を取得」buttonと固定対象labelがなくなる | regression | integration | 22件green。入力待受を行内Actionへ限定し、予約・不正入力の説明を対象行の状態列へ集約 |
+| refactor-done | Windows通常描画で選択、待受、reserved、conflict後の状態が不自然に見えない | new | manual | 6状態を原寸確認。待受終了後に予約理由が残る不具合を修正し再取得 |
 
 ## 7. 設計メモ
 
@@ -115,17 +115,34 @@
 | `spec/initial/input.md` | modify | remap captureとEscape規則 |
 | `spec/initial/testing.md` | modify | delegate、keyboard、accessibility受入 |
 | `spec/initial/ui.md` | modify | 行内操作とdialog構成 |
-| `spec/wip/unit_035/INLINE_KEY_MAPPING.md` | new | 作業境界と検証記録 |
+| `spec/complete/unit_035/INLINE_KEY_MAPPING.md` | new | 完了した作業境界と検証記録 |
 
 ## 9. 検証
 
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit/test_documentation.py tests/unit/test_work_unit_records.py` | pass | 3 passed、仕様作成時の文書構造を確認 |
-| `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/unit/application/test_settings_editor.py` | not run | 実装前の仕様作成段階 |
-| `uv run pytest tests/integration/ui/test_mapping_dialog.py` | not run | Qt eventとfocus実装後に実行する |
-| 標準gate | not run | settings保存とinput capture境界変更のため実装時に必須 |
-| `$inspect-gui-states`による代表状態の画像評価 | not run | 通常、待受、reserved、conflict後を確認する |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-delegate-green2 tests/unit/ui/test_mapping_delegate.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 11 passed。mouse / keyboardが同じrow commandを発行し、行Widgetを生成しないことを確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-rowstate-green3 tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 12 passed。対象行だけのinstruction / Cancel表示と既存capture往復を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-cancel-green2 tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 13 passed。Escapeと行内Cancelがdraftとdialogを保持することを確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-escape-green tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 14 passed。Assign Escape actionのcontext menu登録、shortcut、保存、再表示を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-f4-green tests/unit/application/test_settings_editor.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_dialog_validation.py -q` | pass | 20 passed。F4理由表示と待受継続、F12 captureと再表示、予約source拒否を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-conflict-green3 tests/unit/application/test_settings_editor.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 21 passed。重複source、変更先、既存先の表示、Cancel無変更、Replace時の旧row解除を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-friendly-green2 tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_localization.py -q` | pass | 16 passed。friendly表示、canonical role、保存往復を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-tabs-green2 tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 16 passed。tab移動の待受取消、Action列keyboard操作、Save / Cancel focusを確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-inline-only-green2 tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_dialog_validation.py tests/integration/ui/test_localization.py -q` | pass | 22 passed。表外取得buttonと固定labelの不在、行内待受、行内の予約・不正入力説明を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit-035-inline/scenario.py --output tmp/gui-audit/unit-035-inline` | pass | Windows通常描画で6 PNGを取得。通常、選択、待受、F4予約、競合確認に文字切れ・重なりなし。待受と予約理由が対象行だけに表示されることを目視確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-visual-fix tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 18 passed。待受の移動・取消で直前行の一時statusが消えることを確認 |
+| `$inspect-gui-states`による`capture-02`の6状態 | pass | Windows通常描画の通常、選択、待受、F4予約、競合確認、置換後を原寸確認。文字切れなし、置換後の古い予約理由なし |
+| `uv sync --dev` / `uv lock --check` | pass | 77 packagesを解決しlock整合を確認 |
+| `uv run ruff format --check .` / `uv run ruff check .` | pass | 148 files formatted、lint errorなし |
+| `uv run ty check --no-progress` | pass | 型errorなし |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-unit2 tests/unit` | pass | 278 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-int-nonui2 tests/integration --ignore=tests/integration/ui` | pass | 15 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-int-ui2 tests/integration/ui --ignore=tests/integration/ui/test_source_entry_points.py` | pass | 76 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-entry2 tests/integration/ui/test_source_entry_points.py` | pass | 3 passed |
+| `$env:PYTHONUTF8='1'; uv build` | pass | sdistとwheelを生成 |
+| `git diff --check` | pass | whitespace errorなし |
 
 ## 10. 先送り事項
 
@@ -138,6 +155,6 @@
 - [x] TDD Test Listを作成した
 - [x] 実装検証が未実行である理由を記録した
 - [x] Escape cancelとEscape割り当ての両立方法を定義した
-- [ ] 行内remapのmouse / keyboard操作をgreenにした
-- [ ] F4予約とF12許可をunit_033と共通化した
-- [ ] `$inspect-gui-states`で代表画面を評価した
+- [x] 行内remapのmouse / keyboard操作をgreenにした
+- [x] F4予約とF12許可をunit_033と共通化した
+- [x] `$inspect-gui-states`で代表画面を評価した

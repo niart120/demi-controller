@@ -49,7 +49,7 @@ from demi.controller.events import (
 from demi.controller.runtime import ControllerRuntime
 from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.errors import DomainValueError
-from demi.domain.settings import DiagnosticLevel
+from demi.domain.settings import DiagnosticLevel, UiLanguage
 from demi.input.publisher import InputPublisher
 
 if TYPE_CHECKING:
@@ -112,6 +112,7 @@ class WindowSpec:
     width: int
     height: int
     maximized: bool
+    language: UiLanguage = UiLanguage.ENGLISH
 
 
 class WindowPort(PointerCapturePort, Protocol):
@@ -293,7 +294,7 @@ class ApplicationSession:
             if event.state is ConnectionState.READY and self._startup_reconnect_discovery_complete:
                 self._start_saved_reconnect_once()
         elif isinstance(event, ControllerError):
-            self._coordinator.stop_capture()
+            self._coordinator.neutralize_input()
             self._connection_retryable = event.retryable
             self._presentation.set_connection(ConnectionState.ERROR)
             self._presentation.set_error(_safe_error_message(event.category))
@@ -304,8 +305,8 @@ class ApplicationSession:
                 self._coordinator.is_captured
                 and event.capture_epoch == self._coordinator.capture_epoch
             ):
-                self._coordinator.stop_capture()
-                self._presentation.set_warning("入力監視タイムアウト")
+                self._coordinator.neutralize_input()
+                self._presentation.set_warning("Input monitoring timed out")
         elif isinstance(event, PairingProgress):
             self._presentation.set_warning(event.summary)
         elif isinstance(event, RuntimeStopped):
@@ -344,9 +345,9 @@ class ApplicationSession:
             failure: Category reported by the capture lifecycle coordinator.
         """
         messages = {
-            CaptureFailure.RELATIVE_POINTER_REGISTRATION: "相対マウス入力を開始できませんでした",
-            CaptureFailure.RELATIVE_POINTER_READ: "相対マウス入力を停止しました",
-            CaptureFailure.POINTER_CAPTURE: "入力捕捉を開始できませんでした",
+            CaptureFailure.RELATIVE_POINTER_REGISTRATION: "Could not start relative mouse input",
+            CaptureFailure.RELATIVE_POINTER_READ: "Relative mouse input stopped",
+            CaptureFailure.POINTER_CAPTURE: "Could not start input capture",
         }
         self._presentation.set_warning(messages[failure])
 
@@ -364,7 +365,7 @@ class ApplicationSession:
             return
         connection = self._settings.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
-            self._presentation.set_warning("接続する USB アダプターを選択してください")
+            self._presentation.set_warning("Select a USB adapter to connect")
             self.open_settings(DialogKind.CONNECTION)
             return
         self._presentation.acknowledge_error()
@@ -392,7 +393,7 @@ class ApplicationSession:
         try:
             result = self._settings_modal.save()
         except (DomainValueError, SettingsPersistenceError):
-            self._presentation.set_warning("設定を保存できませんでした")
+            self._presentation.set_warning("Could not save settings")
             return False
         previous_diagnostic_level = self._settings.connection.diagnostic_level
         self._apply_live_settings(result.settings)
@@ -404,7 +405,7 @@ class ApplicationSession:
         if result.reconnect_required:
             self._presentation.set_color_reconnect_pending(True)
             self._presentation.set_warning(
-                "表示色は更新済みです。対象機器へ反映するには再接続してください"
+                "Display colors updated. Reconnect to apply them to the target device"
             )
         return True
 
@@ -443,7 +444,7 @@ class ApplicationSession:
             return False
         connection = editor.draft.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
-            self._presentation.set_warning("ペアリングする USB アダプターを選択してください")
+            self._presentation.set_warning("Select a USB adapter to pair")
             self._dialogs.replace(DialogKind.CONNECTION)
             return False
         if not self.save_settings():
@@ -491,7 +492,7 @@ class ApplicationSession:
         self._startup_reconnect_pending = False
         connection = self._settings.connection
         if not self._presentation.has_adapter(connection.adapter_id):
-            self._presentation.set_warning("保存済みの USB アダプターが見つかりません")
+            self._presentation.set_warning("Saved USB adapter not found")
             return
         self._runtime.post(
             ConnectSaved(
@@ -513,7 +514,7 @@ class ApplicationSession:
         for adapter in self._presentation.model.adapters:
             if adapter.id == adapter_id:
                 return adapter.label
-        return "なし"
+        return "None"
 
 
 @dataclass(frozen=True, slots=True)
@@ -809,7 +810,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
                 "Project_Demi startup failed: %s",
                 type(error).__name__,
             )
-        sys.stderr.write("Project_Demi の起動に失敗しました。\n")
+        sys.stderr.write("Project_Demi failed to start.\n")
         exit_status = 1
     finally:
         if shutdown is not None:
@@ -899,6 +900,7 @@ def _window_spec_for(settings: AppSettings) -> WindowSpec:
         width=settings.window.width,
         height=settings.window.height,
         maximized=settings.window.maximized,
+        language=settings.ui.language,
     )
 
 
@@ -911,14 +913,14 @@ def _active_profile(settings: AppSettings) -> InputProfile:
 
 def _safe_error_message(category: ControllerErrorCategory) -> str:
     messages = {
-        ControllerErrorCategory.ADAPTER_NOT_FOUND: "USB アダプターが見つかりません",
-        ControllerErrorCategory.ADAPTER_OPEN_FAILED: "USB アダプターを開けません",
-        ControllerErrorCategory.BOND_NOT_FOUND: "保存済みボンドが見つかりません",
-        ControllerErrorCategory.PAIRING_TIMEOUT: "新規ペアリングが時間内に完了しませんでした",
-        ControllerErrorCategory.RECONNECT_FAILED: "保存済み接続に失敗しました",
-        ControllerErrorCategory.CONNECTION_LOST: "接続が切断されました",
-        ControllerErrorCategory.INVALID_INPUT: "入力をコントローラーへ適用できません",
-        ControllerErrorCategory.SHUTDOWN_FAILED: "終了処理の一部に失敗しました",
-        ControllerErrorCategory.UNEXPECTED: "予期しないコントローラーエラーが発生しました",
+        ControllerErrorCategory.ADAPTER_NOT_FOUND: "USB adapter not found",
+        ControllerErrorCategory.ADAPTER_OPEN_FAILED: "Could not open USB adapter",
+        ControllerErrorCategory.BOND_NOT_FOUND: "Saved bond not found",
+        ControllerErrorCategory.PAIRING_TIMEOUT: "Pairing timed out",
+        ControllerErrorCategory.RECONNECT_FAILED: "Could not reconnect saved connection",
+        ControllerErrorCategory.CONNECTION_LOST: "Connection lost",
+        ControllerErrorCategory.INVALID_INPUT: "Could not apply input to controller",
+        ControllerErrorCategory.SHUTDOWN_FAILED: "Part of shutdown failed",
+        ControllerErrorCategory.UNEXPECTED: "Unexpected controller error",
     }
     return messages[category]

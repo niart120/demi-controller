@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
         )
         self._status_bar.refresh(
             StatusBarState(
-                adapter_label="なし",
+                adapter_label="None",
                 connection_state=ConnectionState.STOPPED,
                 application_state=AppState.IDLE,
                 pointer_quality=RelativePointerQuality.UNAVAILABLE,
@@ -355,6 +355,7 @@ class MainWindow(QMainWindow):
         adapter = QtInputAdapter(
             state=publisher.state,
             is_captured=lambda: coordinator.is_captured,
+            is_keyboard_active=lambda: coordinator.operational_input_active,
             on_stop_capture=self._stop_input_capture,
             on_focus_lost=self._handle_input_focus_loss,
             on_focus_gained=self._handle_input_focus_gain,

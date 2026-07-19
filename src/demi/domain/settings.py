@@ -27,6 +27,13 @@ class DiagnosticLevel(StrEnum):
     ERROR = "ERROR"
 
 
+class UiLanguage(StrEnum):
+    """Languages available for the desktop user interface."""
+
+    ENGLISH = "en"
+    JAPANESE = "ja"
+
+
 def _require_integer_range(value: int, minimum: int, maximum: int) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
         raise DomainValueError
@@ -147,7 +154,7 @@ class LocalActions:
 
     toggle_capture: tuple[str, ...] = ("CTRL+C",)
     quit: tuple[str, ...] = ("CTRL+Q",)
-    release_capture: tuple[str, ...] = ("F12",)
+    release_capture: tuple[str, ...] = ("F4",)
     connection: tuple[str, ...] = ("CTRL+RETURN", "CTRL+ENTER")
 
     def __post_init__(self) -> None:
@@ -165,11 +172,24 @@ class LocalActions:
 
 
 @dataclass(frozen=True, slots=True)
+class UiSettings:
+    """Desktop user interface preferences."""
+
+    language: UiLanguage = UiLanguage.ENGLISH
+
+    def __post_init__(self) -> None:
+        """Validate the selected user interface language."""
+        if not isinstance(self.language, UiLanguage):
+            raise DomainValueError
+
+
+@dataclass(frozen=True, slots=True)
 class AppSettings:
     """Complete validated application settings snapshot."""
 
     schema: str = SCHEMA
     active_profile: str = "default"
+    ui: UiSettings = field(default_factory=UiSettings)
     window: WindowSettings = field(default_factory=WindowSettings)
     connection: ConnectionSettings = field(default_factory=ConnectionSettings)
     controller_colors: ControllerColorSettings = field(default_factory=ControllerColorSettings)
@@ -187,6 +207,8 @@ class AppSettings:
         if self.schema != SCHEMA:
             raise DomainValueError
         if not isinstance(self.active_profile, str) or not self.active_profile:
+            raise DomainValueError
+        if not isinstance(self.ui, UiSettings):
             raise DomainValueError
         if not isinstance(self.window, WindowSettings):
             raise DomainValueError

@@ -116,6 +116,7 @@ class ControllerFrame:
     gyro_rate: GyroRate
     accel_g: AccelG
     capture_active: bool
+    pointer_capture_active: bool = False
 
     def __post_init__(self) -> None:
         """Validate frame metadata and nested domain values."""
@@ -135,4 +136,6 @@ class ControllerFrame:
         if not isinstance(self.accel_g, AccelG):
             raise DomainValueError
         if not isinstance(self.capture_active, bool):
+            raise DomainValueError
+        if not isinstance(self.pointer_capture_active, bool):
             raise DomainValueError

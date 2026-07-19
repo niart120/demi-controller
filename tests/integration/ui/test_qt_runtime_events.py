@@ -146,10 +146,10 @@ class _RecordingMainWindow(MainWindow):
         super().refresh(snapshot)
 
 
-def test_f12_capture_release_refreshes_the_bound_toolbar(
+def test_f4_pointer_release_refreshes_the_bound_toolbar(
     qt_application: QApplication,
 ) -> None:
-    """Keep F12 capture release consistent with the toolbar action state."""
+    """Keep F4 pointer release consistent with the toolbar action state."""
     settings = AppSettings.default()
     runtime = _Runtime()
     window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
@@ -174,17 +174,17 @@ def test_f12_capture_release_refreshes_the_bound_toolbar(
 
     window.main_toolbar.capture_action.trigger()
     assert coordinator.app_state is AppState.CAPTURED
-    assert window.main_toolbar.capture_action.text() == "入力解除"
+    assert window.main_toolbar.capture_action.text() == "Stop mouse"
     assert window.main_toolbar.capture_action.isChecked()
 
     QCoreApplication.sendEvent(
         window,
-        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
     )
     qt_application.processEvents()
 
     assert coordinator.app_state is AppState.IDLE
-    assert window.main_toolbar.capture_action.text() == "入力開始"
+    assert window.main_toolbar.capture_action.text() == "Start mouse"
     assert not window.main_toolbar.capture_action.isChecked()
 
 
@@ -460,7 +460,7 @@ def test_router_binds_connection_and_capture_toolbar_actions_to_the_session(
 
     window.main_toolbar.capture_action.trigger()
     assert not coordinator.is_captured
-    assert not runtime.frames[-1].capture_active
+    assert runtime.frames[-1].capture_active
     assert not window.main_toolbar.capture_action.isChecked()
 
     window.main_toolbar.connection_action.trigger()
@@ -699,14 +699,14 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     error_worker.start()
     error_worker.join()
 
-    assert window.status_bar.connection_label.text() == "接続: 停止"
+    assert window.status_bar.connection_label.text() == "Connection: Stopped"
     qt_application.processEvents()
 
     assert coordinator.is_captured is False
     assert runtime.frames[-1].capture_active is False
     assert window.main_toolbar.connection_action.isEnabled() is retryable
-    assert window.status_bar.connection_label.text() == "接続: エラー"
-    assert window.status_bar.notice_label.text() == "エラー: 保存済み接続に失敗しました"
+    assert window.status_bar.connection_label.text() == "Connection: Error"
+    assert window.status_bar.notice_label.text() == "Error: Could not reconnect saved connection"
     assert secret not in window.status_bar.notice_label.text()
     assert set(window.refresh_threads) == {main_thread}
 
@@ -725,8 +725,8 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     assert not window.main_toolbar.mapping_action.isEnabled()
     assert not window.main_toolbar.connection_settings_action.isEnabled()
     assert not window.main_toolbar.colors_action.isEnabled()
-    assert window.status_bar.connection_label.text() == "接続: 停止"
-    assert window.status_bar.notice_label.text() == "エラー: 保存済み接続に失敗しました"
+    assert window.status_bar.connection_label.text() == "Connection: Stopped"
+    assert window.status_bar.notice_label.text() == "Error: Could not reconnect saved connection"
     assert set(window.refresh_threads) == {main_thread}
 
 

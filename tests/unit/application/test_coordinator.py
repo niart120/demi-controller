@@ -49,7 +49,7 @@ def make_coordinator(window: FakeWindow) -> tuple[CaptureCoordinator, FakeSink]:
     return CaptureCoordinator(publisher=publisher, pointer_capture=window), sink
 
 
-def test_capture_start_and_stop_emit_epoch_neutrals_and_clear_state() -> None:
+def test_pointer_capture_start_and_stop_preserve_operational_keyboard() -> None:
     window = FakeWindow()
     coordinator, sink = make_coordinator(window)
 
@@ -64,9 +64,9 @@ def test_capture_start_and_stop_emit_epoch_neutrals_and_clear_state() -> None:
     assert frame is not None
     assert coordinator.app_state is AppState.IDLE
     assert coordinator.capture_epoch == 2
-    assert frame.capture_active is False
-    assert frame.buttons == frozenset()
-    assert coordinator.publisher.state.held_keys == set()
+    assert frame.capture_active is True
+    assert frame.buttons
+    assert coordinator.publisher.state.held_keys
     assert window.exclusive_calls == [True, False]
 
 

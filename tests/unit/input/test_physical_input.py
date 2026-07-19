@@ -53,6 +53,19 @@ def test_clear_removes_all_held_sources() -> None:
     assert state.held_mouse_buttons == set()
 
 
+def test_clear_mouse_preserves_held_keys_and_discards_pointer_state() -> None:
+    state = PhysicalInputState()
+    state.press_key("F")
+    state.press_mouse_button("LEFT")
+    state.add_mouse_motion(4.0, -2.0)
+
+    state.clear_mouse()
+
+    assert state.held_keys == {KeySource("F")}
+    assert state.held_mouse_buttons == set()
+    assert state.consume_mouse_motion() == (0.0, 0.0)
+
+
 def test_mouse_motion_is_accumulated_and_consumed_once() -> None:
     state = PhysicalInputState()
     state.add_mouse_motion(2.0, 1.0)

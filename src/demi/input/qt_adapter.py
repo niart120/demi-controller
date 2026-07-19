@@ -22,6 +22,7 @@ class QtInputAdapter(QObject):
         *,
         state: PhysicalInputState,
         is_captured: CaptureActivity,
+        is_keyboard_active: CaptureActivity | None = None,
         on_stop_capture: CaptureTransition | None = None,
         on_focus_lost: CaptureTransition | None = None,
         on_focus_gained: CaptureTransition | None = None,
@@ -34,8 +35,10 @@ class QtInputAdapter(QObject):
 
         Args:
             state: Mutable held-source state for the current capture session.
-            is_captured: Returns whether controller input capture is active.
-            on_stop_capture: Handles an F12 capture-release request.
+            is_captured: Returns whether pointer capture is active.
+            is_keyboard_active: Returns whether operational keyboard input is
+                active. Defaults to ``is_captured`` for legacy callers.
+            on_stop_capture: Handles an F4 pointer-capture release request.
             on_focus_lost: Handles a window or application focus loss.
             on_focus_gained: Handles a window or application focus gain.
             on_dialog_opened: Neutralizes capture before a dialog opens.
@@ -47,6 +50,7 @@ class QtInputAdapter(QObject):
         super().__init__()
         self._state = state
         self._is_captured = is_captured
+        self._is_keyboard_active = is_captured if is_keyboard_active is None else is_keyboard_active
         self._on_stop_capture = on_stop_capture
         self._on_focus_lost = on_focus_lost
         self._on_focus_gained = on_focus_gained
@@ -64,16 +68,18 @@ class QtInputAdapter(QObject):
         if event_type in _FOCUS_GAIN_EVENTS and self._accepts_focus_event(watched):
             _invoke(self._on_focus_gained)
             return False
-        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F12:
+        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F4:
             if self._is_captured():
                 _invoke(self._on_stop_capture)
             return False
 
+        if isinstance(event, QKeyEvent):
+            if self._is_keyboard_active():
+                self._handle_key_event(event)
+            return False
         if not self._is_captured():
             return False
-        if isinstance(event, QKeyEvent):
-            self._handle_key_event(event)
-        elif isinstance(event, QMouseEvent):
+        if isinstance(event, QMouseEvent):
             self._handle_mouse_event(event)
         return False
 

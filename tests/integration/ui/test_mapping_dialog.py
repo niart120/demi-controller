@@ -2,7 +2,15 @@ from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+)
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.dialogs import DialogKind, DialogManager
@@ -61,7 +69,7 @@ class FakeRepository:
         self.saved = settings
 
 
-def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
+def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
     qt_application: QApplication,
 ) -> None:
     editor = SettingsEditor(AppSettings.default())
@@ -93,51 +101,212 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f12(
 
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
         )
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
         assert coordinator.publisher.state.held_keys == set()
 
         dialog.table.selectRow(0)
-        dialog.capture_button.click()
+        dialog.begin_capture_row(0)
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
-        assert dialog.capture_label.text() == "入力: KEY:A"
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 1)) == "U"
         assert coordinator.publisher.state.held_keys == set()
 
-        dialog.capture_button.click()
+        dialog.begin_capture_row(0)
+        QCoreApplication.sendEvent(
+            dialog.table,
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
+        )
+
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
+        assert release_requests == []
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+            "F4 is reserved for mouse capture release"
+        )
+        assert dialog.mapping_model.capture_row == 0
+
         QCoreApplication.sendEvent(
             dialog.table,
             QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
-        assert release_requests == [True]
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
+        reloaded = MappingDialog(SettingsEditor(editor.draft))
+        assert reloaded.mapping_model.data(reloaded.mapping_model.index(0, 1)) == "F12"
+        assert (
+            reloaded.mapping_model.data(
+                reloaded.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole
+            )
+            == "KEY:F12"
+        )
 
         dialog.table.selectRow(1)
-        dialog.capture_button.click()
+        dialog.begin_capture_row(1)
         QCoreApplication.sendEvent(
             dialog.table,
             QMouseEvent(
                 QEvent.Type.MouseButtonPress,
                 QPointF(10.0, 10.0),
                 QPointF(10.0, 10.0),
-                Qt.MouseButton.RightButton,
-                Qt.MouseButton.RightButton,
+                Qt.MouseButton.BackButton,
+                Qt.MouseButton.BackButton,
                 Qt.KeyboardModifier.NoModifier,
             ),
         )
 
-        assert editor.draft.profiles[0].bindings[1].source == "MOUSE:RIGHT"
+        assert editor.draft.profiles[0].bindings[1].source == "MOUSE:BUTTON_4"
         assert coordinator.publisher.state.held_mouse_buttons == set()
     finally:
         dialog.close()
         qt_application.processEvents()
         qt_application.removeEventFilter(adapter)
+
+
+def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    dialog.begin_capture_row(0)
+    _send_key(dialog.table, Qt.Key.Key_Escape)
+    qt_application.processEvents()
+
+    assert dialog.isVisible()
+    assert editor.draft == original
+    assert dialog.mapping_model.capture_row is None
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+
+    dialog.begin_capture_row(0)
+    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 4))
+    QTest.mouseClick(dialog.table.viewport(), Qt.MouseButton.LeftButton, pos=action_rect.center())
+    qt_application.processEvents()
+
+    assert dialog.isVisible()
+    assert editor.draft == original
+    assert dialog.mapping_model.capture_row is None
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+
+
+def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_and_round_trips(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved: list[AppSettings] = []
+    dialog = MappingDialog(editor, on_save=lambda: not saved.append(editor.draft))
+    dialog.show()
+    qt_application.processEvents()
+    dialog.table.selectRow(0)
+
+    assert dialog.assign_escape_action in dialog.table.actions()
+    assert dialog.assign_escape_action.text() == "Assign Escape"
+    assert not dialog.assign_escape_action.shortcut().isEmpty()
+
+    QTest.keySequence(dialog.table, dialog.assign_escape_action.shortcut())
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:ESCAPE"
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+    assert saved
+
+    reopened = MappingDialog(SettingsEditor(saved[-1]))
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "Escape"
+    assert (
+        reopened.mapping_model.data(reopened.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole)
+        == "KEY:ESCAPE"
+    )
+
+
+def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved: list[AppSettings] = []
+    release_requests: list[bool] = []
+    dialog = MappingDialog(
+        editor,
+        on_release_capture=lambda: release_requests.append(True),
+        on_save=lambda: saved.append(editor.draft) is None,
+    )
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    _send_key(dialog.table, Qt.Key.Key_F4)
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+        "F4 is reserved for mouse capture release"
+    )
+    assert dialog.mapping_model.capture_row == 0
+    assert release_requests == []
+
+    _send_key(dialog.table, Qt.Key.Key_F12)
+    qt_application.processEvents()
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
+
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+    reopened = MappingDialog(SettingsEditor(saved[-1]))
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "F12"
+    assert (
+        reopened.mapping_model.data(reopened.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole)
+        == "KEY:F12"
+    )
+
+
+def test_mapping_dialog_duplicate_assignment_names_both_targets_and_only_replace_mutates(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    _send_key(dialog.table, Qt.Key.Key_V)
+    qt_application.processEvents()
+
+    confirmation = dialog.binding_replacement_confirmation
+    assert confirmation is not None
+    assert "KEY:V" in confirmation.text()
+    assert "BUTTON:A" in confirmation.informativeText()
+    assert "BUTTON:B" in confirmation.informativeText()
+    assert editor.draft == original
+
+    cancel_button = confirmation.button(QMessageBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+    assert editor.draft == original
+
+    dialog.begin_capture_row(0)
+    _send_key(dialog.table, Qt.Key.Key_V)
+    qt_application.processEvents()
+    confirmation = dialog.binding_replacement_confirmation
+    assert confirmation is not None
+    replace_button = confirmation.button(QMessageBox.StandardButton.Yes)
+    assert replace_button is not None
+    replace_button.click()
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
+    assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
 
 
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
@@ -152,8 +321,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "重複: KEY:F"
-    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "ローカル操作: CTRL+C"
+    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
+    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -162,8 +331,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
 
     confirmation = dialog.conflict_confirmation
     assert confirmation is not None
-    assert confirmation.text() == "重複またはローカル操作との競合があります。"
-    assert confirmation.informativeText() == "重複: KEY:F\nローカル操作: CTRL+C"
+    assert confirmation.text() == "Mappings conflict with duplicates or local actions."
+    assert confirmation.informativeText() == "Duplicate: KEY:F\nLocal action: CTRL+C"
     assert dialog.isVisible()
 
     cancel_button = confirmation.button(QMessageBox.StandardButton.Cancel)
@@ -219,7 +388,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     qt_application.processEvents()
 
     assert dialog.isVisible()
-    assert dialog.save_error_label.text() == "設定を保存できませんでした"
+    assert dialog.save_error_label.text() == "Could not save settings"
     assert modal.editor is editor
     assert editor.draft.profiles[0].bindings[0].source == "KEY:P"
     assert repository.saved == original
@@ -261,7 +430,7 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
     assert editor.draft.profiles[0].bindings[0].inverted is True
     model = dialog.table.model()
     assert model is not None
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "はい"
+    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "Yes"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -284,9 +453,9 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
 
     assert model.rowCount() == 33
     assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "KEY:I"
+    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "I"
     assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
-    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "KEY:O"
+    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
 
     dialog.table.selectRow(32)
     qt_application.processEvents()
@@ -320,7 +489,7 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     dialog.show()
     qt_application.processEvents()
 
-    assert dialog.mouse_gyro_group.title() == "マウスジャイロ設定"
+    assert dialog.mouse_gyro_group.title() == "Mouse gyro settings"
     assert not dialog.mouse_gyro_enabled_checkbox.isChecked()
     assert dialog.horizontal_sensitivity_spinbox.value() == 2.5
     assert dialog.vertical_sensitivity_spinbox.value() == 1.5
@@ -355,6 +524,36 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     qt_application.processEvents()
 
 
+def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_keyboard_actions_reachable(
+    qt_application: QApplication,
+) -> None:
+    dialog = MappingDialog(SettingsEditor(AppSettings.default()))
+    dialog.show()
+    qt_application.processEvents()
+
+    assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
+        "Bindings",
+        "Mouse gyro",
+    ]
+    dialog.begin_capture_row(0)
+    dialog.tabs.setCurrentIndex(1)
+    qt_application.processEvents()
+    assert dialog.mapping_model.capture_row is None
+
+    dialog.tabs.setCurrentIndex(0)
+    action_index = dialog.mapping_model.index(0, 4)
+    dialog.table.setCurrentIndex(action_index)
+    _send_key(dialog.table, Qt.Key.Key_Return)
+    assert dialog.mapping_model.capture_row == 0
+
+    save = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    cancel = dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+    assert save is not None
+    assert save.focusPolicy() != Qt.FocusPolicy.NoFocus
+    assert cancel is not None
+    assert cancel.focusPolicy() != Qt.FocusPolicy.NoFocus
+
+
 def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     qt_application: QApplication,
 ) -> None:
@@ -373,9 +572,9 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
 
     _send_key(dialog.inverted_checkbox, Qt.Key.Key_Tab)
     qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.capture_button
+    assert qt_application.focusWidget() is dialog.restore_button
 
-    _send_key(dialog.capture_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
+    _send_key(dialog.restore_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
     qt_application.processEvents()
     assert qt_application.focusWidget() is dialog.inverted_checkbox
 
@@ -402,6 +601,35 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     assert escaped.result() == int(QDialog.DialogCode.Rejected)
 
 
+def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_row_action_keyboard_reachable(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.tabs.count() == 2
+    assert dialog.tabs.tabText(0) == "Bindings"
+    assert dialog.tabs.tabText(1) == "Mouse gyro"
+
+    action_index = dialog.mapping_model.index(0, 4)
+    dialog.table.setCurrentIndex(action_index)
+    dialog.table.setFocus()
+    _send_key(dialog.table, Qt.Key.Key_Space)
+    qt_application.processEvents()
+    assert dialog.mapping_model.capture_row == 0
+
+    dialog.tabs.setCurrentIndex(1)
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.capture_row is None
+    assert editor.draft == original
+    assert not dialog.table.isVisible()
+    assert dialog.mouse_gyro_group.isVisible()
+
+
 def test_mapping_dialog_shows_default_columns_without_text_clipping(
     qt_application: QApplication,
 ) -> None:
@@ -426,6 +654,21 @@ def test_mapping_dialog_shows_default_columns_without_text_clipping(
     assert dialog.table.horizontalScrollBar().maximum() == 0
     dialog.close()
     qt_application.processEvents()
+
+
+def test_mapping_dialog_removes_the_external_capture_button_and_fixed_prompt(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    dialog = MappingDialog(SettingsEditor(AppSettings.default()))
+
+    assert not hasattr(dialog, "capture_button")
+    assert not hasattr(dialog, "capture_label")
+    button_texts = {button.text() for button in dialog.findChildren(QPushButton)}
+    label_texts = {label.text() for label in dialog.findChildren(QLabel)}
+
+    assert "Capture next input" not in button_texts
+    assert "No input captured" not in label_texts
 
 
 def _send_key(
