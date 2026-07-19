@@ -95,7 +95,7 @@
 |---|---|---|
 | 現行の視覚再現 | pass | `tmp/gui-audit/ui-self-review-preview/capture-01/` に 4 サイズの通常 Windows 描画を保存した。 |
 | 変形原因のコード確認 | pass | 相対座標の独立スケールと `drawEllipse()` の組合せを確認した。 |
-| 仕様書の整合性 | pass | `uv run pytest tests/unit/test_documentation.py tests/unit/test_work_unit_records.py` は 3 passed。 |
+| 旧 docs test | historical pass | 固定文字列 assertion 3件は pass だったが、この仕様書を読まず、意味上の整合性を検証していない。unit_038 で削除する。 |
 | 文書品質確認 | pass | `git diff --check` と仮テキスト・曖昧表現の検索で問題なし。 |
 | 新レイアウトの unit test | not run | 実装前。 |
 | 新レイアウトの integration test | not run | 実装前。 |

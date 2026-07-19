@@ -29,7 +29,9 @@ description: "README、docs、公開 API docstring、spec、PR 本文、AGENTS.m
 - 対話内だけの表現を残さない。`前回`、`今回`、`一旦`、`上述`、`ユーザに言われたため` のような文脈依存語は repo に残る言葉へ直す。
 - 事実、推論、提案、未検証を分ける。未実行の検証や外部仕様の推測を確認済みとして書かない。
 - 完了状態を盛らない。未実行は `not run`、対象外は `not applicable` とし、理由を書く。
-- docs test や README 差分検知 test が落ちたら、先に文言と置き場所を直す。テストを弱めるのは、期待値が古いと確認できた場合だけにする。
+- docs / spec の品質は、対象ファイルを読んで、事実整合、対象読者、根拠、未検証表示、リンク、仮テキストを review する。
+- 自動検査へ落とすのは、構文、参照、schema、実行可能な製品契約に限る。自然言語の表現、見出し、説明順、禁止語、作業記録の状態語を固定する assertion は追加しない。
+- docs test が落ちた場合は、文書の誤りと test 設計の誤りを同列に調査する。変更対象を読まない test の pass を、その文書の検証根拠にしない。
 - experimental、preview、unsupported などの支援範囲は、公開 docs で条件を明確にする。未確定の実装方針は `spec/dev-journal.md` に置く。
 - docs site や GitHub Pages 公開が対象範囲に入る場合、local build 成功だけで完了にしない。remote workflow、deployment、公開 URL の確認を根拠に含める。
 - 繰り返す agent 手順は static docs に埋め込まず skill 化する。agent 向けの導線は README ではなく `AGENTS.md` と `.agents/skills` に置く。
@@ -40,8 +42,9 @@ description: "README、docs、公開 API docstring、spec、PR 本文、AGENTS.m
 2. 各対象文書の役割に合わない内容を移動または削除する。
 3. 公開面の文言から、開発者向けメタ表現、会話依存語、仮テキストを取り除く。
 4. public API / package / release / docs site に触れている場合、必要な docs gate を追加する。
-5. PR body、work unit、handoff には実行 command と結果を具体的に書く。
-6. `agentic-self-review` の前に指摘を整理し、未検証事項を残す。
+5. docs-only 変更では、確認した対象ファイルと確認方法を検証記録に書く。
+6. PR body、work unit、handoff には実行 command と結果を具体的に書く。
+7. `agentic-self-review` の前に指摘を整理し、未検証事項を残す。
 
 ## Checks
 
@@ -54,7 +57,7 @@ rg -n "TODO|TBD|xxx|前回|今回|一旦|上述|適宜|必要に応じて" $path
 git diff --check
 ```
 
-該当する構成がある場合だけ実行する。
+該当する機械的契約または構成がある場合だけ実行する。
 
 ```powershell
 uv run ruff format --check .
@@ -80,9 +83,10 @@ uv run --with pyyaml python -X utf8 C:\Users\train\.codex\skills\.system\skill-c
 
 確認:
 - 対象:
+- methods:
 - commands:
 - not run:
 
 残リスク:
-- 
+- なし
 ```

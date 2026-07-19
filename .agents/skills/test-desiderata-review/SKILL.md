@@ -20,6 +20,8 @@ description: "この Python repo のテスト設計を Kent Beck の Test Deside
 
 - library の純粋ロジックは unit test を優先する。
 - CLI や package metadata は小さい smoke test に分ける。
+- 自然言語の語句、見出し、説明順、禁止語、作業記録の状態語だけを検査する test は、意味上の誤りを特定できず representative でもないため通常 gate に追加しない。
+- docs test は、対象ファイルを機械的に検査できる構文、参照、schema、実行可能な契約に限定する。
 - network、PyPI、GitHub Actions など外部状態は通常 unit gate に入れない。
 - 実行していない外部 smoke を pass と書かない。
 

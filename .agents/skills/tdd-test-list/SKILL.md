@@ -20,6 +20,8 @@ description: "この Python repo の仕様、use case、public API、package beh
 - 実装順、file list、内部 helper 名だけを item にしない。
 - public API、CLI、package metadata、error behavior は観測面を明示する。
 - 新しく見つけた振る舞いは、今の red/green に混ぜず list へ追加する。
+- `docs` layer の自動 test は、構文、参照、schema、実行可能な契約など機械的に観測できる対象と失敗条件を明記する。
+- prose の正確さ、読みやすさ、説明の十分性は review 項目として記録し、固定文字列 assertion の TDD item にしない。
 
 ## Item Table
 

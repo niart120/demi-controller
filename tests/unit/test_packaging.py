@@ -23,15 +23,6 @@ def test_package_builder_and_license_inventory_do_not_reference_pyglet() -> None
     assert "pyglet" not in (root / "packaging" / "LICENSES.md").read_text(encoding="utf-8").lower()
 
 
-def test_current_readme_and_initial_spec_do_not_adopt_pyglet() -> None:
-    root = Path(__file__).parents[2]
-    current_documents = [root / "README.md", *(root / "spec" / "initial").glob("*.md")]
-
-    assert all(
-        "pyglet" not in path.read_text(encoding="utf-8").lower() for path in current_documents
-    )
-
-
 def test_legacy_package_workflow_is_removed_until_qt_packaging() -> None:
     workflow = Path(__file__).parents[2] / ".github" / "workflows" / "package.yml"
 
