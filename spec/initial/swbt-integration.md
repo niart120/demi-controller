@@ -2,7 +2,7 @@
 
 ## 1. 対象契約
 
-0.1.0は、issue #69の物理角速度APIとissue #70のG単位加速度APIを取り込んだswbt-python 0.2系を対象とする。正式リリース後に `pyproject.toml` の下限版をその版へ引き上げる。主に次の公開要素を使う。
+0.1.0は `swbt-python>=0.4.0,<0.5.0` を対象とする。Project_Demiは周期送信型を使わず、送信完了をawaitできるDirect公開型だけに依存する。主に次の公開要素を使う。
 
 ```python
 from swbt import (
@@ -10,7 +10,8 @@ from swbt import (
     ControllerColors,
     IMUFrame,
     InputState,
-    ProController,
+    DirectProController,
+    DirectSwitchGamepad,
     Stick,
     list_adapters,
 )
@@ -69,7 +70,7 @@ SwbtControllerAdapter
 ワーカースレッド内で次を生成する。
 
 ```python
-controller = ProController(
+controller = DirectProController(
     adapter=adapter_id,
     key_store_path=bond_path,
     controller_colors=colors,
@@ -77,7 +78,7 @@ controller = ProController(
 await controller.open()
 ```
 
-実装時は公開されている非同期コンテキストまたは `open()/close()` 契約のうち、0.2系文書で推奨される方を使用する。どちらを選んでも、生成から破棄までを同一ワーカースレッドへ限定する。
+生成から破棄までを同一ワーカースレッドへ限定する。`report_period_us` は渡さない。
 
 ### 3.2 接続
 
@@ -110,7 +111,7 @@ await controller.connect(
 
 接続成功後、入力受付開始前に次を行う。
 
-1. ボタン解放、スティック中央、ジャイロ0、加速度 `(0, 0, +1) G` のrest `InputState`を `apply()`
+1. ボタン解放、スティック中央、ジャイロ0、加速度 `(0, 0, +1) G` のrest `InputState`を `send()` し、完了を待つ
 2. 接続状態を `CONNECTED` へ更新
 3. UIへ接続イベントを通知
 4. 最新フレームが捕捉中でなければrest状態を維持
@@ -119,7 +120,7 @@ await controller.connect(
 ### 3.4 切断
 
 1. フレーム受付を停止
-2. rest `InputState` の `apply()` を最善努力し、失敗時だけ `controller.neutral()` を最終フォールバックとして試す
+2. rest送信成功時は `close(neutral=False)`、rest送信失敗時だけ `close(neutral=True)` を最善努力で試す
 3. コントローラーを閉じる
 4. 内部参照を破棄
 5. UIへ切断イベント
@@ -203,23 +204,24 @@ state = InputState(
 
 定常rest状態も同じ変換経路を使い、`GyroRate(0, 0, 0)` と `AccelG(0, 0, 1)` を明示する。現行swbt-pythonのゼロ加速度ニュートラルを通常の静止状態として利用しない。
 
-変換結果は `await controller.apply(state)` で一括反映する。ボタン、スティック、IMUを別々の呼び出しで更新しない。
+変換結果は `await controller.send(state)` で一括送信し、完了を待つ。ボタン、スティック、IMUを別々の呼び出しで更新しない。
 
 ## 6. フレーム併合
 
-`ControllerRuntime.offer_frame()` は最新フレームだけを保持する。
+`ControllerRuntime.offer_frame()` は表示用の最新フレームと送信用の定数サイズ集約を分けて保持する。
 
 処理規則:
 
 - `sequence` が現在値以下なら破棄
-- `capture_epoch` が現在の捕捉セッションと異なれば破棄
+- 古い `capture_epoch` は破棄し、新しいepochは未送信集約を破棄して開始
 - 接続していなければ送信しないが、最新値は状態表示用に保持
-- 接続中かつ新しい値なら `apply()`
-- 同一の入力内容であれば `apply()` を省略可能
+- 接続中は評価frameごとに完全な `InputState` を `send()` する
+- send中に届いた複数frameは、最新のボタン・スティック・加速度と、各軸の `Σ(gyro_rate × sample_duration)` を次の1送信へ集約する
+- 集約後のgyro rateは累積角変位を累積時間で割って再構成する。ボタン遷移は保存せず最新状態を使う
 - `capture_active=True` のフレーム受信時刻を監視に記録
 - 捕捉解除フレームは内容が同じに見えても必ず1回処理する
 
-比較から `sequence` と `monotonic_ns` を除き、ボタン、スティック、角速度、加速度、捕捉状態を比較する。
+安全境界（watchdog、切断、終了、再生成、送信失敗）では未送信集約を破棄し、理由を診断ログへ記録する。
 
 ## 7. 入力停止監視
 
@@ -235,7 +237,7 @@ active only when:
 
 タイムアウト時:
 
-1. rest `InputState` を `apply()`
+1. workerの逐次処理でrest `InputState` を `send()`
 2. `watchdog_tripped = True`
 3. 同じ停止中に繰り返しログを出さない
 4. `WatchdogNeutralized` をUIへ通知
@@ -265,7 +267,7 @@ colors = ControllerColors(
 )
 ```
 
-色は `ProController` 生成時の引数であるため、接続中の変更は次回再生成時に反映する。UIプレビューは即時更新する。
+色は `DirectProController` 生成時の引数であるため、接続中の変更ではrest送信成功後に再生成して反映する。UIプレビューは即時更新する。
 
 ## 9. ボンド情報
 
