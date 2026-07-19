@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -382,14 +383,24 @@ class MappingDialog(QDialog):
             self,
         )
 
+        bindings_page = QWidget(self)
+        bindings_layout = QVBoxLayout(bindings_page)
+        bindings_layout.addWidget(self.table)
+        bindings_layout.addWidget(self.inverted_checkbox)
+        bindings_layout.addWidget(self.capture_button)
+        bindings_layout.addWidget(self.capture_label)
+        bindings_layout.addWidget(self.restore_button)
+        mouse_page = QWidget(self)
+        mouse_layout = QVBoxLayout(mouse_page)
+        mouse_layout.addWidget(self.mouse_gyro_group)
+        mouse_layout.addStretch()
+        self.tabs = QTabWidget(self)
+        self.tabs.addTab(bindings_page, self.tr("Bindings"))
+        self.tabs.addTab(mouse_page, self.tr("Mouse gyro"))
+
         layout = QVBoxLayout(self)
-        layout.addWidget(self.table)
-        layout.addWidget(self.inverted_checkbox)
-        layout.addWidget(self.capture_button)
-        layout.addWidget(self.capture_label)
-        layout.addWidget(self.mouse_gyro_group)
+        layout.addWidget(self.tabs)
         layout.addWidget(self.save_error_label)
-        layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
         self.setMinimumSize(760, 520)
         self.resize(840, 640)
@@ -412,6 +423,7 @@ class MappingDialog(QDialog):
 
         self.capture_button.clicked.connect(self.begin_capture)
         self.assign_escape_action.triggered.connect(self.assign_escape)
+        self.tabs.currentChanged.connect(self._handle_tab_changed)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
@@ -471,6 +483,10 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self._mapping_model.cancel_capture()
         self.capture_label.setText(self.tr("Input capture cancelled"))
+
+    def _handle_tab_changed(self, index: int) -> None:
+        if index != 0 and self._capture_row is not None:
+            self.cancel_capture()
 
     def assign_escape(self) -> None:
         """Assign Escape to the selected row through an explicit action."""
@@ -642,6 +658,15 @@ class MappingDialog(QDialog):
         if not self._belongs_to_dialog(watched):
             return False
         if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
+            current = self.table.currentIndex()
+            if (
+                watched is self.table
+                and current.column() == 4
+                and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
+            ):
+                self._activate_row_action(current.row())
+                event.accept()
+                return True
             if event.key() == Qt.Key.Key_Escape and self._capture_row is not None:
                 self.cancel_capture()
                 event.accept()

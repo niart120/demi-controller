@@ -36,6 +36,8 @@
     <name>MappingDialog</name>
     <message><source>Input capture cancelled</source><translation>入力待受を中止しました</translation></message>
     <message><source>Assign Escape</source><translation>Escapeを割り当て</translation></message>
+    <message><source>Bindings</source><translation>割り当て</translation></message>
+    <message><source>Mouse gyro</source><translation>マウスジャイロ</translation></message>
     <message><source>Replace existing binding?</source><translation>既存の割り当てを置換しますか?</translation></message>
     <message><source>The input {source} is already assigned.</source><translation>{source}はすでに割り当てられています。</translation></message>
     <message><source>{source}: replace {existing} with {target}</source><translation>{source}: {existing}を解除して{target}へ割り当てます</translation></message>

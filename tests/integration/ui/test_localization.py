@@ -93,6 +93,8 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert window.main_toolbar.connection_action.text() == "接続"
     assert window.status_bar.adapter_label.text() == "アダプター: なし"
     assert mapping.windowTitle() == "キー割り当て"
+    assert mapping.tabs.tabText(0) == "割り当て"
+    assert mapping.tabs.tabText(1) == "マウスジャイロ"
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
     assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
     assert (

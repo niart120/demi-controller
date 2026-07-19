@@ -513,6 +513,36 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     qt_application.processEvents()
 
 
+def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_keyboard_actions_reachable(
+    qt_application: QApplication,
+) -> None:
+    dialog = MappingDialog(SettingsEditor(AppSettings.default()))
+    dialog.show()
+    qt_application.processEvents()
+
+    assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
+        "Bindings",
+        "Mouse gyro",
+    ]
+    dialog.begin_capture_row(0)
+    dialog.tabs.setCurrentIndex(1)
+    qt_application.processEvents()
+    assert dialog.mapping_model.capture_row is None
+
+    dialog.tabs.setCurrentIndex(0)
+    action_index = dialog.mapping_model.index(0, 4)
+    dialog.table.setCurrentIndex(action_index)
+    _send_key(dialog.table, Qt.Key.Key_Return)
+    assert dialog.mapping_model.capture_row == 0
+
+    save = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    cancel = dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+    assert save is not None
+    assert save.focusPolicy() != Qt.FocusPolicy.NoFocus
+    assert cancel is not None
+    assert cancel.focusPolicy() != Qt.FocusPolicy.NoFocus
+
+
 def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     qt_application: QApplication,
 ) -> None:
@@ -558,6 +588,35 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     qt_application.processEvents()
 
     assert escaped.result() == int(QDialog.DialogCode.Rejected)
+
+
+def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_row_action_keyboard_reachable(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.tabs.count() == 2
+    assert dialog.tabs.tabText(0) == "Bindings"
+    assert dialog.tabs.tabText(1) == "Mouse gyro"
+
+    action_index = dialog.mapping_model.index(0, 4)
+    dialog.table.setCurrentIndex(action_index)
+    dialog.table.setFocus()
+    _send_key(dialog.table, Qt.Key.Key_Space)
+    qt_application.processEvents()
+    assert dialog.mapping_model.capture_row == 0
+
+    dialog.tabs.setCurrentIndex(1)
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.capture_row is None
+    assert editor.draft == original
+    assert not dialog.table.isVisible()
+    assert dialog.mouse_gyro_group.isVisible()
 
 
 def test_mapping_dialog_shows_default_columns_without_text_clipping(
