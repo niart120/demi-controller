@@ -285,7 +285,12 @@ class ControllerPreviewWidget(QWidget):
         on = translate("ControllerPreviewWidget", "On")
         off = translate("ControllerPreviewWidget", "Off")
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
-        status = QRectF(self.width() * 0.34, self.height() * 0.72, self.width() * 0.32, 34.0)
+        status = QRectF(
+            self.width() * 0.05,
+            self.height() * 0.515,
+            self.width() * 0.90,
+            self.height() * 0.055,
+        )
         painter.drawText(
             status,
             Qt.AlignmentFlag.AlignCenter,

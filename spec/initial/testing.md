@@ -176,6 +176,11 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - ConnectionStateからボタンラベル
 - CaptureStateから枠表示
 - ControllerFrameから各コントロール表示
+- minimum、default、large sizeの全control boundsと、許可していないcontrol間の非交差
+- digital control ID、stick軸clamp、stick clickの独立状態
+- ジャイロ円弧と加速度ベクトルの符号、単調な表示量、上限clamp
+- tooltipとアクセシビリティ説明のセンサー軸名、値、単位
+- Windows通常描画のneutral、全入力、minimum、large状態における欠落、切れ、重なり
 - 色変更プレビュー
 - エラー分類からユーザー向け文
 - モーダル排他
