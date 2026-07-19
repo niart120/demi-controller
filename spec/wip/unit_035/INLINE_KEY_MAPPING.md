@@ -13,7 +13,7 @@
 | user review | 表の外にある「次の入力を取得」では変更対象が分かりにくい | 対話、2026-07-19 |
 | user proposal | 各行にbuttonを置くか、現在の割り当てcellをclickして待受を始める | 対話、2026-07-19 |
 | user request | key mappingをescapeできる仕組みが必要 | 対話、2026-07-19 |
-| input redesign | `F4`をmouse capture解除に予約し、`F12`は通常入力へ戻す | `spec/wip/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md` |
+| input redesign | `F4`をmouse capture解除に予約し、`F12`は通常入力へ戻す | `spec/complete/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md` |
 | current implementation | 選択行、外部capture button、固定status labelで待受を操作する | `src/demi/ui/dialogs/mapping.py` |
 
 ### 1.3 use case
@@ -64,8 +64,8 @@
 - `spec/complete/unit_003/INPUT_PIPELINE.md`
 - `spec/complete/unit_015/QT_INPUT_AND_CONTROLLER_PREVIEW.md`
 - `spec/complete/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
-- `spec/wip/unit_032/UI_LOCALIZATION_FOUNDATION.md`
-- `spec/wip/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md`
+- `spec/complete/unit_032/UI_LOCALIZATION_FOUNDATION.md`
+- `spec/complete/unit_033/POINTER_CAPTURE_AND_KEYBOARD_ROUTING.md`
 
 ## 5. 振る舞い仕様
 
@@ -134,10 +134,15 @@
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit-035-inline/scenario.py --output tmp/gui-audit/unit-035-inline` | pass | Windows通常描画で6 PNGを取得。通常、選択、待受、F4予約、競合確認に文字切れ・重なりなし。待受と予約理由が対象行だけに表示されることを目視確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-visual-fix tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 18 passed。待受の移動・取消で直前行の一時statusが消えることを確認 |
 | `$inspect-gui-states`による`capture-02`の6状態 | pass | Windows通常描画の通常、選択、待受、F4予約、競合確認、置換後を原寸確認。文字切れなし、置換後の古い予約理由なし |
-| `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/unit/application/test_settings_editor.py` | not run | 実装前の仕様作成段階 |
-| `uv run pytest tests/integration/ui/test_mapping_dialog.py` | not run | Qt eventとfocus実装後に実行する |
-| 標準gate | not run | settings保存とinput capture境界変更のため実装時に必須 |
-| `$inspect-gui-states`による代表状態の画像評価 | not run | 通常、待受、reserved、conflict後を確認する |
+| `uv sync --dev` / `uv lock --check` | pass | 77 packagesを解決しlock整合を確認 |
+| `uv run ruff format --check .` / `uv run ruff check .` | pass | 148 files formatted、lint errorなし |
+| `uv run ty check --no-progress` | pass | 型errorなし |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-unit2 tests/unit` | pass | 278 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-int-nonui2 tests/integration --ignore=tests/integration/ui` | pass | 15 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-int-ui2 tests/integration/ui --ignore=tests/integration/ui/test_source_entry_points.py` | pass | 76 passed |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-entry2 tests/integration/ui/test_source_entry_points.py` | pass | 3 passed |
+| `$env:PYTHONUTF8='1'; uv build` | pass | sdistとwheelを生成 |
+| `git diff --check` | pass | whitespace errorなし |
 
 ## 10. 先送り事項
 
@@ -150,6 +155,6 @@
 - [x] TDD Test Listを作成した
 - [x] 実装検証が未実行である理由を記録した
 - [x] Escape cancelとEscape割り当ての両立方法を定義した
-- [ ] 行内remapのmouse / keyboard操作をgreenにした
-- [ ] F4予約とF12許可をunit_033と共通化した
-- [ ] `$inspect-gui-states`で代表画面を評価した
+- [x] 行内remapのmouse / keyboard操作をgreenにした
+- [x] F4予約とF12許可をunit_033と共通化した
+- [x] `$inspect-gui-states`で代表画面を評価した
