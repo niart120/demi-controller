@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QPushButton
@@ -8,6 +9,7 @@ from demi.app import WindowSpec
 from demi.application.coordinator import CaptureCoordinator, CaptureFailure
 from demi.application.state import AppState
 from demi.domain.controller import ControllerFrame, LogicalButton
+from demi.domain.settings import MouseSettings
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
 from demi.platform.windows_mouse_hook import (
@@ -80,6 +82,42 @@ class RecordingButton(QPushButton):
         """Record normal Qt delivery before delegating to the standard button."""
         self.received_event_types.append(event.type())
         return super().event(event)
+
+
+@pytest.mark.parametrize("mouse_gyro_enabled", [False, True])
+def test_keyboard_input_reaches_evaluated_frame_without_pointer_capture(
+    qt_application: object,
+    mouse_gyro_enabled: bool,
+) -> None:
+    """Keep keyboard mappings active whether or not mouse gyro is enabled."""
+    assert qt_application is not None
+    clock = FakeClock()
+    sink = FakeSink()
+    publisher = InputPublisher(
+        clock=clock,
+        sink=sink,
+        mouse_settings=MouseSettings(gyro_enabled=mouse_gyro_enabled),
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    coordinator = CaptureCoordinator(publisher=publisher, pointer_capture=window)
+    window.configure_input(publisher=publisher, coordinator=coordinator)
+
+    QCoreApplication.sendEvent(window, _key_event(Qt.Key.Key_F))
+    clock.now_ns += 8_000_000
+    frame = window.evaluate_input()
+
+    assert coordinator.is_captured is False
+    assert frame.capture_active is True
+    assert frame.pointer_capture_active is False
+    assert frame.buttons == frozenset({LogicalButton.A})
+
+    QCoreApplication.sendEvent(
+        window,
+        QKeyEvent(QEvent.Type.KeyRelease, Qt.Key.Key_F, Qt.KeyboardModifier.NoModifier),
+    )
+    clock.now_ns += 8_000_000
+    assert window.evaluate_input().buttons == frozenset()
+    coordinator.begin_shutdown()
 
 
 def test_f4_releases_pointer_while_focus_dialog_and_shutdown_neutralize_all_input(
