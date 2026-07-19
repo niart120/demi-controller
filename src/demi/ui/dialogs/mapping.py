@@ -108,6 +108,7 @@ class MappingTableModel(QAbstractTableModel):
         """
         super().__init__(parent)
         self._editor = editor
+        self._capture_row: int | None = None
 
     @override
     def rowCount(
@@ -135,14 +136,39 @@ class MappingTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
         binding = self._bindings()[index.row()]
+        input_text = (
+            self.tr("Press a key or mouse button")
+            if index.row() == self._capture_row
+            else binding.source
+        )
+        action_text = self.tr("Cancel") if index.row() == self._capture_row else self.tr("Remap")
         values = (
             binding.target.value,
-            binding.source,
+            input_text,
             self.tr("Yes") if binding.inverted else self.tr("No"),
             self._conflict_text(index.row()),
-            self.tr("Remap"),
+            action_text,
         )
         return values[index.column()]
+
+    @property
+    def capture_row(self) -> int | None:
+        """Return the row currently waiting for an input source."""
+        return self._capture_row
+
+    def begin_capture(self, row: int) -> None:
+        """Mark one binding row as waiting for its replacement source."""
+        if not 0 <= row < self.rowCount():
+            raise DomainValueError
+        self._capture_row = row
+        self._reset_from_editor()
+
+    def cancel_capture(self) -> None:
+        """Clear the waiting row without changing the settings draft."""
+        if self._capture_row is None:
+            return
+        self._capture_row = None
+        self._reset_from_editor()
 
     @override
     def headerData(
@@ -168,6 +194,7 @@ class MappingTableModel(QAbstractTableModel):
             source: Canonical source string selected by the dialog.
         """
         self._editor.update_binding(row, source=source)
+        self._capture_row = None
         self._reset_from_editor()
 
     def update_inverted(self, row: int, inverted: bool) -> None:
@@ -267,7 +294,7 @@ class MappingDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._mapping_action_delegate = MappingActionDelegate(
-            on_activated=self.begin_capture_row,
+            on_activated=self._activate_row_action,
             parent=self.table,
         )
         self.table.setItemDelegateForColumn(4, self._mapping_action_delegate)
@@ -385,9 +412,18 @@ class MappingDialog(QDialog):
 
     def begin_capture_row(self, row: int) -> None:
         """Arm one explicit binding row for the next supported input event."""
-        self.table.selectRow(row)
         self._capture_row = row
+        self._mapping_model.begin_capture(row)
+        self.table.selectRow(row)
         self.capture_label.setText(self.tr("Press the next key or mouse button"))
+
+    def _activate_row_action(self, row: int) -> None:
+        if self._capture_row == row:
+            self._capture_row = None
+            self._mapping_model.cancel_capture()
+            self.capture_label.setText(self.tr("Input capture cancelled"))
+            return
+        self.begin_capture_row(row)
 
     def begin_capture(self) -> None:
         """Arm the selected table row for exactly one supported input event."""
@@ -401,6 +437,7 @@ class MappingDialog(QDialog):
         """Restore the built-in profile through the application-owned editor."""
         self._mapping_model.restore_default_profile()
         self._capture_row = None
+        self._mapping_model.cancel_capture()
         self.capture_label.setText(self.tr("Defaults restored"))
 
     def set_source(self, row: int, source: str) -> bool:

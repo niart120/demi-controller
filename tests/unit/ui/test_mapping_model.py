@@ -36,3 +36,20 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
 
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "KEY:F"
     assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "KEY:O"
+
+
+def test_mapping_model_changes_only_the_armed_row_to_instruction_and_cancel(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    model = MappingTableModel(SettingsEditor(AppSettings.default()))
+    unchanged_source = model.data(model.index(1, 1), Qt.ItemDataRole.DisplayRole)
+
+    model.begin_capture(0)
+
+    assert (
+        model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "Press a key or mouse button"
+    )
+    assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Cancel"
+    assert model.data(model.index(1, 1), Qt.ItemDataRole.DisplayRole) == unchanged_source
+    assert model.data(model.index(1, 4), Qt.ItemDataRole.DisplayRole) == "Remap"

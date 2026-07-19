@@ -85,7 +85,7 @@
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-skipped | 全binding rowにdelegateのRemap actionがあり、clickとkeyboard activationが同じrow idで待受を開始する | new | unit / integration | 11件green。列単位delegateと単一row commandで成立し追加の構造変更なし |
-| todo | 待受中は対象input cellにinstruction、actionにCancelを表示し、他rowの表示は変えない | new | unit | model roleとdelegate stateを検証する |
+| refactor-done | 待受中は対象input cellにinstruction、actionにCancelを表示し、他rowの表示は変えない | new | unit | 12件green。dialogとmodelの二重状態を同時resetする境界へ整理 |
 | todo | Escape keyとCancel actionは待受前のdraftを保持して待受だけを中止する | new / regression | integration | dialog rejectを発火しない |
 | todo | context menuとkeyboardからAssign Escapeを実行でき、KEY:ESCAPEを保存・再表示できる | new / regression | integration | accessibility action名も確認する |
 | todo | F4は理由付きで拒否され、F12は通常bindingとしてcapture、save、reloadできる | regression | unit / integration | unit_033の予約規則と共通化する |
@@ -123,6 +123,7 @@
 |---|---|---|
 | `uv run pytest tests/unit/test_documentation.py tests/unit/test_work_unit_records.py` | pass | 3 passed、仕様作成時の文書構造を確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-delegate-green2 tests/unit/ui/test_mapping_delegate.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 11 passed。mouse / keyboardが同じrow commandを発行し、行Widgetを生成しないことを確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-rowstate-green3 tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 12 passed。対象行だけのinstruction / Cancel表示と既存capture往復を確認 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/unit/application/test_settings_editor.py` | not run | 実装前の仕様作成段階 |
 | `uv run pytest tests/integration/ui/test_mapping_dialog.py` | not run | Qt eventとfocus実装後に実行する |
 | 標準gate | not run | settings保存とinput capture境界変更のため実装時に必須 |

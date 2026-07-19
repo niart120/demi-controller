@@ -19,6 +19,8 @@
     <message><source>Conflict</source><translation>競合</translation></message>
     <message><source>Action</source><translation>操作</translation></message>
     <message><source>Remap</source><translation>変更</translation></message>
+    <message><source>Press a key or mouse button</source><translation>キーまたはマウスボタンを押してください</translation></message>
+    <message><source>Cancel</source><translation>中止</translation></message>
     <message><source>Yes</source><translation>はい</translation></message>
     <message><source>No</source><translation>いいえ</translation></message>
     <message><source>Local action: {action}</source><translation>ローカル操作: {action}</translation></message>
