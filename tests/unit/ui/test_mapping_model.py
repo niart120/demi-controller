@@ -12,7 +12,7 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     model = MappingTableModel(editor)
 
     assert model.rowCount() == 33
-    assert model.columnCount() == 4
+    assert model.columnCount() == 5
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DisplayRole) == "BUTTON:A"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "KEY:F"
     assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "No"

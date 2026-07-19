@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, override
 
 from PySide6.QtCore import (
+    QAbstractItemModel,
     QAbstractTableModel,
     QCoreApplication,
     QEvent,
@@ -27,6 +28,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -41,12 +44,60 @@ _ROOT_INDEX = QModelIndex()
 
 type CaptureTransition = Callable[[], object]
 type SettingsAction = Callable[[], bool]
+type RowAction = Callable[[int], object]
+
+
+class MappingActionDelegate(QStyledItemDelegate):
+    """Turn one painted action cell into a mouse and keyboard row command."""
+
+    def __init__(
+        self,
+        *,
+        on_activated: RowAction,
+        parent: QObject | None = None,
+    ) -> None:
+        """Create a delegate that reports the activated model row.
+
+        Args:
+            on_activated: Command receiving the activated binding row.
+            parent: Optional Qt owner.
+        """
+        super().__init__(parent)
+        self._on_activated = on_activated
+
+    @override
+    def editorEvent(
+        self,
+        event: QEvent,
+        model: QAbstractItemModel,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> bool:
+        """Activate the indexed row from a left click, Enter, or Space."""
+        del model
+        if isinstance(event, QMouseEvent):
+            if (
+                event.type() is QEvent.Type.MouseButtonRelease
+                and event.button() is Qt.MouseButton.LeftButton
+                and option.rect.contains(event.position().toPoint())
+            ):
+                self._on_activated(index.row())
+                return True
+            return False
+        if (
+            isinstance(event, QKeyEvent)
+            and event.type() is QEvent.Type.KeyPress
+            and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
+        ):
+            self._on_activated(index.row())
+            return True
+        return False
 
 
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("Target", "Input", "Inverted", "Conflict")
+    _HEADERS = ("Target", "Input", "Inverted", "Conflict", "Action")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -89,6 +140,7 @@ class MappingTableModel(QAbstractTableModel):
             binding.source,
             self.tr("Yes") if binding.inverted else self.tr("No"),
             self._conflict_text(index.row()),
+            self.tr("Remap"),
         )
         return values[index.column()]
 
@@ -214,10 +266,16 @@ class MappingDialog(QDialog):
         self.table.setModel(self._mapping_model)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._mapping_action_delegate = MappingActionDelegate(
+            on_activated=self.begin_capture_row,
+            parent=self.table,
+        )
+        self.table.setItemDelegateForColumn(4, self._mapping_action_delegate)
         table_header = self.table.horizontalHeader()
         for column in range(3):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.capture_button = QPushButton(self.tr("Capture next input"), self)
         self.capture_label = QLabel(self.tr("No input captured"), self)
         self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
@@ -269,8 +327,8 @@ class MappingDialog(QDialog):
         layout.addWidget(self.save_error_label)
         layout.addWidget(self.restore_button)
         layout.addWidget(self.button_box)
-        self.setMinimumSize(640, 520)
-        self.resize(720, 640)
+        self.setMinimumSize(760, 520)
+        self.resize(840, 640)
 
         QWidget.setTabOrder(self.table, self.inverted_checkbox)
         QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
@@ -320,14 +378,24 @@ class MappingDialog(QDialog):
         """Return the currently visible binding-conflict confirmation, if any."""
         return self._conflict_confirmation
 
+    @property
+    def mapping_model(self) -> MappingTableModel:
+        """Return the binding table model for row-oriented dialog actions."""
+        return self._mapping_model
+
+    def begin_capture_row(self, row: int) -> None:
+        """Arm one explicit binding row for the next supported input event."""
+        self.table.selectRow(row)
+        self._capture_row = row
+        self.capture_label.setText(self.tr("Press the next key or mouse button"))
+
     def begin_capture(self) -> None:
         """Arm the selected table row for exactly one supported input event."""
         selected = self.table.currentIndex()
         if not selected.isValid():
             self.capture_label.setText(self.tr("Select a target"))
             return
-        self._capture_row = selected.row()
-        self.capture_label.setText(self.tr("Press the next key or mouse button"))
+        self.begin_capture_row(selected.row())
 
     def restore_default_profile(self) -> None:
         """Restore the built-in profile through the application-owned editor."""
