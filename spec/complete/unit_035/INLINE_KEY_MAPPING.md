@@ -115,7 +115,7 @@
 | `spec/initial/input.md` | modify | remap captureとEscape規則 |
 | `spec/initial/testing.md` | modify | delegate、keyboard、accessibility受入 |
 | `spec/initial/ui.md` | modify | 行内操作とdialog構成 |
-| `spec/wip/unit_035/INLINE_KEY_MAPPING.md` | new | 作業境界と検証記録 |
+| `spec/complete/unit_035/INLINE_KEY_MAPPING.md` | new | 完了した作業境界と検証記録 |
 
 ## 9. 検証
 
