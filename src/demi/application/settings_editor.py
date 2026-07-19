@@ -71,6 +71,32 @@ class SettingsEditor:
         bindings = (*profile.bindings[:index], updated, *profile.bindings[index + 1 :])
         self._replace_profile(replace(profile, bindings=bindings))
 
+    def replace_binding_source(self, index: int, source: str) -> None:
+        """Assign one source and atomically unassign rows that already use it.
+
+        Args:
+            index: Active-profile row receiving the source.
+            source: Canonical source selected by the user.
+
+        Raises:
+            DomainValueError: The row or source is invalid or reserved.
+        """
+        profile = self._active_profile()
+        if source in RESERVED_BINDING_SOURCES:
+            raise DomainValueError
+        try:
+            current = profile.bindings[index]
+        except IndexError:
+            raise DomainValueError from None
+        bindings = [
+            replace(binding, source="KEY:UNASSIGNED")
+            if row != index and binding.source == source
+            else binding
+            for row, binding in enumerate(profile.bindings)
+        ]
+        bindings[index] = replace(current, source=source)
+        self._replace_profile(replace(profile, bindings=tuple(bindings)))
+
     def update_connection(
         self,
         *,

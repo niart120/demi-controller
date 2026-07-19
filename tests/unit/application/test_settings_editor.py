@@ -61,6 +61,15 @@ def test_editor_reports_duplicate_source_and_local_action_conflicts_only() -> No
     assert all(conflict.source != "KEY:V" for conflict in conflicts)
 
 
+def test_editor_replaces_a_duplicate_source_and_unassigns_the_old_row() -> None:
+    editor = SettingsEditor(AppSettings.default())
+
+    editor.replace_binding_source(0, "KEY:V")
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
+    assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
+
+
 @pytest.mark.parametrize("source", ["KEY:CTRL+RETURN", "KEY:CTRL+ENTER"])
 def test_editor_reports_connection_shortcut_conflicts(source: str) -> None:
     editor = SettingsEditor(AppSettings.default())

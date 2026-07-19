@@ -201,6 +201,24 @@ class MappingTableModel(QAbstractTableModel):
         self._capture_row = None
         self._reset_from_editor()
 
+    def replace_source(self, row: int, source: str) -> None:
+        """Assign a source and unassign every conflicting row atomically."""
+        self._editor.replace_binding_source(row, source)
+        self._capture_row = None
+        self._reset_from_editor()
+
+    def conflicting_rows(self, row: int, source: str) -> tuple[int, ...]:
+        """Return other binding rows that already use a source."""
+        return tuple(
+            candidate
+            for candidate, binding in enumerate(self._bindings())
+            if candidate != row and binding.source == source
+        )
+
+    def target_at(self, row: int) -> str:
+        """Return the canonical target for one binding row."""
+        return self._bindings()[row].target.value
+
     def update_inverted(self, row: int, inverted: bool) -> None:
         """Replace one binding inversion flag through the draft editor.
 
@@ -292,6 +310,8 @@ class MappingDialog(QDialog):
         self._cancel_requested = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
+        self._binding_replacement_confirmation: QMessageBox | None = None
+        self._pending_binding_replacement: tuple[int, str] | None = None
 
         self.table = QTableView(self)
         self.table.setModel(self._mapping_model)
@@ -416,6 +436,11 @@ class MappingDialog(QDialog):
         return self._conflict_confirmation
 
     @property
+    def binding_replacement_confirmation(self) -> QMessageBox | None:
+        """Return the visible per-source replacement confirmation, if any."""
+        return self._binding_replacement_confirmation
+
+    @property
     def mapping_model(self) -> MappingTableModel:
         """Return the binding table model for row-oriented dialog actions."""
         return self._mapping_model
@@ -473,6 +498,10 @@ class MappingDialog(QDialog):
         Returns:
             Whether the draft accepted the candidate source.
         """
+        conflicting_rows = self._mapping_model.conflicting_rows(row, source)
+        if conflicting_rows:
+            self._open_binding_replacement(row, source, conflicting_rows)
+            return False
         try:
             self._mapping_model.update_source(row, source)
         except DomainValueError:
@@ -481,6 +510,57 @@ class MappingDialog(QDialog):
         self.table.selectRow(row)
         self.capture_label.setText(self.tr("Input: {source}").format(source=source))
         return True
+
+    def _open_binding_replacement(
+        self,
+        row: int,
+        source: str,
+        conflicting_rows: tuple[int, ...],
+    ) -> None:
+        if self._binding_replacement_confirmation is not None:
+            return
+        existing_targets = ", ".join(
+            self._mapping_model.target_at(conflicting_row) for conflicting_row in conflicting_rows
+        )
+        confirmation = QMessageBox(
+            QMessageBox.Icon.Warning,
+            self.tr("Replace existing binding?"),
+            self.tr("The input {source} is already assigned.").format(source=source),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            self,
+        )
+        confirmation.setInformativeText(
+            self.tr("{source}: replace {existing} with {target}").format(
+                source=source,
+                existing=existing_targets,
+                target=self._mapping_model.target_at(row),
+            )
+        )
+        confirmation.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        self._pending_binding_replacement = (row, source)
+        confirmation.buttonClicked.connect(self._handle_binding_replacement)
+        confirmation.finished.connect(self._clear_binding_replacement)
+        self._binding_replacement_confirmation = confirmation
+        confirmation.open()
+
+    def _handle_binding_replacement(self, button: QAbstractButton) -> None:
+        confirmation = self._binding_replacement_confirmation
+        pending = self._pending_binding_replacement
+        if (
+            confirmation is None
+            or pending is None
+            or confirmation.standardButton(button) != QMessageBox.StandardButton.Yes
+        ):
+            return
+        row, source = pending
+        self._mapping_model.replace_source(row, source)
+        self._capture_row = None
+        self.table.selectRow(row)
+        self.capture_label.setText(self.tr("Input: {source}").format(source=source))
+
+    def _clear_binding_replacement(self, _result: int) -> None:
+        self._binding_replacement_confirmation = None
+        self._pending_binding_replacement = None
 
     def set_inverted(self, inverted: bool) -> None:
         """Update the selected binding inversion through the draft editor.

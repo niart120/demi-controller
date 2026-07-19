@@ -94,7 +94,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
         )
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
         assert coordinator.publisher.state.held_keys == set()
@@ -103,11 +103,11 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         dialog.capture_button.click()
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
-        assert dialog.capture_label.text() == "Input: KEY:A"
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
+        assert dialog.capture_label.text() == "Input: KEY:U"
         assert coordinator.publisher.state.held_keys == set()
 
         dialog.capture_button.click()
@@ -116,7 +116,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
             QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
         assert release_requests == []
         assert dialog.capture_label.text() == "F4 is reserved for mouse capture release"
         assert dialog.mapping_model.capture_row == 0
@@ -138,13 +138,13 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
                 QEvent.Type.MouseButtonPress,
                 QPointF(10.0, 10.0),
                 QPointF(10.0, 10.0),
-                Qt.MouseButton.RightButton,
-                Qt.MouseButton.RightButton,
+                Qt.MouseButton.BackButton,
+                Qt.MouseButton.BackButton,
                 Qt.KeyboardModifier.NoModifier,
             ),
         )
 
-        assert editor.draft.profiles[0].bindings[1].source == "MOUSE:RIGHT"
+        assert editor.draft.profiles[0].bindings[1].source == "MOUSE:BUTTON_4"
         assert coordinator.publisher.state.held_mouse_buttons == set()
     finally:
         dialog.close()
@@ -242,6 +242,46 @@ def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
     qt_application.processEvents()
     reopened = MappingDialog(SettingsEditor(saved[-1]))
     assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:F12"
+
+
+def test_mapping_dialog_duplicate_assignment_names_both_targets_and_only_replace_mutates(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    _send_key(dialog.table, Qt.Key.Key_V)
+    qt_application.processEvents()
+
+    confirmation = dialog.binding_replacement_confirmation
+    assert confirmation is not None
+    assert "KEY:V" in confirmation.text()
+    assert "BUTTON:A" in confirmation.informativeText()
+    assert "BUTTON:B" in confirmation.informativeText()
+    assert editor.draft == original
+
+    cancel_button = confirmation.button(QMessageBox.StandardButton.Cancel)
+    assert cancel_button is not None
+    cancel_button.click()
+    qt_application.processEvents()
+    assert editor.draft == original
+
+    dialog.begin_capture_row(0)
+    _send_key(dialog.table, Qt.Key.Key_V)
+    qt_application.processEvents()
+    confirmation = dialog.binding_replacement_confirmation
+    assert confirmation is not None
+    replace_button = confirmation.button(QMessageBox.StandardButton.Yes)
+    assert replace_button is not None
+    replace_button.click()
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
+    assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
 
 
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
