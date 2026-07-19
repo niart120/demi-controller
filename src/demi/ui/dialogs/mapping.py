@@ -419,11 +419,15 @@ class MappingDialog(QDialog):
 
     def _activate_row_action(self, row: int) -> None:
         if self._capture_row == row:
-            self._capture_row = None
-            self._mapping_model.cancel_capture()
-            self.capture_label.setText(self.tr("Input capture cancelled"))
+            self.cancel_capture()
             return
         self.begin_capture_row(row)
+
+    def cancel_capture(self) -> None:
+        """Stop the active row remap without changing or closing the draft."""
+        self._capture_row = None
+        self._mapping_model.cancel_capture()
+        self.capture_label.setText(self.tr("Input capture cancelled"))
 
     def begin_capture(self) -> None:
         """Arm the selected table row for exactly one supported input event."""
@@ -509,6 +513,7 @@ class MappingDialog(QDialog):
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt override name.
         """Stop listening for dialog input once this dialog is hidden."""
         self._capture_row = None
+        self._mapping_model.cancel_capture()
         self._remove_input_filter()
         super().hideEvent(event)
 
@@ -530,6 +535,10 @@ class MappingDialog(QDialog):
         if not self._belongs_to_dialog(watched):
             return False
         if isinstance(event, QKeyEvent) and event.type() is QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Escape and self._capture_row is not None:
+                self.cancel_capture()
+                event.accept()
+                return True
             if event.key() == Qt.Key.Key_F4:
                 self._capture_row = None
                 self.capture_label.setText(self.tr("Input capture released with F4"))
@@ -538,6 +547,10 @@ class MappingDialog(QDialog):
                 return True
             return self._capture_source(key_source_for_event(event))
         if isinstance(event, QMouseEvent) and event.type() is QEvent.Type.MouseButtonPress:
+            if watched is self.table.viewport():
+                index = self.table.indexAt(event.position().toPoint())
+                if index.column() == 4 and index.row() == self._capture_row:
+                    return False
             return self._capture_source(mouse_source_for_event(event))
         return False
 

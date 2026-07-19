@@ -2,6 +2,7 @@ from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
 
 from demi.application.coordinator import CaptureCoordinator
@@ -146,6 +147,35 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         dialog.close()
         qt_application.processEvents()
         qt_application.removeEventFilter(adapter)
+
+
+def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    dialog.begin_capture_row(0)
+    _send_key(dialog.table, Qt.Key.Key_Escape)
+    qt_application.processEvents()
+
+    assert dialog.isVisible()
+    assert editor.draft == original
+    assert dialog.mapping_model.capture_row is None
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+
+    dialog.begin_capture_row(0)
+    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 4))
+    QTest.mouseClick(dialog.table.viewport(), Qt.MouseButton.LeftButton, pos=action_rect.center())
+    qt_application.processEvents()
+
+    assert dialog.isVisible()
+    assert editor.draft == original
+    assert dialog.mapping_model.capture_row is None
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
 
 
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
