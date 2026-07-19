@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 
-from demi.domain.controller import GyroRate
+from demi.domain.controller import AccelG, GyroRate
 
 GYRO_DISPLAY_LIMIT = 4.0
+ACCEL_DISPLAY_LIMIT = 2.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,15 @@ def gyro_display(rate: GyroRate) -> SensorDisplay:
         x=_signed_axis(rate.x_radians_per_second, GYRO_DISPLAY_LIMIT),
         y=_signed_axis(rate.y_radians_per_second, GYRO_DISPLAY_LIMIT),
         z=_signed_axis(rate.z_radians_per_second, GYRO_DISPLAY_LIMIT),
+    )
+
+
+def accel_display(acceleration: AccelG) -> SensorDisplay:
+    """Normalize signed acceleration as bounded axis-vector components."""
+    return SensorDisplay(
+        x=_signed_axis(acceleration.x_g, ACCEL_DISPLAY_LIMIT),
+        y=_signed_axis(acceleration.y_g, ACCEL_DISPLAY_LIMIT),
+        z=_signed_axis(acceleration.z_g, ACCEL_DISPLAY_LIMIT),
     )
 
 

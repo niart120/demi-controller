@@ -1,7 +1,12 @@
 import pytest
 
-from demi.domain.controller import GyroRate
-from demi.ui.preview_sensor import GYRO_DISPLAY_LIMIT, gyro_display
+from demi.domain.controller import AccelG, GyroRate
+from demi.ui.preview_sensor import (
+    ACCEL_DISPLAY_LIMIT,
+    GYRO_DISPLAY_LIMIT,
+    accel_display,
+    gyro_display,
+)
 
 
 @pytest.mark.parametrize("axis", ["x", "y", "z"])
@@ -23,7 +28,31 @@ def test_gyro_display_magnitude_is_monotonic_and_clamped() -> None:
     assert large == 1.0
 
 
+@pytest.mark.parametrize("axis", ["x", "y", "z"])
+def test_accel_axes_encode_vector_direction_and_length(axis: str) -> None:
+    positive = accel_display(_accel(axis, 0.5))
+    negative = accel_display(_accel(axis, -0.5))
+
+    assert getattr(positive, axis).direction == 1
+    assert getattr(negative, axis).direction == -1
+    assert getattr(positive, axis).magnitude == pytest.approx(0.5 / ACCEL_DISPLAY_LIMIT)
+
+
+def test_accel_display_clamps_values_beyond_its_visual_bound() -> None:
+    display = accel_display(AccelG(10.0, -10.0, 0.0))
+
+    assert display.x.magnitude == 1.0
+    assert display.y.magnitude == 1.0
+    assert display.z.magnitude == 0.0
+
+
 def _gyro(axis: str, value: float) -> GyroRate:
     values = {"x": 0.0, "y": 0.0, "z": 0.0}
     values[axis] = value
     return GyroRate(values["x"], values["y"], values["z"])
+
+
+def _accel(axis: str, value: float) -> AccelG:
+    values = {"x": 0.0, "y": 0.0, "z": 0.0}
+    values[axis] = value
+    return AccelG(values["x"], values["y"], values["z"])
