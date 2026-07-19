@@ -217,3 +217,35 @@ def test_accepted_picker_updates_only_its_swatch_draft_and_preview(
     assert previews == [changed]
     for other_field in dialog.color_buttons.keys() - {field}:
         assert getattr(changed, other_field) == getattr(original, other_field)
+
+
+@pytest.mark.parametrize("field", ["body", "buttons", "left_grip", "right_grip"])
+def test_rejected_picker_does_not_change_draft_preview_or_swatch(
+    qt_application: QApplication,
+    field: ColorField,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    previews: list[ControllerColorSettings] = []
+    dialog = ControllerColorsDialog(
+        editor,
+        connected=False,
+        on_preview=previews.append,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    original_swatch = dialog.color_buttons[field].property("swatchColor")
+    dialog.open_color_dialog(field)
+    picker = dialog.color_dialog
+    assert picker is not None
+
+    picker.setCurrentColor(QColor("#12abef"))
+    picker.reject()
+    qt_application.processEvents()
+
+    assert editor.draft == original
+    assert previews == []
+    assert dialog.color_buttons[field].property("swatchColor") == original_swatch
+    assert dialog.color_dialog is None
