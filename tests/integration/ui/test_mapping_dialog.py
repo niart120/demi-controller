@@ -128,7 +128,13 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
         reloaded = MappingDialog(SettingsEditor(editor.draft))
-        assert reloaded.mapping_model.data(reloaded.mapping_model.index(0, 1)) == "KEY:F12"
+        assert reloaded.mapping_model.data(reloaded.mapping_model.index(0, 1)) == "F12"
+        assert (
+            reloaded.mapping_model.data(
+                reloaded.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole
+            )
+            == "KEY:F12"
+        )
 
         dialog.table.selectRow(1)
         dialog.capture_button.click()
@@ -206,7 +212,11 @@ def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_an
     assert saved
 
     reopened = MappingDialog(SettingsEditor(saved[-1]))
-    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:ESCAPE"
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "Escape"
+    assert (
+        reopened.mapping_model.data(reopened.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole)
+        == "KEY:ESCAPE"
+    )
 
 
 def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
@@ -241,7 +251,11 @@ def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
     save_button.click()
     qt_application.processEvents()
     reopened = MappingDialog(SettingsEditor(saved[-1]))
-    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:F12"
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "F12"
+    assert (
+        reopened.mapping_model.data(reopened.mapping_model.index(0, 1), Qt.ItemDataRole.UserRole)
+        == "KEY:F12"
+    )
 
 
 def test_mapping_dialog_duplicate_assignment_names_both_targets_and_only_replace_mutates(
@@ -428,9 +442,9 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
 
     assert model.rowCount() == 33
     assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "KEY:I"
+    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "I"
     assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
-    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "KEY:O"
+    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
 
     dialog.table.selectRow(32)
     qt_application.processEvents()

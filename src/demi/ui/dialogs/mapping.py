@@ -137,13 +137,21 @@ class MappingTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         """Return a textual value for a valid table cell."""
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid():
             return None
         binding = self._bindings()[index.row()]
+        if index.column() == 1 and role in {
+            Qt.ItemDataRole.UserRole,
+            Qt.ItemDataRole.ToolTipRole,
+            Qt.ItemDataRole.AccessibleDescriptionRole,
+        }:
+            return binding.source
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
         input_text = (
             self.tr("Press a key or mouse button")
             if index.row() == self._capture_row
-            else binding.source
+            else _friendly_source(binding.source)
         )
         action_text = self.tr("Cancel") if index.row() == self._capture_row else self.tr("Remap")
         values = (
@@ -716,6 +724,22 @@ class MappingDialog(QDialog):
 def _invoke(callback: CaptureTransition | None) -> None:
     if callback is not None:
         callback()
+
+
+def _friendly_source(source: str) -> str:
+    translate = QCoreApplication.translate
+    if source == "KEY:UNASSIGNED":
+        return translate("MappingTableModel", "Unassigned")
+    if source.startswith("KEY:"):
+        return " + ".join(part.replace("_", " ").title() for part in source[4:].split("+"))
+    mouse_name = {
+        "MOUSE:LEFT": "Left mouse",
+        "MOUSE:RIGHT": "Right mouse",
+        "MOUSE:MIDDLE": "Middle mouse",
+        "MOUSE:BUTTON_4": "Back mouse",
+        "MOUSE:BUTTON_5": "Forward mouse",
+    }.get(source, source.removeprefix("MOUSE:").replace("_", " ").title())
+    return translate("MappingTableModel", mouse_name)
 
 
 def _sensitivity_spinbox(parent: QWidget, value: float) -> QDoubleSpinBox:

@@ -21,6 +21,12 @@
     <message><source>Remap</source><translation>変更</translation></message>
     <message><source>Press a key or mouse button</source><translation>キーまたはマウスボタンを押してください</translation></message>
     <message><source>Cancel</source><translation>中止</translation></message>
+    <message><source>Unassigned</source><translation>未割り当て</translation></message>
+    <message><source>Left mouse</source><translation>左マウス</translation></message>
+    <message><source>Middle mouse</source><translation>中央マウス</translation></message>
+    <message><source>Right mouse</source><translation>右マウス</translation></message>
+    <message><source>Back mouse</source><translation>戻るマウス</translation></message>
+    <message><source>Forward mouse</source><translation>進むマウス</translation></message>
     <message><source>Yes</source><translation>はい</translation></message>
     <message><source>No</source><translation>いいえ</translation></message>
     <message><source>Local action: {action}</source><translation>ローカル操作: {action}</translation></message>
