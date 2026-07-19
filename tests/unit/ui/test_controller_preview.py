@@ -148,7 +148,22 @@ def test_preview_limits_repaint_requests_to_sixty_hz_but_keeps_the_latest_frame(
     assert widget.model == controller_preview_model(latest, ControllerColorSettings())
 
 
-def _frame(*, sequence: int) -> ControllerFrame:
+def test_preview_keeps_keyboard_operation_independent_from_pointer_capture() -> None:
+    model = controller_preview_model(
+        _frame(sequence=1, capture_active=True, pointer_capture_active=False),
+        ControllerColorSettings(),
+    )
+
+    assert model.capture_active is True
+    assert model.pointer_capture_active is False
+
+
+def _frame(
+    *,
+    sequence: int,
+    capture_active: bool = True,
+    pointer_capture_active: bool = False,
+) -> ControllerFrame:
     return ControllerFrame(
         sequence=sequence,
         capture_epoch=1,
@@ -158,5 +173,6 @@ def _frame(*, sequence: int) -> ControllerFrame:
         right_stick=StickVector(x=0.0, y=0.0),
         gyro_rate=GyroRate(0.0, 0.0, 0.0),
         accel_g=AccelG(0.0, 0.0, 1.0),
-        capture_active=True,
+        capture_active=capture_active,
+        pointer_capture_active=pointer_capture_active,
     )
