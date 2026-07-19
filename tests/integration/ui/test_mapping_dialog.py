@@ -3,7 +3,14 @@ from dataclasses import dataclass, replace
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+)
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.dialogs import DialogKind, DialogManager
@@ -100,17 +107,17 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         assert coordinator.publisher.state.held_keys == set()
 
         dialog.table.selectRow(0)
-        dialog.capture_button.click()
+        dialog.begin_capture_row(0)
         QCoreApplication.sendEvent(
             dialog.table,
             QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
         )
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
-        assert dialog.capture_label.text() == "Input: KEY:U"
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 1)) == "U"
         assert coordinator.publisher.state.held_keys == set()
 
-        dialog.capture_button.click()
+        dialog.begin_capture_row(0)
         QCoreApplication.sendEvent(
             dialog.table,
             QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
@@ -118,7 +125,9 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
         assert release_requests == []
-        assert dialog.capture_label.text() == "F4 is reserved for mouse capture release"
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+            "F4 is reserved for mouse capture release"
+        )
         assert dialog.mapping_model.capture_row == 0
 
         QCoreApplication.sendEvent(
@@ -137,7 +146,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         )
 
         dialog.table.selectRow(1)
-        dialog.capture_button.click()
+        dialog.begin_capture_row(1)
         QCoreApplication.sendEvent(
             dialog.table,
             QMouseEvent(
@@ -238,7 +247,9 @@ def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert dialog.capture_label.text() == "F4 is reserved for mouse capture release"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+        "F4 is reserved for mouse capture release"
+    )
     assert dialog.mapping_model.capture_row == 0
     assert release_requests == []
 
@@ -561,9 +572,9 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
 
     _send_key(dialog.inverted_checkbox, Qt.Key.Key_Tab)
     qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.capture_button
+    assert qt_application.focusWidget() is dialog.restore_button
 
-    _send_key(dialog.capture_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
+    _send_key(dialog.restore_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
     qt_application.processEvents()
     assert qt_application.focusWidget() is dialog.inverted_checkbox
 
@@ -643,6 +654,21 @@ def test_mapping_dialog_shows_default_columns_without_text_clipping(
     assert dialog.table.horizontalScrollBar().maximum() == 0
     dialog.close()
     qt_application.processEvents()
+
+
+def test_mapping_dialog_removes_the_external_capture_button_and_fixed_prompt(
+    qt_application: QApplication,
+) -> None:
+    assert qt_application is not None
+    dialog = MappingDialog(SettingsEditor(AppSettings.default()))
+
+    assert not hasattr(dialog, "capture_button")
+    assert not hasattr(dialog, "capture_label")
+    button_texts = {button.text() for button in dialog.findChildren(QPushButton)}
+    label_texts = {label.text() for label in dialog.findChildren(QLabel)}
+
+    assert "Capture next input" not in button_texts
+    assert "No input captured" not in label_texts
 
 
 def _send_key(

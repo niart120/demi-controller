@@ -114,6 +114,7 @@ class MappingTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._editor = editor
         self._capture_row: int | None = None
+        self._row_status: dict[int, str] = {}
 
     @override
     def rowCount(
@@ -159,7 +160,7 @@ class MappingTableModel(QAbstractTableModel):
             binding.target.value,
             input_text,
             self.tr("Yes") if binding.inverted else self.tr("No"),
-            self._conflict_text(index.row()),
+            self._row_status.get(index.row()) or self._conflict_text(index.row()),
             action_text,
         )
         return values[index.column()]
@@ -173,14 +174,25 @@ class MappingTableModel(QAbstractTableModel):
         """Mark one binding row as waiting for its replacement source."""
         if not 0 <= row < self.rowCount():
             raise DomainValueError
+        if self._capture_row is not None:
+            self._row_status.pop(self._capture_row, None)
         self._capture_row = row
+        self._row_status.pop(row, None)
         self._reset_from_editor()
 
     def cancel_capture(self) -> None:
         """Clear the waiting row without changing the settings draft."""
         if self._capture_row is None:
             return
+        self._row_status.pop(self._capture_row, None)
         self._capture_row = None
+        self._reset_from_editor()
+
+    def set_row_status(self, row: int, message: str) -> None:
+        """Show transient feedback in the affected row's status column."""
+        if not 0 <= row < self.rowCount():
+            raise DomainValueError
+        self._row_status[row] = message
         self._reset_from_editor()
 
     @override
@@ -208,12 +220,14 @@ class MappingTableModel(QAbstractTableModel):
         """
         self._editor.update_binding(row, source=source)
         self._capture_row = None
+        self._row_status.pop(row, None)
         self._reset_from_editor()
 
     def replace_source(self, row: int, source: str) -> None:
         """Assign a source and unassign every conflicting row atomically."""
         self._editor.replace_binding_source(row, source)
         self._capture_row = None
+        self._row_status.pop(row, None)
         self._reset_from_editor()
 
     def conflicting_rows(self, row: int, source: str) -> tuple[int, ...]:
@@ -249,6 +263,7 @@ class MappingTableModel(QAbstractTableModel):
     def restore_default_profile(self) -> None:
         """Restore the standard profile through the application-owned editor."""
         self._editor.reset_profile()
+        self._row_status.clear()
         self._reset_from_editor()
 
     def conflict_summary(self) -> str:
@@ -341,8 +356,6 @@ class MappingDialog(QDialog):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.capture_button = QPushButton(self.tr("Capture next input"), self)
-        self.capture_label = QLabel(self.tr("No input captured"), self)
         self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
         self.inverted_checkbox.setEnabled(False)
         mouse_settings = editor.draft.input.mouse
@@ -387,8 +400,6 @@ class MappingDialog(QDialog):
         bindings_layout = QVBoxLayout(bindings_page)
         bindings_layout.addWidget(self.table)
         bindings_layout.addWidget(self.inverted_checkbox)
-        bindings_layout.addWidget(self.capture_button)
-        bindings_layout.addWidget(self.capture_label)
         bindings_layout.addWidget(self.restore_button)
         mouse_page = QWidget(self)
         mouse_layout = QVBoxLayout(mouse_page)
@@ -406,8 +417,8 @@ class MappingDialog(QDialog):
         self.resize(840, 640)
 
         QWidget.setTabOrder(self.table, self.inverted_checkbox)
-        QWidget.setTabOrder(self.inverted_checkbox, self.capture_button)
-        QWidget.setTabOrder(self.capture_button, self.mouse_gyro_enabled_checkbox)
+        QWidget.setTabOrder(self.inverted_checkbox, self.restore_button)
+        QWidget.setTabOrder(self.restore_button, self.mouse_gyro_enabled_checkbox)
         QWidget.setTabOrder(
             self.mouse_gyro_enabled_checkbox,
             self.horizontal_sensitivity_spinbox,
@@ -419,9 +430,8 @@ class MappingDialog(QDialog):
         QWidget.setTabOrder(self.vertical_sensitivity_spinbox, self.invert_x_checkbox)
         QWidget.setTabOrder(self.invert_x_checkbox, self.invert_y_checkbox)
         QWidget.setTabOrder(self.invert_y_checkbox, self.pitch_limit_spinbox)
-        QWidget.setTabOrder(self.pitch_limit_spinbox, self.restore_button)
+        QWidget.setTabOrder(self.pitch_limit_spinbox, self.button_box)
 
-        self.capture_button.clicked.connect(self.begin_capture)
         self.assign_escape_action.triggered.connect(self.assign_escape)
         self.tabs.currentChanged.connect(self._handle_tab_changed)
         self.restore_button.clicked.connect(self.restore_default_profile)
@@ -470,7 +480,6 @@ class MappingDialog(QDialog):
         self._capture_row = row
         self._mapping_model.begin_capture(row)
         self.table.selectRow(row)
-        self.capture_label.setText(self.tr("Press the next key or mouse button"))
 
     def _activate_row_action(self, row: int) -> None:
         if self._capture_row == row:
@@ -482,7 +491,6 @@ class MappingDialog(QDialog):
         """Stop the active row remap without changing or closing the draft."""
         self._capture_row = None
         self._mapping_model.cancel_capture()
-        self.capture_label.setText(self.tr("Input capture cancelled"))
 
     def _handle_tab_changed(self, index: int) -> None:
         if index != 0 and self._capture_row is not None:
@@ -492,25 +500,15 @@ class MappingDialog(QDialog):
         """Assign Escape to the selected row through an explicit action."""
         selected = self.table.currentIndex()
         if not selected.isValid():
-            self.capture_label.setText(self.tr("Select a target"))
             return
         self.cancel_capture()
         self.set_source(selected.row(), "KEY:ESCAPE")
-
-    def begin_capture(self) -> None:
-        """Arm the selected table row for exactly one supported input event."""
-        selected = self.table.currentIndex()
-        if not selected.isValid():
-            self.capture_label.setText(self.tr("Select a target"))
-            return
-        self.begin_capture_row(selected.row())
 
     def restore_default_profile(self) -> None:
         """Restore the built-in profile through the application-owned editor."""
         self._mapping_model.restore_default_profile()
         self._capture_row = None
         self._mapping_model.cancel_capture()
-        self.capture_label.setText(self.tr("Defaults restored"))
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -529,10 +527,9 @@ class MappingDialog(QDialog):
         try:
             self._mapping_model.update_source(row, source)
         except DomainValueError:
-            self.capture_label.setText(self.tr("Input cannot be assigned"))
+            self._mapping_model.set_row_status(row, self.tr("Input cannot be assigned"))
             return False
         self.table.selectRow(row)
-        self.capture_label.setText(self.tr("Input: {source}").format(source=source))
         return True
 
     def _open_binding_replacement(
@@ -580,7 +577,6 @@ class MappingDialog(QDialog):
         self._mapping_model.replace_source(row, source)
         self._capture_row = None
         self.table.selectRow(row)
-        self.capture_label.setText(self.tr("Input: {source}").format(source=source))
 
     def _clear_binding_replacement(self, _result: int) -> None:
         self._binding_replacement_confirmation = None
@@ -673,9 +669,11 @@ class MappingDialog(QDialog):
                 return True
             if event.key() == Qt.Key.Key_F4 and "KEY:F4" in RESERVED_BINDING_SOURCES:
                 if self._capture_row is not None:
-                    self.capture_label.setText(self.tr("F4 is reserved for mouse capture release"))
+                    self._mapping_model.set_row_status(
+                        self._capture_row,
+                        self.tr("F4 is reserved for mouse capture release"),
+                    )
                 else:
-                    self.capture_label.setText(self.tr("Input capture released with F4"))
                     _invoke(self._on_release_capture)
                 event.accept()
                 return True

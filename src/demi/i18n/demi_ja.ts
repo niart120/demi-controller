@@ -42,8 +42,6 @@
     <message><source>The input {source} is already assigned.</source><translation>{source}はすでに割り当てられています。</translation></message>
     <message><source>{source}: replace {existing} with {target}</source><translation>{source}: {existing}を解除して{target}へ割り当てます</translation></message>
     <message><source>Key mappings</source><translation>キー割り当て</translation></message>
-    <message><source>Capture next input</source><translation>次の入力を取得</translation></message>
-    <message><source>No input captured</source><translation>入力を取得していません</translation></message>
     <message><source>Inverted</source><translation>反転</translation></message>
     <message><source>Mouse gyro settings</source><translation>マウスジャイロ設定</translation></message>
     <message><source>Enabled</source><translation>有効</translation></message>
@@ -53,11 +51,8 @@
     <message><source>Vertical sensitivity</source><translation>垂直感度</translation></message>
     <message><source>Pitch limit</source><translation>ピッチ上限</translation></message>
     <message><source>Restore defaults</source><translation>標準に戻す</translation></message>
-    <message><source>Select a target</source><translation>対象を選択してください</translation></message>
     <message><source>Press the next key or mouse button</source><translation>次のキーまたはマウスボタンを押してください</translation></message>
-    <message><source>Defaults restored</source><translation>標準設定に戻しました</translation></message>
     <message><source>Input cannot be assigned</source><translation>入力を割り当てられません</translation></message>
-    <message><source>Input: {source}</source><translation>入力: {source}</translation></message>
     <message><source>Key mapping conflicts</source><translation>キー割り当ての競合</translation></message>
     <message><source>Mappings conflict with duplicates or local actions.</source><translation>重複またはローカル操作との競合があります。</translation></message>
     <message><source>Input capture released with F4</source><translation>F4で入力捕捉を解除しました</translation></message>

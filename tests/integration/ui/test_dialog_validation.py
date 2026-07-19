@@ -22,7 +22,9 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
 
     assert not mapping.set_source(0, "KEY:F4")
     assert mapping_editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert mapping.capture_label.text() == "Input cannot be assigned"
+    assert mapping.mapping_model.data(mapping.mapping_model.index(0, 3)) == (
+        "Input cannot be assigned"
+    )
     assert mapping.isVisible()
 
     connection_editor = SettingsEditor(AppSettings.default())

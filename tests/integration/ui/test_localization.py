@@ -37,7 +37,6 @@ def test_default_user_interface_uses_english_source_text(
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "No"
-    assert mapping.capture_button.text() == "Capture next input"
     assert mapping.mouse_gyro_group.title() == "Mouse gyro settings"
     assert connection.windowTitle() == "Connection settings"
     assert connection.rescan_button.text() == "Rescan"
@@ -98,9 +97,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
     assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
     assert (
-        mapping.table.model().data(
-            mapping.table.model().index(4, 1), Qt.ItemDataRole.UserRole
-        )
+        mapping.table.model().data(mapping.table.model().index(4, 1), Qt.ItemDataRole.UserRole)
         == "MOUSE:MIDDLE"
     )
     assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
@@ -111,7 +108,6 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
         )
         == "MOUSE:MIDDLE"
     )
-    assert mapping.capture_button.text() == "次の入力を取得"
     assert mapping.mouse_gyro_group.title() == "マウスジャイロ設定"
     assert "ピッチ上限" in {label.text() for label in mapping.findChildren(QLabel)}
     assert connection.windowTitle() == "接続設定"

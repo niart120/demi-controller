@@ -56,3 +56,22 @@ def test_mapping_model_changes_only_the_armed_row_to_instruction_and_cancel(
     assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Cancel"
     assert model.data(model.index(1, 1), Qt.ItemDataRole.DisplayRole) == unchanged_source
     assert model.data(model.index(1, 4), Qt.ItemDataRole.DisplayRole) == "Remap"
+
+
+def test_mapping_model_clears_transient_status_when_capture_moves_or_stops(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    model = MappingTableModel(SettingsEditor(AppSettings.default()))
+    status_index = model.index(0, 3)
+
+    model.begin_capture(0)
+    model.set_row_status(0, "F4 is reserved")
+    model.begin_capture(1)
+
+    assert model.data(status_index, Qt.ItemDataRole.DisplayRole) == ""
+
+    model.set_row_status(1, "Input cannot be assigned")
+    model.cancel_capture()
+
+    assert model.data(model.index(1, 3), Qt.ItemDataRole.DisplayRole) == ""
