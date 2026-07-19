@@ -93,7 +93,7 @@
 | refactor-done | canonical sourceとfriendly display roleを分離し、locale変更で永続値が変わらない | new / regression | unit | 16件green。display変換をmodel境界へ分離しcanonical roleを保持 |
 | refactor-done | Bindings / Mouse gyro間のtab移動は待受を残さず、Tab順がrow actionとSave / Cancelへ到達する | new / edge | integration | 16件green。tab変更時の取消とAction列keyboard転送を追加 |
 | refactor-done | mapping dialogから表外の「次の入力を取得」buttonと固定対象labelがなくなる | regression | integration | 22件green。入力待受を行内Actionへ限定し、予約・不正入力の説明を対象行の状態列へ集約 |
-| todo | Windows通常描画で選択、待受、reserved、conflict後の状態が不自然に見えない | new | manual | `$inspect-gui-states`で代表PNGを確認する |
+| refactor-skipped | Windows通常描画で選択、待受、reserved、conflict後の状態が不自然に見えない | new | manual | 通常、選択、待受、F4予約、競合確認の6 PNGを確認。文字切れ・重なりはなく追加修正なし |
 
 ## 7. 設計メモ
 
@@ -131,6 +131,7 @@
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-friendly-green2 tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_localization.py -q` | pass | 16 passed。friendly表示、canonical role、保存往復を確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-tabs-green2 tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 16 passed。tab移動の待受取消、Action列keyboard操作、Save / Cancel focusを確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-inline-only-green2 tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_dialog_validation.py tests/integration/ui/test_localization.py -q` | pass | 22 passed。表外取得buttonと固定labelの不在、行内待受、行内の予約・不正入力説明を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit-035-inline/scenario.py --output tmp/gui-audit/unit-035-inline` | pass | Windows通常描画で6 PNGを取得。通常、選択、待受、F4予約、競合確認に文字切れ・重なりなし。待受と予約理由が対象行だけに表示されることを目視確認 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/unit/application/test_settings_editor.py` | not run | 実装前の仕様作成段階 |
 | `uv run pytest tests/integration/ui/test_mapping_dialog.py` | not run | Qt eventとfocus実装後に実行する |
 | 標準gate | not run | settings保存とinput capture境界変更のため実装時に必須 |
