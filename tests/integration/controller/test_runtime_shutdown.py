@@ -76,12 +76,15 @@ class WaitingAdapter:
         """Provide the adapter protocol operation."""
         del adapter_id, bond_path, timeout_seconds, colors
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Complete fake disconnect."""
+        del neutral
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Provide the adapter protocol operation."""
-        del colors
+        del colors, neutral
 
     async def send_frame(self, frame: ControllerFrame) -> None:
         """Accept cleanup rest state."""

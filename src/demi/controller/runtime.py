@@ -366,8 +366,7 @@ class ControllerRuntime:
         self._set_connection_state(ConnectionState.DISCONNECTING)
         try:
             if self._connected:
-                await self._apply_rest_state()
-                await adapter.disconnect()
+                await self._disconnect_after_rest(adapter)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
@@ -388,7 +387,8 @@ class ControllerRuntime:
         self._watchdog.set_connected(False)
         self._set_connection_state(ConnectionState.CONNECTING, adapter_id)
         try:
-            await adapter.recreate_with_colors(command.colors)
+            await self._apply_rest_state()
+            await adapter.recreate_with_colors(command.colors, neutral=False)
             self._connected = True
             self._watchdog.set_connected(True)
             await self._apply_connection_initial_state()
@@ -446,6 +446,15 @@ class ControllerRuntime:
         if self._adapter is not None:
             await self._adapter.send_frame(self._connection_initial_frame())
 
+    async def _disconnect_after_rest(self, adapter: "ControllerAdapter") -> None:
+        """Send Project_Demi rest before closing without a duplicate neutral."""
+        rest_sent = False
+        try:
+            await self._apply_rest_state()
+            rest_sent = True
+        finally:
+            await adapter.disconnect(neutral=not rest_sent)
+
     def _connection_initial_frame(self) -> ControllerFrame:
         frame = self._neutral_frame()
         latest = self._latest_frame
@@ -474,16 +483,7 @@ class ControllerRuntime:
             if adapter is not None:
                 if self._connected:
                     try:
-                        await self._apply_rest_state()
-                    except Exception as error:  # noqa: BLE001
-                        self._emit_error(
-                            self._category_for_error(
-                                error, ControllerErrorCategory.SHUTDOWN_FAILED
-                            ),
-                            error,
-                        )
-                    try:
-                        await adapter.disconnect()
+                        await self._disconnect_after_rest(adapter)
                     except Exception as error:  # noqa: BLE001
                         self._emit_error(
                             self._category_for_error(
@@ -527,7 +527,7 @@ class ControllerRuntime:
         if adapter is None:
             return
         try:
-            await adapter.disconnect()
+            await adapter.disconnect(neutral=True)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),

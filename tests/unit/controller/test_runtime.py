@@ -131,14 +131,17 @@ class FakeAdapter:
         """Complete a fake pairing operation."""
         del adapter_id, bond_path, timeout_seconds, colors
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Complete a fake disconnect."""
+        del neutral
         if self.disconnect_error is not None:
             raise self.disconnect_error
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Complete a fake color recreation."""
-        del colors
+        del colors, neutral
         self.recreate_calls += 1
         if self.recreate_error is not None:
             raise self.recreate_error
@@ -213,9 +216,11 @@ class WaitingRecreateAdapter(FakeAdapter):
     recreate_started: Event = field(default_factory=Event)
     recreate_cancelled: Event = field(default_factory=Event)
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Wait indefinitely and record task cancellation."""
-        del colors
+        del colors, neutral
         self.recreate_calls += 1
         self.recreate_started.set()
         try:
@@ -282,8 +287,9 @@ class CleanupRecordingAdapter(FakeAdapter):
         if self.fail_stage == "rest":
             raise RuntimeError
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Record disconnect and optionally fail it."""
+        del neutral
         self.cleanup_operations.append("disconnect")
         if self.fail_stage == "disconnect":
             raise RuntimeError

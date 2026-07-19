@@ -67,7 +67,7 @@ def test_saved_reconnect_and_pairing_use_distinct_public_lifecycle_routes() -> N
 
     async def exercise() -> None:
         await adapter.connect_saved("usb:0", Path("saved.json"), 12.5, colors)
-        await adapter.disconnect()
+        await adapter.disconnect(neutral=False)
         await adapter.start_pairing("usb:0", Path("new.json"), 20.0, colors)
         await adapter.close()
 
@@ -79,6 +79,8 @@ def test_saved_reconnect_and_pairing_use_distinct_public_lifecycle_routes() -> N
     ]
     assert gamepads[0].reconnect_timeouts == [12.5]
     assert gamepads[1].connect_options == [(20.0, True)]
+    assert gamepads[0].close_neutral_values == [False]
+    assert gamepads[1].close_neutral_values == [True]
     assert [kwargs["key_store_path"] for kwargs in factory_kwargs] == [
         "saved.json",
         "new.json",

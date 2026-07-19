@@ -143,26 +143,28 @@ class SwbtControllerAdapter(ControllerAdapter):
             await self._discard_failed_gamepad()
             _raise_adapter_failure(error, ControllerErrorCategory.PAIRING_TIMEOUT)
 
-    async def disconnect(self) -> None:
-        """Close the current gamepad with a final neutral attempt."""
+    async def disconnect(self, *, neutral: bool = True) -> None:
+        """Close the current gamepad with the requested neutral policy."""
         gamepad = self._gamepad
         if gamepad is None:
             return
         try:
-            await gamepad.close(neutral=True)
+            await gamepad.close(neutral=neutral)
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
         finally:
             self._clear_gamepad()
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Recreate and reconnect the current saved controller with new colors."""
         adapter_id = self._adapter_id
         bond_path = self._bond_path
         timeout_seconds = self._timeout_seconds
         if adapter_id is None or bond_path is None:
             return
-        await self.disconnect()
+        await self.disconnect(neutral=neutral)
         await self.connect_saved(adapter_id, bond_path, timeout_seconds or 30.0, colors)
 
     async def send_frame(self, frame: ControllerFrame) -> None:

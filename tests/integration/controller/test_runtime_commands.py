@@ -125,13 +125,16 @@ class RecordingAdapter:
         self.pairing_bond_paths.append(bond_path)
         self._record("pairing")
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Record a disconnect request."""
+        del neutral
         self._record("disconnect")
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Record a color recreation request."""
-        del colors
+        del colors, neutral
         self._record("colors")
 
     async def send_frame(self, frame: ControllerFrame) -> None:
