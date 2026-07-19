@@ -249,3 +249,33 @@ def test_rejected_picker_does_not_change_draft_preview_or_swatch(
     assert previews == []
     assert dialog.color_buttons[field].property("swatchColor") == original_swatch
     assert dialog.color_dialog is None
+
+
+def test_textless_swatches_publish_field_color_and_action_to_assistive_ui() -> None:
+    settings = AppSettings.default()
+    dialog = ControllerColorsDialog(
+        SettingsEditor(settings),
+        connected=False,
+        on_preview=lambda _colors: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    expected_names: dict[ColorField, str] = {
+        "body": "Body",
+        "buttons": "Buttons",
+        "left_grip": "Left grip",
+        "right_grip": "Right grip",
+    }
+
+    for field, name in expected_names.items():
+        button = dialog.color_buttons[field]
+        color = getattr(settings.controller_colors, field)
+        assert button.accessibleName() == name
+        assert name in button.accessibleDescription()
+        assert color in button.accessibleDescription()
+        assert "choose a color" in button.accessibleDescription().lower()
+        assert name in button.toolTip()
+        assert color in button.toolTip()
+        assert "choose a color" in button.toolTip().lower()

@@ -82,7 +82,7 @@ class ControllerColorsDialog(QDialog):
                 lambda _checked=False, selected_field=field: self.open_color_dialog(selected_field)
             )
             self.color_buttons[field] = button
-            color_form.addRow(label, button)
+            color_form.addRow(self.tr(label), button)
 
         self.save_error_label = QLabel("", self)
         self.button_box = QDialogButtonBox(
@@ -202,9 +202,14 @@ class ControllerColorsDialog(QDialog):
     def _refresh_color_buttons(self, colors: ControllerColorSettings) -> None:
         for field, button in self.color_buttons.items():
             color = self._color_value(field, colors)
+            label = self.tr(_COLOR_LABELS[field])
+            action = self.tr("Choose a color")
             button.setText("")
             button.setProperty("swatchColor", color)
             button.setStyleSheet(f"background-color: {color};")
+            button.setAccessibleName(label)
+            button.setAccessibleDescription(f"{label}: {color}. {action}")
+            button.setToolTip(f"{label}: {color}. {action}")
 
     def _color_value(
         self,
