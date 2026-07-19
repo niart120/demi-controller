@@ -196,7 +196,10 @@ class ControllerColorsDialog(QDialog):
 
     def _refresh_color_buttons(self, colors: ControllerColorSettings) -> None:
         for field, button in self.color_buttons.items():
-            button.setText(self._color_value(field, colors))
+            color = self._color_value(field, colors)
+            button.setText("")
+            button.setProperty("swatchColor", color)
+            button.setStyleSheet(f"background-color: {color};")
 
     def _color_value(
         self,

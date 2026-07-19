@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QMessageBox
 
 from demi.application.settings_editor import SettingsEditor
 from demi.domain.settings import AppSettings
@@ -11,6 +11,7 @@ from demi.ui.dialogs.colors import ControllerColorsDialog
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QApplication
 
+    from demi.application.settings_editor import ColorField
     from demi.domain.settings import ControllerColorSettings
 
 
@@ -41,7 +42,7 @@ def test_colors_dialog_previews_draft_restores_saved_colors_and_requests_reconne
 
     assert editor.draft.controller_colors.body == "#ABCDEF"
     assert previews[-1].body == "#ABCDEF"
-    assert cancelled.color_buttons["body"].text() == "#ABCDEF"
+    assert cancelled.color_buttons["body"].property("swatchColor") == "#ABCDEF"
 
     cancel_button = cancelled.button_box.button(QDialogButtonBox.StandardButton.Cancel)
     assert cancel_button is not None
@@ -116,3 +117,30 @@ def test_colors_dialog_previews_draft_restores_saved_colors_and_requests_reconne
 
     assert deferred == ["later"]
     assert deferring.result() == int(QDialog.DialogCode.Accepted)
+
+
+def test_colors_dialog_uses_four_textless_swatches_for_the_current_colors() -> None:
+    settings = AppSettings.default()
+    dialog = ControllerColorsDialog(
+        SettingsEditor(settings),
+        connected=False,
+        on_preview=lambda _colors: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+
+    expected: dict[ColorField, str] = {
+        "body": settings.controller_colors.body,
+        "buttons": settings.controller_colors.buttons,
+        "left_grip": settings.controller_colors.left_grip,
+        "right_grip": settings.controller_colors.right_grip,
+    }
+    assert set(dialog.color_buttons) == set(expected)
+    for field, color in expected.items():
+        button = dialog.color_buttons[field]
+        assert button.text() == ""
+        assert button.property("swatchColor") == color
+
+    assert not any(label.text().startswith("#") for label in dialog.findChildren(QLabel))

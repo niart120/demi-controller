@@ -77,7 +77,7 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | 4つの色fieldに対応するswatch buttonが現在色を保持し、visible textとvisible hex labelを持たない | new / regression | unit / integration | dynamic propertyまたはpalette roleを検証する |
+| refactor-skipped | 4つの色fieldに対応するswatch buttonが現在色を保持し、visible textとvisible hex labelを持たない | new / regression | unit / integration | 2件green。既存refresh境界でswatchColor propertyと塗りを更新し追加の構造変更なし |
 | todo | 各swatchのclick、Enter、Spaceが正しいfieldと現在色でpickerを開く | new / regression | integration | input方法で処理を分けない |
 | todo | picker acceptedは対象swatch、draft、previewだけを更新し、他fieldを維持する | regression | unit / integration | fieldごとにparameterizeする |
 | todo | picker rejectedはdraft、preview、swatch、dirty stateを変更しない | regression / edge | integration | 無変更signalも確認する |
