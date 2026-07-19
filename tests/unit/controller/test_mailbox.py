@@ -77,3 +77,13 @@ def test_mailbox_coalesces_pending_gyro_angle_while_keeping_latest_state() -> No
     assert sent.sample_duration_ns == 16_000_000
     assert sent.gyro_rate.z_radians_per_second == pytest.approx(0.0)
     assert mailbox.peek() == newest
+
+
+def test_mailbox_discards_pending_frame_without_losing_latest_view() -> None:
+    mailbox = LatestFrameMailbox()
+    frame = make_frame(sequence=1, epoch=1, duration_ns=8_000_000, gyro_z=1.0)
+
+    assert mailbox.offer(frame) is True
+    assert mailbox.discard_pending(reason="test") is True
+    assert mailbox.take() is None
+    assert mailbox.peek() == frame

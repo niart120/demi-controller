@@ -366,6 +366,7 @@ class ControllerRuntime:
         self._set_connection_state(ConnectionState.DISCONNECTING)
         try:
             if self._connected:
+                self._mailbox.discard_pending(reason="disconnect")
                 await self._disconnect_after_rest(adapter)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
@@ -387,6 +388,7 @@ class ControllerRuntime:
         self._watchdog.set_connected(False)
         self._set_connection_state(ConnectionState.CONNECTING, adapter_id)
         try:
+            self._mailbox.discard_pending(reason="color_recreate")
             await self._apply_rest_state()
             await adapter.recreate_with_colors(command.colors, neutral=False)
             self._connected = True
@@ -394,6 +396,7 @@ class ControllerRuntime:
             await self._apply_connection_initial_state()
             self._set_connection_state(ConnectionState.CONNECTED, adapter_id)
         except Exception as error:  # noqa: BLE001
+            self._mailbox.discard_pending(reason="send_failure")
             self._connected = False
             self._connected_adapter_id = None
             self._watchdog.set_connected(False)
@@ -450,6 +453,7 @@ class ControllerRuntime:
         """Send Project_Demi rest before closing without a duplicate neutral."""
         rest_sent = False
         try:
+            self._mailbox.discard_pending(reason="watchdog")
             await self._apply_rest_state()
             rest_sent = True
         finally:
@@ -483,6 +487,7 @@ class ControllerRuntime:
             if adapter is not None:
                 if self._connected:
                     try:
+                        self._mailbox.discard_pending(reason="shutdown")
                         await self._disconnect_after_rest(adapter)
                     except Exception as error:  # noqa: BLE001
                         self._emit_error(
@@ -526,6 +531,7 @@ class ControllerRuntime:
         self._adapter = None
         if adapter is None:
             return
+        self._mailbox.discard_pending(reason="recovery")
         try:
             await adapter.disconnect(neutral=True)
         except Exception as error:  # noqa: BLE001

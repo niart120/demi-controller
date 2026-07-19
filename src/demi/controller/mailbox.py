@@ -1,9 +1,12 @@
 """Thread-safe latest-frame view and constant-size send coalescer."""
 
+import logging
 from dataclasses import replace
 from threading import Lock
 
 from demi.domain.controller import ControllerFrame, GyroRate
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class LatestFrameMailbox:
@@ -61,6 +64,24 @@ class LatestFrameMailbox:
             frame = self._pending
             self._clear_pending()
             return frame
+
+    def discard_pending(self, *, reason: str) -> bool:
+        """Discard unsent input at a safety boundary and record its reason."""
+        with self._lock:
+            frame = self._pending
+            self._clear_pending()
+        if frame is None:
+            return False
+        _LOGGER.debug(
+            "Discarded coalesced controller frame",
+            extra={
+                "reason": reason,
+                "sequence": frame.sequence,
+                "capture_epoch": frame.capture_epoch,
+                "sample_duration_ns": frame.sample_duration_ns,
+            },
+        )
+        return True
 
     def _append_pending(self, frame: ControllerFrame) -> None:
         if self._pending is None:
