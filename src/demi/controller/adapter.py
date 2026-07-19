@@ -48,8 +48,8 @@ class ControllerAdapter(Protocol):
     async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
         """Recreate the controller using new colors."""
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
-        """Apply one complete Project_Demi controller frame."""
+    async def send_frame(self, frame: ControllerFrame) -> None:
+        """Send one complete Project_Demi controller frame."""
 
     async def close(self) -> None:
         """Release all adapter resources."""

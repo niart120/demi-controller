@@ -412,7 +412,7 @@ class ControllerRuntime:
         if frame.capture_active and self._watchdog.watchdog_tripped:
             return
         try:
-            await self._adapter.apply_frame(frame)
+            await self._adapter.send_frame(frame)
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
@@ -439,11 +439,11 @@ class ControllerRuntime:
 
     async def _apply_rest_state(self) -> None:
         if self._adapter is not None:
-            await self._adapter.apply_frame(self._neutral_frame())
+            await self._adapter.send_frame(self._neutral_frame())
 
     async def _apply_connection_initial_state(self) -> None:
         if self._adapter is not None:
-            await self._adapter.apply_frame(self._connection_initial_frame())
+            await self._adapter.send_frame(self._connection_initial_frame())
 
     def _connection_initial_frame(self) -> ControllerFrame:
         frame = self._neutral_frame()

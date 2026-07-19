@@ -12,11 +12,11 @@ from swbt import (
     ConnectionFailedError,
     ConnectionTimeoutError,
     ControllerColors,
+    DirectProController,
     IMUFrame,
     InputState,
     InvalidInputError,
     InvalidKeyStoreError,
-    ProController,
     Stick,
     SwbtError,
     TransportOpenError,
@@ -46,8 +46,8 @@ class SwbtGamepad(Protocol):
     ) -> None:
         """Connect through reconnect and optional pairing."""
 
-    async def apply(self, state: InputState) -> None:
-        """Replace the complete input state."""
+    async def send(self, state: InputState) -> None:
+        """Send one complete input state and wait for completion."""
 
     async def close(self, *, neutral: bool = True) -> None:
         """Close the gamepad and optionally send neutral."""
@@ -85,20 +85,17 @@ class SwbtControllerAdapter(ControllerAdapter):
     def __init__(
         self,
         *,
-        gamepad_factory: GamepadFactory = ProController,
+        gamepad_factory: GamepadFactory = DirectProController,
         adapter_lister: AdapterLister = list_adapters,
-        report_period_us: int = 8_000,
     ) -> None:
         """Initialize an adapter with injectable public-API boundaries.
 
         Args:
             gamepad_factory: Public swbt gamepad constructor.
             adapter_lister: Public swbt adapter discovery function.
-            report_period_us: Periodic input report interval in microseconds.
         """
         self._gamepad_factory = gamepad_factory
         self._adapter_lister = adapter_lister
-        self._report_period_us = report_period_us
         self._gamepad: SwbtGamepad | None = None
         self._adapter_id: str | None = None
         self._bond_path: Path | None = None
@@ -168,10 +165,10 @@ class SwbtControllerAdapter(ControllerAdapter):
         await self.disconnect()
         await self.connect_saved(adapter_id, bond_path, timeout_seconds or 30.0, colors)
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
-        """Convert and apply one complete Project_Demi frame."""
+    async def send_frame(self, frame: ControllerFrame) -> None:
+        """Convert and send one complete Project_Demi frame."""
         try:
-            await self._require_gamepad().apply(frame_to_input_state(frame))
+            await self._require_gamepad().send(frame_to_input_state(frame))
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
 
@@ -191,7 +188,6 @@ class SwbtControllerAdapter(ControllerAdapter):
             adapter=adapter_id,
             key_store_path=str(bond_path),
             controller_colors=to_swbt_colors(colors),
-            report_period_us=self._report_period_us,
         )
         self._adapter_id = adapter_id
         self._bond_path = bond_path

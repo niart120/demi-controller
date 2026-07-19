@@ -143,7 +143,7 @@ class FakeAdapter:
         if self.recreate_error is not None:
             raise self.recreate_error
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Accept a frame without hardware."""
         del frame
         self.apply_calls += 1
@@ -248,7 +248,7 @@ class WaitingFrameAdapter(FakeAdapter):
     frame_cancelled: Event = field(default_factory=Event)
     active_sequences: list[int] = field(default_factory=list)
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Block active input but allow rest-state cleanup."""
         self.apply_calls += 1
         if not frame.capture_active:
@@ -270,7 +270,7 @@ class CleanupRecordingAdapter(FakeAdapter):
     cleanup_operations: list[str] = field(default_factory=list)
     rest_calls: int = 0
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Record initial and shutdown rest-state application."""
         self.apply_calls += 1
         if frame.capture_active:

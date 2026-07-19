@@ -134,9 +134,9 @@ class RecordingAdapter:
         del colors
         self._record("colors")
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Record a complete frame application."""
-        self._record("apply_frame")
+        self._record("send_frame")
         if frame.capture_active:
             self.active_frame_attempts.append(frame)
             if self.active_frame_error is not None:
@@ -179,7 +179,7 @@ def test_commands_are_ordered_on_worker_and_events_return_to_the_sink() -> None:
 
     runtime.close()
 
-    assert adapter.operations[:4] == ["discover", "connect_saved", "apply_frame", "apply_frame"]
+    assert adapter.operations[:4] == ["discover", "connect_saved", "send_frame", "send_frame"]
     assert "disconnect" in adapter.operations
     assert adapter.operations[-1] == "close"
     assert len(set(adapter.thread_ids)) == 1

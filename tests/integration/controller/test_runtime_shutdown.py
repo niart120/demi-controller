@@ -83,7 +83,7 @@ class WaitingAdapter:
         """Provide the adapter protocol operation."""
         del colors
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Accept cleanup rest state."""
         del frame
 

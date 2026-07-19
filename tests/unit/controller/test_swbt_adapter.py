@@ -14,7 +14,7 @@ from demi.domain.settings import ControllerColorSettings
 class RecordingGamepad:
     """Public-gamepad-shaped fake used to observe translated input states."""
 
-    applied_states: list[InputState] = field(default_factory=list)
+    sent_states: list[InputState] = field(default_factory=list)
 
     async def open(self) -> None:
         """Open the fake gamepad."""
@@ -32,9 +32,9 @@ class RecordingGamepad:
         """Connect the fake gamepad."""
         del timeout, allow_pairing
 
-    async def apply(self, state: InputState) -> None:
+    async def send(self, state: InputState) -> None:
         """Record one complete public input state."""
-        self.applied_states.append(state)
+        self.sent_states.append(state)
 
     async def close(self, *, neutral: bool = True) -> None:
         """Close the fake gamepad."""
@@ -71,12 +71,12 @@ def test_controller_frame_is_converted_to_one_public_input_state() -> None:
             30.0,
             ControllerColorSettings(),
         )
-        await adapter.apply_frame(frame)
+        await adapter.send_frame(frame)
 
     asyncio.run(exercise())
 
-    assert len(gamepad.applied_states) == 1
-    state = gamepad.applied_states[0]
+    assert len(gamepad.sent_states) == 1
+    state = gamepad.sent_states[0]
     assert state.buttons == frozenset({Button.A, Button.ZR})
     assert state.left_stick == Stick.normalized(x=-1.0, y=0.25)
     assert state.right_stick == Stick.normalized(x=0.5, y=-1.0)
@@ -118,11 +118,11 @@ def test_neutral_frame_uses_one_g_acceleration_in_all_three_imu_slots() -> None:
             30.0,
             ControllerColorSettings(),
         )
-        await adapter.apply_frame(neutral_frame)
+        await adapter.send_frame(neutral_frame)
 
     asyncio.run(exercise())
 
-    state = gamepad.applied_states[0]
+    state = gamepad.sent_states[0]
     expected_imu = IMUFrame.gyro_rate().with_accel_g(x_g=0.0, y_g=0.0, z_g=1.0)
     assert state.buttons == frozenset()
     assert state.left_stick == Stick.center()
@@ -188,7 +188,7 @@ def test_adapter_info_and_project_colors_cross_the_public_boundary() -> None:
     assert swbt_colors.right_grip == 0x708090
 
 
-def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
+def test_direct_gamepad_constructor_omits_report_period() -> None:
     gamepad = RecordingGamepad()
     constructor_kwargs: dict[str, object] = {}
 
@@ -199,7 +199,6 @@ def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
     adapter = SwbtControllerAdapter(
         gamepad_factory=gamepad_factory,
         adapter_lister=lambda: (),
-        report_period_us=16_000,
     )
 
     asyncio.run(
@@ -211,4 +210,4 @@ def test_configured_report_period_crosses_the_public_gamepad_boundary() -> None:
         )
     )
 
-    assert constructor_kwargs["report_period_us"] == 16_000
+    assert "report_period_us" not in constructor_kwargs
