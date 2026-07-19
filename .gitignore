@@ -10,4 +10,5 @@ build/
 .ty/
 .coverage
 htmlcov/
-tmp/
+tmp/*
+!tmp/.gitkeep
