@@ -229,6 +229,7 @@ class ControllerRuntime:
                     frame_task = asyncio.create_task(frame_event.wait())
                 if watchdog_task in done:
                     watchdog_task.result()
+                    await self._neutralize_for_watchdog()
                     watchdog_task = asyncio.create_task(self._watchdog_loop())
         except Exception as error:  # noqa: BLE001
             self._emit_error(
@@ -267,7 +268,7 @@ class ControllerRuntime:
         while True:
             await asyncio.sleep(FrameWatchdog.monitor_interval_ms / 1000.0)
             if self._watchdog.check():
-                await self._neutralize_for_watchdog()
+                return
 
     async def _handle_command(self, command: ControllerCommand) -> None:
         if isinstance(command, DiscoverAdapters):
