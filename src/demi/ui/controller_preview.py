@@ -11,7 +11,13 @@ from PySide6.QtWidgets import QWidget
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
-from demi.ui.preview_layout import CONTROL_IDS, normalized_stick_position
+from demi.ui.preview_layout import (
+    CONTROL_IDS,
+    PreviewRect,
+    normalized_stick_position,
+    preview_layout,
+)
+from demi.ui.preview_sensor import SensorDisplay, accel_display, gyro_display
 
 type RepaintRequest = Callable[[], object]
 
@@ -76,6 +82,8 @@ class ControllerPreviewModel:
     right_stick_position: tuple[float, float]
     gyro_rate: GyroRate
     accel_g: AccelG
+    gyro_display: SensorDisplay
+    accel_display: SensorDisplay
     capture_active: bool
     pointer_capture_active: bool
     control_ids: frozenset[str]
@@ -107,6 +115,8 @@ def controller_preview_model(
         right_stick_position=normalized_stick_position(frame.right_stick.x, frame.right_stick.y),
         gyro_rate=frame.gyro_rate,
         accel_g=frame.accel_g,
+        gyro_display=gyro_display(frame.gyro_rate),
+        accel_display=accel_display(frame.accel_g),
         capture_active=frame.capture_active,
         pointer_capture_active=frame.pointer_capture_active,
         control_ids=CONTROL_IDS,
@@ -198,108 +208,152 @@ class ControllerPreviewWidget(QWidget):
         painter.end()
 
     def _draw_model(self, painter: QPainter, model: ControllerPreviewModel) -> None:
-        bounds = QRectF(self.rect()).adjusted(20.0, 20.0, -20.0, -20.0)
+        canvas_width = self.width()
+        canvas_height = self.height()
+        layout = preview_layout(canvas_width, canvas_height)
         body = QRectF(
-            bounds.left() + bounds.width() * 0.15,
-            bounds.top() + bounds.height() * 0.22,
-            bounds.width() * 0.70,
-            bounds.height() * 0.46,
+            canvas_width * 0.04,
+            canvas_height * 0.16,
+            canvas_width * 0.92,
+            canvas_height * 0.62,
         )
         painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
         painter.setBrush(QColor(model.body_color))
-        painter.drawRoundedRect(body, 44.0, 44.0)
-
-        left_grip_center = QPointF(body.left() + body.width() * 0.18, body.center().y())
-        right_grip_center = QPointF(body.right() - body.width() * 0.18, body.center().y())
-        self._draw_grip(painter, left_grip_center, QColor(model.left_grip_color))
-        self._draw_grip(painter, right_grip_center, QColor(model.right_grip_color))
-        self._draw_stick(painter, left_grip_center, model.left_stick)
-        self._draw_stick(painter, right_grip_center, model.right_stick)
-        self._draw_buttons(painter, body, model)
-        self._draw_diagnostics(painter, bounds, model)
-        self._draw_capture_overlay(painter, body, model.pointer_capture_active)
+        painter.drawRoundedRect(body, 36.0, 36.0)
+        for control_id, bounds in layout.controls.items():
+            self._draw_control(painter, control_id, bounds, model)
+        self._draw_status(painter, model)
+        self._draw_sensors(painter, model)
 
     def _request_widget_repaint(self) -> None:
         self.update()
 
-    @staticmethod
-    def _draw_grip(painter: QPainter, center: QPointF, color: QColor) -> None:
-        painter.setPen(QPen(QColor("#E0E0E0"), 1.5))
-        painter.setBrush(color)
-        painter.drawEllipse(_circle(center, 54.0))
-
-    @staticmethod
-    def _draw_stick(painter: QPainter, center: QPointF, stick: StickVector) -> None:
-        painter.setPen(QPen(QColor("#F5F5F5"), 2.0))
-        painter.setBrush(QColor("#242424"))
-        painter.drawEllipse(_circle(center, 31.0))
-        thumb_center = QPointF(center.x() + stick.x * 21.0, center.y() - stick.y * 21.0)
-        painter.setBrush(QColor("#D8D8D8"))
-        painter.drawEllipse(_circle(thumb_center, 11.0))
-
-    @staticmethod
-    def _draw_buttons(
+    def _draw_control(
+        self,
         painter: QPainter,
-        body: QRectF,
+        control_id: str,
+        bounds: PreviewRect,
         model: ControllerPreviewModel,
     ) -> None:
-        positions = {
-            LogicalButton.X: QPointF(body.right() - 78.0, body.top() + 62.0),
-            LogicalButton.Y: QPointF(body.right() - 102.0, body.top() + 86.0),
-            LogicalButton.A: QPointF(body.right() - 54.0, body.top() + 86.0),
-            LogicalButton.B: QPointF(body.right() - 78.0, body.top() + 110.0),
-            LogicalButton.DPAD_UP: QPointF(body.left() + 78.0, body.top() + 62.0),
-            LogicalButton.DPAD_LEFT: QPointF(body.left() + 54.0, body.top() + 86.0),
-            LogicalButton.DPAD_RIGHT: QPointF(body.left() + 102.0, body.top() + 86.0),
-            LogicalButton.DPAD_DOWN: QPointF(body.left() + 78.0, body.top() + 110.0),
-        }
+        rect = QRectF(bounds.left, bounds.top, bounds.width, bounds.height)
+        pressed = control_id in model.pressed_control_ids
         base_color = QColor(model.buttons_color)
-        for button, center in positions.items():
-            painter.setPen(QPen(QColor("#F0F0F0"), 1.5))
-            button_color = (
-                base_color.lighter(150) if button in model.pressed_buttons else base_color
+        painter.setPen(QPen(QColor("#F5F5F5"), 1.5))
+        painter.setBrush(base_color.lighter(165) if pressed else base_color)
+        if control_id in {"left_stick", "right_stick"}:
+            grip_color = QColor(
+                model.left_grip_color if control_id == "left_stick" else model.right_grip_color
             )
-            painter.setBrush(button_color)
-            painter.drawEllipse(_circle(center, 13.0))
-            painter.drawText(_circle(center, 13.0), Qt.AlignmentFlag.AlignCenter, button.value[:1])
+            painter.setBrush(grip_color)
+            painter.drawEllipse(rect)
+            position = (
+                model.left_stick_position
+                if control_id == "left_stick"
+                else model.right_stick_position
+            )
+            radius = min(rect.width(), rect.height()) * 0.17
+            travel = min(rect.width(), rect.height()) * 0.25
+            center = rect.center()
+            knob = QPointF(center.x() + position[0] * travel, center.y() - position[1] * travel)
+            painter.setBrush(QColor("#D8D8D8"))
+            painter.drawEllipse(_circle(knob, radius))
+            return
+        if control_id.endswith("_stick_click"):
+            painter.setBrush(QColor("#F4C95D") if pressed else QColor("#303030"))
+            painter.drawEllipse(rect)
+            return
+        label = {
+            "dpad_up": "↑",
+            "dpad_right": "→",
+            "dpad_down": "↓",
+            "dpad_left": "←",
+            "minus": "-",
+            "plus": "+",
+            "home": "H",
+            "capture": "C",
+        }.get(control_id, control_id.upper())
+        if control_id in {"zl", "l", "r", "zr", "minus", "plus", "home", "capture"}:
+            painter.drawRoundedRect(rect, 7.0, 7.0)
+        else:
+            painter.drawEllipse(rect)
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, label)
 
-    @staticmethod
-    def _draw_diagnostics(
-        painter: QPainter,
-        bounds: QRectF,
-        model: ControllerPreviewModel,
-    ) -> None:
-        painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
+    def _draw_status(self, painter: QPainter, model: ControllerPreviewModel) -> None:
         translate = QCoreApplication.translate
-        pressed = ", ".join(sorted(button.value for button in model.pressed_buttons)) or translate(
-            "ControllerPreviewWidget", "None"
+        keyboard = translate("ControllerPreviewWidget", "Keyboard input")
+        mouse = translate("ControllerPreviewWidget", "Mouse capture")
+        on = translate("ControllerPreviewWidget", "On")
+        off = translate("ControllerPreviewWidget", "Off")
+        painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
+        status = QRectF(self.width() * 0.34, self.height() * 0.72, self.width() * 0.32, 34.0)
+        painter.drawText(
+            status,
+            Qt.AlignmentFlag.AlignCenter,
+            f"{keyboard}: {on if model.capture_active else off}  ·  "
+            f"{mouse}: {on if model.pointer_capture_active else off}",
         )
-        text = (
-            f"{translate('ControllerPreviewWidget', 'Buttons')}: {pressed}\n"
-            f"{translate('ControllerPreviewWidget', 'Gyro')}: "
-            f"{model.gyro_rate.x_radians_per_second:.2f}, "
-            f"{model.gyro_rate.y_radians_per_second:.2f}, "
-            f"{model.gyro_rate.z_radians_per_second:.2f}\n"
-            f"{translate('ControllerPreviewWidget', 'Acceleration')}: "
-            f"{model.accel_g.x_g:.2f}, {model.accel_g.y_g:.2f}, {model.accel_g.z_g:.2f}"
+
+    def _draw_sensors(self, painter: QPainter, model: ControllerPreviewModel) -> None:
+        translate = QCoreApplication.translate
+        top = self.height() * 0.82
+        height = self.height() * 0.14
+        gyro_bounds = QRectF(self.width() * 0.06, top, self.width() * 0.40, height)
+        accel_bounds = QRectF(self.width() * 0.54, top, self.width() * 0.40, height)
+        self._draw_gyro(painter, gyro_bounds, model.gyro_display)
+        self._draw_accel(painter, accel_bounds, model.accel_display)
+        painter.setPen(QPen(QColor("#EAEAEA"), 1.0))
+        painter.drawText(
+            gyro_bounds,
+            Qt.AlignmentFlag.AlignTop,
+            translate("ControllerPreviewWidget", "Gyro"),
         )
-        diagnostics = QRectF(bounds.left(), bounds.bottom() - 58.0, bounds.width(), 58.0)
-        painter.drawText(diagnostics, Qt.AlignmentFlag.AlignLeft, text)
+        painter.drawText(
+            accel_bounds,
+            Qt.AlignmentFlag.AlignTop,
+            translate("ControllerPreviewWidget", "Acceleration"),
+        )
 
     @staticmethod
-    def _draw_capture_overlay(
-        painter: QPainter, body: QRectF, pointer_capture_active: bool
-    ) -> None:
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#167A4C") if pointer_capture_active else QColor("#4A4A4A"))
-        overlay = QRectF(body.center().x() - 64.0, body.bottom() - 36.0, 128.0, 24.0)
-        painter.drawRoundedRect(overlay, 8.0, 8.0)
-        painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
-        label = QCoreApplication.translate(
-            "ControllerPreviewWidget",
-            "Mouse captured" if pointer_capture_active else "Mouse not captured",
+    def _draw_gyro(painter: QPainter, bounds: QRectF, display: SensorDisplay) -> None:
+        colors = (QColor("#E25D5D"), QColor("#63B66F"), QColor("#5B8DEF"))
+        axes = zip((display.x, display.y, display.z), colors, strict=True)
+        for index, (axis, color) in enumerate(axes):
+            center = QPointF(
+                bounds.left() + bounds.width() * (0.32 + index * 0.24),
+                bounds.center().y() + 5.0,
+            )
+            radius = min(bounds.height() * 0.30, bounds.width() * 0.08)
+            painter.setPen(QPen(QColor("#555555"), 2.0))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(_circle(center, radius))
+            painter.setPen(QPen(color, 4.0))
+            span = int(axis.direction * axis.magnitude * 300.0 * 16.0)
+            painter.drawArc(_circle(center, radius), 90 * 16, span)
+            painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
+            painter.drawText(_circle(center, radius), Qt.AlignmentFlag.AlignCenter, "XYZ"[index])
+
+    @staticmethod
+    def _draw_accel(painter: QPainter, bounds: QRectF, display: SensorDisplay) -> None:
+        center = QPointF(bounds.center().x(), bounds.center().y() + 5.0)
+        length = min(bounds.width() * 0.32, bounds.height() * 0.42)
+        axes = (
+            (display.x, QPointF(1.0, 0.0), QColor("#E25D5D"), "X"),
+            (display.y, QPointF(0.0, -1.0), QColor("#63B66F"), "Y"),
+            (display.z, QPointF(0.72, -0.72), QColor("#5B8DEF"), "Z"),
         )
-        painter.drawText(overlay, Qt.AlignmentFlag.AlignCenter, label)
+        for axis, direction, color, label in axes:
+            signed_length = length * axis.magnitude * axis.direction
+            end = QPointF(
+                center.x() + direction.x() * signed_length,
+                center.y() + direction.y() * signed_length,
+            )
+            painter.setPen(QPen(color, 4.0))
+            painter.drawLine(center, end)
+            label_bounds = QRectF(end.x() - 9.0, end.y() - 9.0, 18.0, 18.0)
+            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, label)
+        painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
+        painter.setBrush(QColor("#F0F0F0"))
+        painter.drawEllipse(_circle(center, 3.0))
 
 
 def _circle(center: QPointF, radius: float) -> QRectF:

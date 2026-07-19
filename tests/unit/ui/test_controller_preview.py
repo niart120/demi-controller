@@ -15,6 +15,7 @@ from demi.ui.controller_preview import (
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
+from demi.ui.preview_sensor import accel_display, gyro_display
 
 
 @dataclass
@@ -103,6 +104,8 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     assert model.right_stick_position == (0.75, -0.5)
     assert model.gyro_rate == GyroRate(1.25, -2.5, 0.5)
     assert model.accel_g == AccelG(0.1, -0.2, 1.05)
+    assert model.gyro_display == gyro_display(frame.gyro_rate)
+    assert model.accel_display == accel_display(frame.accel_g)
     assert model.capture_active is True
     assert model.pointer_capture_active is True
 

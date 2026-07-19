@@ -89,6 +89,10 @@
     <message><source>Buttons</source><translation>ボタン</translation></message>
     <message><source>Gyro</source><translation>ジャイロ</translation></message>
     <message><source>Acceleration</source><translation>加速度</translation></message>
+    <message><source>Keyboard input</source><translation>キーボード入力</translation></message>
+    <message><source>Mouse capture</source><translation>マウス捕捉</translation></message>
+    <message><source>On</source><translation>有効</translation></message>
+    <message><source>Off</source><translation>無効</translation></message>
     <message><source>Mouse captured</source><translation>マウス捕捉中</translation></message>
     <message><source>Mouse not captured</source><translation>マウス捕捉なし</translation></message>
   </context>
