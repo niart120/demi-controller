@@ -69,6 +69,7 @@ class ControllerPreviewModel:
     left_grip_color: str
     right_grip_color: str
     pressed_buttons: frozenset[LogicalButton]
+    pressed_control_ids: frozenset[str]
     left_stick: StickVector
     right_stick: StickVector
     gyro_rate: GyroRate
@@ -97,6 +98,7 @@ def controller_preview_model(
         left_grip_color=colors.left_grip,
         right_grip_color=colors.right_grip,
         pressed_buttons=frame.buttons,
+        pressed_control_ids=frozenset(_control_id(button) for button in frame.buttons),
         left_stick=frame.left_stick,
         right_stick=frame.right_stick,
         gyro_rate=frame.gyro_rate,
@@ -105,6 +107,14 @@ def controller_preview_model(
         pointer_capture_active=frame.pointer_capture_active,
         control_ids=CONTROL_IDS,
     )
+
+
+def _control_id(button: LogicalButton) -> str:
+    if button is LogicalButton.LEFT_STICK:
+        return "left_stick_click"
+    if button is LogicalButton.RIGHT_STICK:
+        return "right_stick_click"
+    return button.value.lower()
 
 
 class ControllerPreviewWidget(QWidget):

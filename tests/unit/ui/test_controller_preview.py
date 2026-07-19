@@ -94,6 +94,7 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     assert model.left_grip_color == "#708090"
     assert model.right_grip_color == "#A0B0C0"
     assert model.pressed_buttons == frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT})
+    assert model.pressed_control_ids == frozenset({"a", "dpad_left"})
     assert model.left_stick == StickVector(x=-0.5, y=0.25)
     assert model.right_stick == StickVector(x=0.75, y=-0.5)
     assert model.gyro_rate == GyroRate(1.25, -2.5, 0.5)
