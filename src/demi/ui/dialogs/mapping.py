@@ -84,7 +84,6 @@ class MappingActionDelegate(QStyledItemDelegate):
             if (
                 event.type() is QEvent.Type.MouseButtonRelease
                 and event.button() is Qt.MouseButton.LeftButton
-                and option.rect.contains(event.position().toPoint())
             ):
                 self._on_activated(index.row())
                 return True
@@ -680,9 +679,7 @@ class MappingDialog(QDialog):
             return self._capture_source(key_source_for_event(event))
         if isinstance(event, QMouseEvent) and event.type() is QEvent.Type.MouseButtonPress:
             if watched is self.table.viewport():
-                index = self.table.indexAt(event.position().toPoint())
-                if index.column() == 4 and index.row() == self._capture_row:
-                    return False
+                return False
             return self._capture_source(mouse_source_for_event(event))
         return False
 
