@@ -137,7 +137,7 @@ error-on-warning = true
 output-format = "concise"
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
+addopts = "-ra --strict-config --strict-markers --basetemp=tmp/pytest"
 testpaths = ["tests"]
 xfail_strict = true
 empty_parameter_set_mark = "fail_at_collect"

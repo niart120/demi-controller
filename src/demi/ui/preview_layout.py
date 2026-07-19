@@ -40,6 +40,13 @@ class PreviewRect:
 class PreviewLayout:
     """Named control bounds for one preview canvas size."""
 
+    content_bounds: PreviewRect
+    body_bounds: PreviewRect
+    left_grip_bounds: PreviewRect
+    right_grip_bounds: PreviewRect
+    status_bounds: PreviewRect
+    gyro_bounds: PreviewRect
+    accel_bounds: PreviewRect
     controls: Mapping[str, PreviewRect]
 
 
@@ -66,6 +73,23 @@ _RELATIVE_CONTROLS = {
     "right_stick_click": (0.665, 0.64, 0.05, 0.06),
 }
 CONTROL_IDS = frozenset(_RELATIVE_CONTROLS)
+_CONTENT_ASPECT_RATIO = 8 / 5
+_ROUND_CONTROL_IDS = frozenset(
+    {
+        "a",
+        "b",
+        "x",
+        "y",
+        "dpad_up",
+        "dpad_right",
+        "dpad_down",
+        "dpad_left",
+        "left_stick",
+        "left_stick_click",
+        "right_stick",
+        "right_stick_click",
+    }
+)
 
 
 def normalized_stick_position(x: float, y: float) -> tuple[float, float]:
@@ -79,19 +103,54 @@ def preview_layout(width: int, height: int) -> PreviewLayout:
     """Return relative control bounds scaled to one positive canvas size."""
     if width <= 0 or height <= 0:
         raise DomainValueError
+    if width / height > _CONTENT_ASPECT_RATIO:
+        content_height = float(height)
+        content_width = content_height * _CONTENT_ASPECT_RATIO
+    else:
+        content_width = float(width)
+        content_height = content_width / _CONTENT_ASPECT_RATIO
+    content_bounds = PreviewRect(
+        left=(width - content_width) / 2,
+        top=(height - content_height) / 2,
+        width=content_width,
+        height=content_height,
+    )
+    controls: dict[str, PreviewRect] = {}
+    for control_id, (left, top, relative_width, relative_height) in _RELATIVE_CONTROLS.items():
+        control_width = relative_width * content_width
+        control_height = relative_height * content_height
+        control_left = content_bounds.left + left * content_width
+        if control_id in _ROUND_CONTROL_IDS:
+            control_left += (control_width - control_height) / 2
+            control_width = control_height
+        controls[control_id] = PreviewRect(
+            left=control_left,
+            top=content_bounds.top + top * content_height,
+            width=control_width,
+            height=control_height,
+        )
     return PreviewLayout(
-        controls={
-            control_id: PreviewRect(
-                left * width,
-                top * height,
-                relative_width * width,
-                relative_height * height,
-            )
-            for control_id, (
-                left,
-                top,
-                relative_width,
-                relative_height,
-            ) in _RELATIVE_CONTROLS.items()
-        }
+        content_bounds=content_bounds,
+        body_bounds=_scaled_rect(content_bounds, 0.04, 0.16, 0.92, 0.62),
+        left_grip_bounds=_scaled_rect(content_bounds, 0.15, 0.59, 0.32, 0.19),
+        right_grip_bounds=_scaled_rect(content_bounds, 0.53, 0.59, 0.32, 0.19),
+        status_bounds=_scaled_rect(content_bounds, 0.05, 0.515, 0.90, 0.055),
+        gyro_bounds=_scaled_rect(content_bounds, 0.06, 0.82, 0.40, 0.14),
+        accel_bounds=_scaled_rect(content_bounds, 0.54, 0.82, 0.40, 0.14),
+        controls=controls,
+    )
+
+
+def _scaled_rect(
+    content: PreviewRect,
+    left: float,
+    top: float,
+    width: float,
+    height: float,
+) -> PreviewRect:
+    return PreviewRect(
+        left=content.left + left * content.width,
+        top=content.top + top * content.height,
+        width=width * content.width,
+        height=height * content.height,
     )

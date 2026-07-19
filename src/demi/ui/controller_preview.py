@@ -3,6 +3,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from math import hypot
 from typing import Protocol
 
 from PySide6.QtCore import QCoreApplication, QPointF, QRectF, Qt
@@ -17,9 +18,19 @@ from demi.ui.preview_layout import (
     normalized_stick_position,
     preview_layout,
 )
-from demi.ui.preview_sensor import SensorDisplay, accel_display, gyro_display
+from demi.ui.preview_sensor import (
+    SensorDisplay,
+    SignedAxisDisplay,
+    accel_display,
+    gyro_display,
+)
 
 type RepaintRequest = Callable[[], object]
+
+_PRESSED_FILL_COLOR = "#F4C95D"
+_PRESSED_OUTLINE_COLOR = "#FFF1A8"
+_PRESSED_TEXT_COLOR = "#181818"
+_STICK_CLICK_IDS = frozenset({"left_stick_click", "right_stick_click"})
 
 
 class PreviewClock(Protocol):
@@ -211,19 +222,17 @@ class ControllerPreviewWidget(QWidget):
         canvas_width = self.width()
         canvas_height = self.height()
         layout = preview_layout(canvas_width, canvas_height)
-        body = QRectF(
-            canvas_width * 0.04,
-            canvas_height * 0.16,
-            canvas_width * 0.92,
-            canvas_height * 0.62,
-        )
         painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
         painter.setBrush(QColor(model.body_color))
-        painter.drawRoundedRect(body, 36.0, 36.0)
+        painter.drawRoundedRect(_qrect(layout.body_bounds), 36.0, 36.0)
+        self._draw_grip(painter, layout.left_grip_bounds, model.left_grip_color)
+        self._draw_grip(painter, layout.right_grip_bounds, model.right_grip_color)
         for control_id, bounds in layout.controls.items():
+            if control_id in _STICK_CLICK_IDS:
+                continue
             self._draw_control(painter, control_id, bounds, model)
-        self._draw_status(painter, model)
-        self._draw_sensors(painter, model)
+        self._draw_status(painter, model, layout.status_bounds)
+        self._draw_sensors(painter, model, layout.gyro_bounds, layout.accel_bounds)
 
     def _request_widget_repaint(self) -> None:
         self.update()
@@ -235,16 +244,21 @@ class ControllerPreviewWidget(QWidget):
         bounds: PreviewRect,
         model: ControllerPreviewModel,
     ) -> None:
-        rect = QRectF(bounds.left, bounds.top, bounds.width, bounds.height)
+        rect = _qrect(bounds)
         pressed = control_id in model.pressed_control_ids
         base_color = QColor(model.buttons_color)
-        painter.setPen(QPen(QColor("#F5F5F5"), 1.5))
-        painter.setBrush(base_color.lighter(165) if pressed else base_color)
         if control_id in {"left_stick", "right_stick"}:
-            grip_color = QColor(
-                model.left_grip_color if control_id == "left_stick" else model.right_grip_color
+            stick_click_id = (
+                "left_stick_click" if control_id == "left_stick" else "right_stick_click"
             )
-            painter.setBrush(grip_color)
+            stick_pressed = stick_click_id in model.pressed_control_ids
+            painter.setPen(
+                QPen(
+                    QColor(_PRESSED_OUTLINE_COLOR if stick_pressed else "#F5F5F5"),
+                    4.0 if stick_pressed else 1.5,
+                )
+            )
+            painter.setBrush(base_color)
             painter.drawEllipse(rect)
             position = (
                 model.left_stick_position
@@ -258,10 +272,13 @@ class ControllerPreviewWidget(QWidget):
             painter.setBrush(QColor("#D8D8D8"))
             painter.drawEllipse(_circle(knob, radius))
             return
-        if control_id.endswith("_stick_click"):
-            painter.setBrush(QColor("#F4C95D") if pressed else QColor("#303030"))
-            painter.drawEllipse(rect)
-            return
+        painter.setPen(
+            QPen(
+                QColor(_PRESSED_OUTLINE_COLOR if pressed else "#F5F5F5"),
+                3.0 if pressed else 1.5,
+            )
+        )
+        painter.setBrush(QColor(_PRESSED_FILL_COLOR) if pressed else base_color)
         label = {
             "dpad_up": "↑",
             "dpad_right": "→",
@@ -276,34 +293,50 @@ class ControllerPreviewWidget(QWidget):
             painter.drawRoundedRect(rect, 7.0, 7.0)
         else:
             painter.drawEllipse(rect)
+        font = painter.font()
+        label_font = painter.font()
+        label_font.setPixelSize(_control_label_pixel_size(bounds))
+        painter.setFont(label_font)
+        painter.setPen(QPen(QColor(_PRESSED_TEXT_COLOR if pressed else "#F5F5F5"), 1.0))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, label)
+        painter.setFont(font)
 
-    def _draw_status(self, painter: QPainter, model: ControllerPreviewModel) -> None:
+    @staticmethod
+    def _draw_grip(painter: QPainter, bounds: PreviewRect, color: str) -> None:
+        painter.setPen(QPen(QColor("#B8B8B8"), 1.5))
+        painter.setBrush(QColor(color))
+        radius = min(bounds.width, bounds.height) * 0.45
+        painter.drawRoundedRect(_qrect(bounds), radius, radius)
+
+    def _draw_status(
+        self,
+        painter: QPainter,
+        model: ControllerPreviewModel,
+        bounds: PreviewRect,
+    ) -> None:
         translate = QCoreApplication.translate
         keyboard = translate("ControllerPreviewWidget", "Keyboard input")
         mouse = translate("ControllerPreviewWidget", "Mouse capture")
         on = translate("ControllerPreviewWidget", "On")
         off = translate("ControllerPreviewWidget", "Off")
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
-        status = QRectF(
-            self.width() * 0.05,
-            self.height() * 0.515,
-            self.width() * 0.90,
-            self.height() * 0.055,
-        )
         painter.drawText(
-            status,
+            _qrect(bounds),
             Qt.AlignmentFlag.AlignCenter,
             f"{keyboard}: {on if model.capture_active else off}  ·  "
             f"{mouse}: {on if model.pointer_capture_active else off}",
         )
 
-    def _draw_sensors(self, painter: QPainter, model: ControllerPreviewModel) -> None:
+    def _draw_sensors(
+        self,
+        painter: QPainter,
+        model: ControllerPreviewModel,
+        gyro_region: PreviewRect,
+        accel_region: PreviewRect,
+    ) -> None:
         translate = QCoreApplication.translate
-        top = self.height() * 0.82
-        height = self.height() * 0.14
-        gyro_bounds = QRectF(self.width() * 0.06, top, self.width() * 0.40, height)
-        accel_bounds = QRectF(self.width() * 0.54, top, self.width() * 0.40, height)
+        gyro_bounds = _qrect(gyro_region)
+        accel_bounds = _qrect(accel_region)
         self._draw_gyro(painter, gyro_bounds, model.gyro_display)
         self._draw_accel(painter, accel_bounds, model.accel_display)
         painter.setPen(QPen(QColor("#EAEAEA"), 1.0))
@@ -323,39 +356,67 @@ class ControllerPreviewWidget(QWidget):
         colors = (QColor("#E25D5D"), QColor("#63B66F"), QColor("#5B8DEF"))
         axes = zip((display.x, display.y, display.z), colors, strict=True)
         for index, (axis, color) in enumerate(axes):
-            center = QPointF(
-                bounds.left() + bounds.width() * (0.32 + index * 0.24),
-                bounds.center().y() + 5.0,
+            track, fill = _gyro_bar_geometry(bounds, index, axis)
+            radius = track.height() / 2.0
+            painter.setPen(QPen(QColor("#707070"), 1.0))
+            painter.setBrush(QColor("#303030"))
+            painter.drawRoundedRect(track, radius, radius)
+            if fill.width() > 0.0:
+                painter.setPen(QPen(color, 1.0))
+                painter.setBrush(color)
+                painter.drawRoundedRect(fill, radius, radius)
+            painter.setPen(QPen(QColor("#B8B8B8"), 1.0))
+            painter.drawLine(
+                QPointF(track.center().x(), track.top() - 2.0),
+                QPointF(track.center().x(), track.bottom() + 2.0),
             )
-            radius = min(bounds.height() * 0.30, bounds.width() * 0.08)
-            painter.setPen(QPen(QColor("#555555"), 2.0))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(_circle(center, radius))
-            painter.setPen(QPen(color, 4.0))
-            span = int(axis.direction * axis.magnitude * 300.0 * 16.0)
-            painter.drawArc(_circle(center, radius), 90 * 16, span)
-            painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
-            painter.drawText(_circle(center, radius), Qt.AlignmentFlag.AlignCenter, "XYZ"[index])
+            label_bounds = QRectF(
+                bounds.left(),
+                track.center().y() - bounds.height() * 0.11,
+                bounds.width() * 0.17,
+                bounds.height() * 0.22,
+            )
+            painter.setPen(QPen(color, 1.0))
+            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, "XYZ"[index])
 
     @staticmethod
     def _draw_accel(painter: QPainter, bounds: QRectF, display: SensorDisplay) -> None:
-        center = QPointF(bounds.center().x(), bounds.center().y() + 5.0)
-        length = min(bounds.width() * 0.32, bounds.height() * 0.42)
-        axes = (
-            (display.x, QPointF(1.0, 0.0), QColor("#E25D5D"), "X"),
-            (display.y, QPointF(0.0, -1.0), QColor("#63B66F"), "Y"),
-            (display.z, QPointF(0.72, -0.72), QColor("#5B8DEF"), "Z"),
-        )
-        for axis, direction, color, label in axes:
-            signed_length = length * axis.magnitude * axis.direction
-            end = QPointF(
-                center.x() + direction.x() * signed_length,
-                center.y() + direction.y() * signed_length,
+        center, end, guides = _accel_vector_geometry(bounds, display)
+        colors = (QColor("#E25D5D"), QColor("#63B66F"), QColor("#5B8DEF"))
+        for index, ((guide_start, guide_end), color) in enumerate(zip(guides, colors, strict=True)):
+            painter.setPen(QPen(QColor("#626262"), 1.0))
+            painter.drawLine(guide_start, guide_end)
+            label_bounds = QRectF(guide_end.x() - 11.0, guide_end.y() - 7.0, 22.0, 14.0)
+            original_font = painter.font()
+            label_font = painter.font()
+            label_font.setPixelSize(max(8, round(bounds.height() * 0.13)))
+            painter.setFont(label_font)
+            painter.setPen(QPen(color, 1.0))
+            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, f"+{'XYZ'[index]}")
+            painter.setFont(original_font)
+
+        painter.setPen(QPen(QColor("#E8EEF4"), 4.0))
+        painter.drawLine(center, end)
+        vector_x = end.x() - center.x()
+        vector_y = end.y() - center.y()
+        vector_length = hypot(vector_x, vector_y)
+        if vector_length > 0.0:
+            unit_x = vector_x / vector_length
+            unit_y = vector_y / vector_length
+            head_length = min(9.0, bounds.height() * 0.12)
+            base = QPointF(
+                end.x() - unit_x * head_length,
+                end.y() - unit_y * head_length,
             )
-            painter.setPen(QPen(color, 4.0))
-            painter.drawLine(center, end)
-            label_bounds = QRectF(end.x() - 9.0, end.y() - 9.0, 18.0, 18.0)
-            painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, label)
+            side = head_length * 0.45
+            painter.drawLine(
+                end,
+                QPointF(base.x() - unit_y * side, base.y() + unit_x * side),
+            )
+            painter.drawLine(
+                end,
+                QPointF(base.x() + unit_y * side, base.y() - unit_x * side),
+            )
         painter.setPen(QPen(QColor("#F0F0F0"), 1.0))
         painter.setBrush(QColor("#F0F0F0"))
         painter.drawEllipse(_circle(center, 3.0))
@@ -363,6 +424,70 @@ class ControllerPreviewWidget(QWidget):
 
 def _circle(center: QPointF, radius: float) -> QRectF:
     return QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+
+def _qrect(bounds: PreviewRect) -> QRectF:
+    return QRectF(bounds.left, bounds.top, bounds.width, bounds.height)
+
+
+def _control_label_pixel_size(bounds: PreviewRect) -> int:
+    return max(11, round(min(bounds.width, bounds.height) * 0.42))
+
+
+def _gyro_bar_geometry(
+    bounds: QRectF,
+    index: int,
+    axis: SignedAxisDisplay,
+) -> tuple[QRectF, QRectF]:
+    track = QRectF(
+        bounds.left() + bounds.width() * 0.20,
+        bounds.top() + bounds.height() * (0.40 + index * 0.20),
+        bounds.width() * 0.76,
+        max(3.0, bounds.height() * 0.10),
+    )
+    center_x = track.center().x()
+    signed_width = track.width() * 0.5 * axis.magnitude * axis.direction
+    fill = QRectF(
+        min(center_x, center_x + signed_width),
+        track.top(),
+        abs(signed_width),
+        track.height(),
+    )
+    return track, fill
+
+
+def _accel_vector_geometry(
+    bounds: QRectF,
+    display: SensorDisplay,
+) -> tuple[QPointF, QPointF, tuple[tuple[QPointF, QPointF], ...]]:
+    center = QPointF(bounds.center().x(), bounds.top() + bounds.height() * 0.58)
+    axis_length = min(bounds.width() * 0.25, bounds.height() * 0.38)
+    basis = ((0.0, -1.0), (-0.78, 0.62), (0.78, 0.62))
+    guides = tuple(
+        (
+            QPointF(center.x() - x * axis_length, center.y() - y * axis_length),
+            QPointF(center.x() + x * axis_length, center.y() + y * axis_length),
+        )
+        for x, y in basis
+    )
+    components = tuple(
+        axis.direction * axis.magnitude for axis in (display.x, display.y, display.z)
+    )
+    projected_x = sum(
+        value * direction[0] for value, direction in zip(components, basis, strict=True)
+    )
+    projected_y = sum(
+        value * direction[1] for value, direction in zip(components, basis, strict=True)
+    )
+    projected_length = hypot(projected_x, projected_y)
+    if projected_length > 1.0:
+        projected_x /= projected_length
+        projected_y /= projected_length
+    end = QPointF(
+        center.x() + projected_x * axis_length,
+        center.y() + projected_y * axis_length,
+    )
+    return center, end, guides
 
 
 def _sensor_description(frame: ControllerFrame) -> str:

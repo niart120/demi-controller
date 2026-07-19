@@ -42,6 +42,31 @@ def test_main_window_refreshes_toolbar_and_status_bar_from_application_snapshot(
     assert window.status_bar.preview_label.text() == "Preview: transmitting"
 
 
+def test_main_window_prioritizes_primary_actions_connection_status_and_preview(
+    qt_application: QApplication,
+) -> None:
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    window.show()
+    qt_application.processEvents()
+
+    assert window.main_toolbar.actions()[:2] == [
+        window.main_toolbar.connection_action,
+        window.main_toolbar.capture_action,
+    ]
+    assert not window.main_toolbar.isMovable()
+    assert not window.main_toolbar.isFloatable()
+    assert (
+        window.status_bar.connection_label.geometry().left()
+        < window.status_bar.adapter_label.geometry().left()
+    )
+    assert (
+        window.status_bar.notice_label.geometry().left()
+        < window.status_bar.preview_label.geometry().left()
+    )
+    assert window.main_toolbar.geometry().bottom() < window.controller_preview.geometry().top()
+    assert window.controller_preview.geometry().bottom() < window.status_bar.geometry().top()
+
+
 def test_main_window_disables_busy_connection_and_reenables_a_retryable_error(
     qt_application: QApplication,
 ) -> None:
