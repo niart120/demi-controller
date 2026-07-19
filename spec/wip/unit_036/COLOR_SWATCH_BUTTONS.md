@@ -58,7 +58,7 @@
 - `spec/initial/ui.md`
 - `spec/complete/unit_002/DOMAIN_AND_SETTINGS.md`
 - `spec/complete/unit_016/QT_STANDARD_CONTROLS_AND_DIALOGS.md`
-- `spec/wip/unit_032/UI_LOCALIZATION_FOUNDATION.md`
+- `spec/complete/unit_032/UI_LOCALIZATION_FOUNDATION.md`
 
 ## 5. 振る舞い仕様
 
