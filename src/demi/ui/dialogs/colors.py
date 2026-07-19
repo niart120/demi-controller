@@ -103,6 +103,11 @@ class ControllerColorsDialog(QDialog):
         """Return the visible reconnect choice after a successful save, if any."""
         return self._reconnect_confirmation
 
+    @property
+    def color_dialog(self) -> QColorDialog | None:
+        """Return the currently open standard color picker, if any."""
+        return self._color_dialog
+
     def set_color(self, field: ColorField, value: str) -> bool:
         """Update one draft color and immediately refresh the local preview.
 

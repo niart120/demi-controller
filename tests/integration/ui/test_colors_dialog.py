@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QMessageBox
 
 from demi.application.settings_editor import SettingsEditor
@@ -144,3 +147,39 @@ def test_colors_dialog_uses_four_textless_swatches_for_the_current_colors() -> N
         assert button.property("swatchColor") == color
 
     assert not any(label.text().startswith("#") for label in dialog.findChildren(QLabel))
+
+
+@pytest.mark.parametrize("field", ["body", "buttons", "left_grip", "right_grip"])
+@pytest.mark.parametrize("activation", ["mouse", "enter", "space"])
+def test_each_color_swatch_opens_its_current_color_with_mouse_or_keyboard(
+    qt_application: QApplication,
+    field: ColorField,
+    activation: str,
+) -> None:
+    settings = AppSettings.default()
+    dialog = ControllerColorsDialog(
+        SettingsEditor(settings),
+        connected=False,
+        on_preview=lambda _colors: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    dialog.show()
+    button = dialog.color_buttons[field]
+    button.setFocus()
+    qt_application.processEvents()
+
+    if activation == "mouse":
+        QTest.mouseClick(button, Qt.MouseButton.LeftButton)
+    elif activation == "enter":
+        QTest.keyClick(button, Qt.Key.Key_Return)
+    else:
+        QTest.keyClick(button, Qt.Key.Key_Space)
+    qt_application.processEvents()
+
+    picker = dialog.color_dialog
+    assert picker is not None
+    assert picker.currentColor().name().upper() == getattr(settings.controller_colors, field)
+    picker.close()
