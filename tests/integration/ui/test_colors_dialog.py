@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QMessageBox
 
@@ -183,3 +184,36 @@ def test_each_color_swatch_opens_its_current_color_with_mouse_or_keyboard(
     assert picker is not None
     assert picker.currentColor().name().upper() == getattr(settings.controller_colors, field)
     picker.close()
+
+
+@pytest.mark.parametrize("field", ["body", "buttons", "left_grip", "right_grip"])
+def test_accepted_picker_updates_only_its_swatch_draft_and_preview(
+    qt_application: QApplication,
+    field: ColorField,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft.controller_colors
+    previews: list[ControllerColorSettings] = []
+    dialog = ControllerColorsDialog(
+        editor,
+        connected=False,
+        on_preview=previews.append,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    dialog.open_color_dialog(field)
+    picker = dialog.color_dialog
+    assert picker is not None
+
+    picker.setCurrentColor(QColor("#12abef"))
+    picker.accept()
+    qt_application.processEvents()
+
+    changed = editor.draft.controller_colors
+    assert getattr(changed, field) == "#12ABEF"
+    assert dialog.color_buttons[field].property("swatchColor") == "#12ABEF"
+    assert previews == [changed]
+    for other_field in dialog.color_buttons.keys() - {field}:
+        assert getattr(changed, other_field) == getattr(original, other_field)
