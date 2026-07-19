@@ -231,6 +231,8 @@ target = "ACCEL:ZERO"
 
 `inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
 
+キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示して確認し、置換を選んだ場合だけ既存行を未割り当てへ戻す。`KEY:F4` はマウス捕捉解除用のため保存できず、`KEY:F12` と `KEY:ESCAPE` は保存できる。
+
 診断targetは `GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`ACCEL:ZERO` とする。既定sourceは I/K/J/L/O だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
 
 ## 3. 型と制約
