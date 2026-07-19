@@ -18,6 +18,8 @@ class LatestFrameMailbox:
         self._latest: ControllerFrame | None = None
         self._pending: ControllerFrame | None = None
         self._pending_impulse = (0.0, 0.0, 0.0)
+        self._pending_count = 0
+        self._pending_first_sequence: int | None = None
         self._current_epoch: int | None = None
         self._last_sequence = -1
 
@@ -62,8 +64,20 @@ class LatestFrameMailbox:
         """Return and clear the next coalesced frame to send."""
         with self._lock:
             frame = self._pending
+            count = self._pending_count
+            first_sequence = self._pending_first_sequence
             self._clear_pending()
-            return frame
+        if frame is not None and count > 1:
+            _LOGGER.debug(
+                "Coalesced controller frames",
+                extra={
+                    "frame_count": count,
+                    "first_sequence": first_sequence,
+                    "last_sequence": frame.sequence,
+                    "sample_duration_ns": frame.sample_duration_ns,
+                },
+            )
+        return frame
 
     def discard_pending(self, *, reason: str) -> bool:
         """Discard unsent input at a safety boundary and record its reason."""
@@ -87,6 +101,8 @@ class LatestFrameMailbox:
         if self._pending is None:
             self._pending = frame
             self._pending_impulse = self._impulse_for(frame)
+            self._pending_count = 1
+            self._pending_first_sequence = frame.sequence
             return
         previous = self._pending
         impulse = tuple(
@@ -105,10 +121,13 @@ class LatestFrameMailbox:
             sample_duration_ns=duration_ns,
         )
         self._pending_impulse = impulse
+        self._pending_count += 1
 
     def _clear_pending(self) -> None:
         self._pending = None
         self._pending_impulse = (0.0, 0.0, 0.0)
+        self._pending_count = 0
+        self._pending_first_sequence = None
 
     @staticmethod
     def _impulse_for(frame: ControllerFrame) -> tuple[float, float, float]:
