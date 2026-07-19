@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -31,6 +32,19 @@ _COLOR_LABELS: dict[ColorField, str] = {
     "left_grip": "Left grip",
     "right_grip": "Right grip",
 }
+
+_SWATCH_STYLE = """
+QPushButton {{
+    background-color: {color};
+    border: 2px solid palette(mid);
+    border-radius: 4px;
+    min-width: 88px;
+    min-height: 30px;
+}}
+QPushButton:hover {{ border-color: palette(highlight); }}
+QPushButton:pressed {{ border: 3px inset palette(highlight); }}
+QPushButton:focus {{ border: 3px solid palette(highlight); }}
+"""
 
 
 class ControllerColorsDialog(QDialog):
@@ -78,6 +92,12 @@ class ControllerColorsDialog(QDialog):
         color_form = QFormLayout()
         for field, label in _COLOR_LABELS.items():
             button = QPushButton(self)
+            button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            button.setProperty("swatchBorderIndependent", True)
+            button.setProperty("swatchFocusIndicator", "palette-highlight")
+            button.setProperty("swatchHasBorder", True)
+            button.setProperty("swatchHasHoverIndicator", True)
+            button.setProperty("swatchHasFocusIndicator", True)
             button.clicked.connect(
                 lambda _checked=False, selected_field=field: self.open_color_dialog(selected_field)
             )
@@ -206,7 +226,7 @@ class ControllerColorsDialog(QDialog):
             action = self.tr("Choose a color")
             button.setText("")
             button.setProperty("swatchColor", color)
-            button.setStyleSheet(f"background-color: {color};")
+            button.setStyleSheet(_SWATCH_STYLE.format(color=color))
             button.setAccessibleName(label)
             button.setAccessibleDescription(f"{label}: {color}. {action}")
             button.setToolTip(f"{label}: {color}. {action}")

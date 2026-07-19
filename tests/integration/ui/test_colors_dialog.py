@@ -279,3 +279,36 @@ def test_textless_swatches_publish_field_color_and_action_to_assistive_ui() -> N
         assert name in button.toolTip()
         assert color in button.toolTip()
         assert "choose a color" in button.toolTip().lower()
+
+
+def test_swatch_border_hover_and_focus_do_not_depend_on_the_fill_color(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    dialog = ControllerColorsDialog(
+        editor,
+        connected=False,
+        on_preview=lambda _colors: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    dialog.show()
+    dialog.set_color("body", "#FFFFFF")
+    dialog.set_color("buttons", "#000000")
+    dialog.set_color("left_grip", dialog.palette().window().color().name())
+    qt_application.processEvents()
+
+    for button in dialog.color_buttons.values():
+        assert button.property("swatchBorderIndependent") is True
+        assert button.property("swatchFocusIndicator") == "palette-highlight"
+        assert button.focusPolicy() == Qt.FocusPolicy.StrongFocus
+        assert "QPushButton:hover" in button.styleSheet()
+        assert "QPushButton:pressed" in button.styleSheet()
+        assert "QPushButton:focus" in button.styleSheet()
+        assert "palette(mid)" in button.styleSheet()
+
+    dialog.color_buttons["body"].setFocus()
+    qt_application.processEvents()
+    assert dialog.color_buttons["body"].hasFocus()
