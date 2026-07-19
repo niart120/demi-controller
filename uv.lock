@@ -510,7 +510,7 @@ dev = [
 requires-dist = [
     { name = "platformdirs", specifier = ">=4.10.0" },
     { name = "pyside6", specifier = ">=6.11,<6.12" },
-    { name = "swbt-python", specifier = ">=0.3.0,<0.4.0" },
+    { name = "swbt-python", specifier = ">=0.4.0,<0.5.0" },
     { name = "tomli-w", specifier = ">=1.2.0" },
 ]
 
@@ -1490,14 +1490,14 @@ wheels = [
 
 [[package]]
 name = "swbt-python"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bumble" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/85/a8/a77b71e126ad443de6f0f43a034c2271580c1953dde0150d61b12bccb375/swbt_python-0.3.0.tar.gz", hash = "sha256:d906f32168ca602f614d877a3b5743cfff2e87081767d76e8765524c6604aae2", size = 438278, upload-time = "2026-07-12T15:30:33.931Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/e2/703340af39b89836bfb6fc4658d7ce333e08b094265080e0aea34e904358/swbt_python-0.4.0.tar.gz", hash = "sha256:32492d924eac80fb8dbae3d357d73f8552a107916fc4ef05695393e5f268c6fc", size = 441036, upload-time = "2026-07-19T10:12:33.327Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/60/a7cdcc0daa0c113d20a5e641a12e64dd16cefd0b30cd6b6cadb8b60f345d/swbt_python-0.3.0-py3-none-any.whl", hash = "sha256:9135945d17fe8ec6ade04bd51b3d7c63c2c1f2f5cb333f7dcdfa41e2b0454206", size = 72037, upload-time = "2026-07-12T15:30:32.318Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/34/71274319b2ad970e0324e7441d9868864f8830f0a6938542bc5ef553255c/swbt_python-0.4.0-py3-none-any.whl", hash = "sha256:a617c31d425f70e48182568b37aa9a1867f54b0eff4efa8ee56cd3f7c784669b", size = 73884, upload-time = "2026-07-19T10:12:32.09Z" },
 ]
 
 [[package]]
