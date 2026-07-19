@@ -136,6 +136,7 @@ class ControllerRuntime:
             accepted = self._mailbox.offer(frame)
             if not accepted:
                 return False
+            self._latest_frame = frame
             loop = self._loop
             frame_event = self._frame_event
             if loop is not None and frame_event is not None and self.is_alive:
@@ -409,7 +410,6 @@ class ControllerRuntime:
         frame = self._mailbox.take()
         if frame is None:
             return
-        self._latest_frame = frame
         self._watchdog.note_frame(frame)
         if not self._connected or self._adapter is None:
             return

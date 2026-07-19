@@ -540,6 +540,18 @@ def test_runtime_starts_worker_and_closes_without_leaking_the_thread() -> None:
     assert adapter.close_thread_id != main_thread_id
 
 
+def test_runtime_retains_the_latest_accepted_frame_for_status_before_send() -> None:
+    runtime = ControllerRuntime(
+        adapter_factory=FakeAdapter,
+        event_sink=EventRecorder(),
+        clock=FakeClock(),
+    )
+    frame = make_frame(sequence=1)
+
+    assert runtime.offer_frame(frame) is True
+    assert runtime.latest_frame == frame
+
+
 def test_runtime_preserves_adapter_error_category_in_runtime_event() -> None:
     adapter = FakeAdapter(
         connect_error=ControllerAdapterError(ControllerErrorCategory.BOND_NOT_FOUND),
