@@ -47,13 +47,13 @@ class MainStatusBar(QStatusBar):
         self.pointer_label = QLabel(self)
         self.preview_label = QLabel(self)
         self.notice_label = QLabel(self)
+        self.addWidget(self.connection_label)
+        self.addWidget(self.notice_label, 1)
         for label in (
             self.adapter_label,
-            self.connection_label,
             self.capture_label,
             self.pointer_label,
             self.preview_label,
-            self.notice_label,
         ):
             self.addPermanentWidget(label)
 

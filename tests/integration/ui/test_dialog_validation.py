@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtWidgets import QDialogButtonBox
+
 from demi.application.settings_editor import SettingsEditor
 from demi.domain.settings import AppSettings
 from demi.ui.dialogs.colors import ControllerColorsDialog
@@ -58,3 +60,34 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
     assert colors.save_error_label.text() == "The color format is invalid"
     assert colors.color_buttons["body"].isEnabled()
     assert colors.isVisible()
+
+
+def test_settings_dialogs_mark_save_as_primary_and_focus_invalid_connection_input(
+    qt_application: QApplication,
+) -> None:
+    mapping = MappingDialog(SettingsEditor(AppSettings.default()))
+    colors = ControllerColorsDialog(
+        SettingsEditor(AppSettings.default()),
+        connected=False,
+        on_preview=lambda _colors: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    connection = ConnectionDialog(SettingsEditor(AppSettings.default()), on_rescan=lambda: None)
+
+    for dialog in (mapping, colors, connection):
+        dialog.show()
+        qt_application.processEvents()
+        save = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+        assert save is not None
+        assert save.isDefault()
+
+    connection.bond_slot_edit.setText("default")
+    connection.timeout_edit.setText("invalid")
+    assert not connection.apply_connection_fields()
+    qt_application.processEvents()
+
+    assert connection.timeout_edit.hasFocus()
+    assert connection.connection_error_label.text() == "Connection settings are invalid"

@@ -221,14 +221,28 @@ class ConnectionDialog(QDialog):
             Whether both controls updated the application-owned draft.
         """
         try:
+            timeout_seconds = float(self.timeout_edit.text())
+        except ValueError:
+            self.connection_error_label.setText(self.tr("Connection settings are invalid"))
+            self.timeout_edit.setFocus()
+            self.timeout_edit.selectAll()
+            return False
+        if not 1.0 <= timeout_seconds <= 120.0:
+            self.connection_error_label.setText(self.tr("Connection settings are invalid"))
+            self.timeout_edit.setFocus()
+            self.timeout_edit.selectAll()
+            return False
+        try:
             self._editor.update_connection(
                 bond_slot=self.bond_slot_edit.text(),
-                timeout_seconds=float(self.timeout_edit.text()),
+                timeout_seconds=timeout_seconds,
                 reconnect_on_start=self.reconnect_on_start_checkbox.isChecked(),
                 diagnostic_level=self._selected_diagnostic_level(),
             )
-        except (DomainValueError, ValueError):
+        except DomainValueError:
             self.connection_error_label.setText(self.tr("Connection settings are invalid"))
+            self.bond_slot_edit.setFocus()
+            self.bond_slot_edit.selectAll()
             return False
         self.connection_error_label.clear()
         return True

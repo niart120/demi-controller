@@ -37,6 +37,8 @@ class MainToolBar(QToolBar):
         """
         super().__init__(parent)
         self.setObjectName("main-toolbar")
+        self.setMovable(False)
+        self.setFloatable(False)
         self.connection_action = QAction(self.tr("Connect"), self)
         self.capture_action = QAction(self.tr("Start mouse"), self)
         self.capture_action.setCheckable(True)

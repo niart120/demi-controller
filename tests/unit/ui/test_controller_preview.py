@@ -2,19 +2,21 @@ from dataclasses import dataclass
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 import demi.ui.controller_preview as preview_module
 from demi.app import WindowSpec
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
 from demi.ui.controller_preview import (
+    ControllerPreviewModel,
     ControllerPreviewWidget,
     PreviewRepaintLimiter,
     SystemPreviewClock,
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
+from demi.ui.preview_layout import PreviewRect, preview_layout
 from demi.ui.preview_sensor import accel_display, gyro_display
 
 
@@ -161,17 +163,104 @@ def test_preview_keeps_keyboard_operation_independent_from_pointer_capture() -> 
     assert model.pointer_capture_active is False
 
 
+def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    widget = ControllerPreviewWidget()
+    widget.resize(960, 600)
+    button_bounds = preview_layout(widget.width(), widget.height()).controls["a"]
+    sample_x = round(button_bounds.left + button_bounds.width * 0.78)
+    sample_y = round(button_bounds.top + button_bounds.height * 0.50)
+
+    widget.set_frame(_frame(sequence=1))
+    neutral = QPixmap(widget.size())
+    widget.render(neutral)
+    neutral_fill = neutral.toImage().pixelColor(sample_x, sample_y)
+
+    widget.set_frame(_frame(sequence=2, buttons=frozenset({LogicalButton.A})))
+    pressed = QPixmap(widget.size())
+    widget.render(pressed)
+    pressed_fill = pressed.toImage().pixelColor(sample_x, sample_y)
+
+    assert _contrast_ratio(_rgb(neutral_fill), _rgb(pressed_fill)) >= 3.0
+
+
+def test_stick_click_is_not_drawn_as_a_separate_control_over_the_stick(
+    qt_application: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert qt_application is not None
+    drawn_control_ids: list[str] = []
+    draw_control = ControllerPreviewWidget._draw_control
+
+    def record_control(
+        self: ControllerPreviewWidget,
+        painter: QPainter,
+        control_id: str,
+        bounds: PreviewRect,
+        model: ControllerPreviewModel,
+    ) -> None:
+        drawn_control_ids.append(control_id)
+        draw_control(self, painter, control_id, bounds, model)
+
+    monkeypatch.setattr(ControllerPreviewWidget, "_draw_control", record_control)
+    widget = ControllerPreviewWidget()
+    widget.resize(960, 600)
+    widget.set_frame(_frame(sequence=1, buttons=frozenset({LogicalButton.LEFT_STICK})))
+    canvas = QPixmap(widget.size())
+    widget.render(canvas)
+
+    assert "left_stick" in drawn_control_ids
+    assert "right_stick" in drawn_control_ids
+    assert "left_stick_click" not in drawn_control_ids
+    assert "right_stick_click" not in drawn_control_ids
+
+
+def test_control_label_size_scales_with_the_control() -> None:
+    bounds = preview_layout(960, 600).controls["a"]
+
+    pixel_size = preview_module._control_label_pixel_size(bounds)
+
+    assert pixel_size >= round(bounds.height * 0.40)
+
+
+def test_grip_colors_fill_grip_regions_and_not_the_stick_surfaces(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    colors = ControllerColorSettings(
+        body="#102030",
+        buttons="#405060",
+        left_grip="#A02020",
+        right_grip="#20A020",
+    )
+    widget = ControllerPreviewWidget(colors=colors)
+    widget.resize(960, 600)
+    widget.set_frame(_frame(sequence=1))
+    canvas = QPixmap(widget.size())
+    widget.render(canvas)
+    image = canvas.toImage()
+    layout = preview_layout(widget.width(), widget.height())
+
+    assert _sample_rect(image, layout.left_grip_bounds, 0.20, 0.80) == (160, 32, 32)
+    assert _sample_rect(image, layout.right_grip_bounds, 0.80, 0.80) == (32, 160, 32)
+    assert _sample_rect(image, layout.controls["left_stick"], 0.50, 0.15) == (64, 80, 96)
+    assert _sample_rect(image, layout.controls["right_stick"], 0.50, 0.15) == (64, 80, 96)
+
+
 def _frame(
     *,
     sequence: int,
     capture_active: bool = True,
     pointer_capture_active: bool = False,
+    buttons: frozenset[LogicalButton] = frozenset(),
 ) -> ControllerFrame:
     return ControllerFrame(
         sequence=sequence,
         capture_epoch=1,
         monotonic_ns=1_000_000_000 + sequence,
-        buttons=frozenset(),
+        buttons=buttons,
         left_stick=StickVector(x=0.0, y=0.0),
         right_stick=StickVector(x=0.0, y=0.0),
         gyro_rate=GyroRate(0.0, 0.0, 0.0),
@@ -179,3 +268,34 @@ def _frame(
         capture_active=capture_active,
         pointer_capture_active=pointer_capture_active,
     )
+
+
+def _contrast_ratio(first: tuple[int, int, int], second: tuple[int, int, int]) -> float:
+    def luminance(color: tuple[int, int, int]) -> float:
+        channels = tuple(channel / 255 for channel in color)
+        linear = tuple(
+            channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+            for channel in channels
+        )
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    lighter = max(luminance(first), luminance(second))
+    darker = min(luminance(first), luminance(second))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _sample_rect(
+    image: QImage,
+    bounds: PreviewRect,
+    x_ratio: float,
+    y_ratio: float,
+) -> tuple[int, int, int]:
+    color = image.pixelColor(
+        round(bounds.left + bounds.width * x_ratio),
+        round(bounds.top + bounds.height * y_ratio),
+    )
+    return _rgb(color)
+
+
+def _rgb(color: QColor) -> tuple[int, int, int]:
+    return color.red(), color.green(), color.blue()

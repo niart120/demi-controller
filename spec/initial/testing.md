@@ -176,11 +176,15 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - ConnectionStateからボタンラベル
 - CaptureStateから枠表示
 - ControllerFrameから各コントロール表示
-- minimum、default、large sizeの全control boundsと、許可していないcontrol間の非交差
+- `480x300`、`960x640`、`1200x520`、`600x900` の `8:5` 内容領域、全control bounds、円形要素の幅と高さ、許可していない領域間の非交差
 - digital control ID、stick軸clamp、stick clickの独立状態
+- 既定色で押下と未押下のボタン塗りが3:1以上のコントラストを持つこと
+- stick clickを独立円として描画せず、外周状態へ反映すること
+- ボタンラベルのpixel sizeが操作要素の短辺へ追従すること
+- 左右グリップ色が下部グリップ領域、buttons色がスティック表面へ反映されること
 - ジャイロ円弧と加速度ベクトルの符号、単調な表示量、上限clamp
 - tooltipとアクセシビリティ説明のセンサー軸名、値、単位
-- Windows通常描画のneutral、全入力、minimum、large状態における欠落、切れ、重なり
+- Windows通常描画のneutral、全入力、stick click、左右グリップ別色、最小、標準、横長、縦長状態における欠落、切れ、重なり、押下コントラスト、文字サイズ、円形保持、背景余白
 - 色変更プレビュー
 - 複数色変更後のdialog取消、未接続保存、接続中の再接続確認を回帰する
 - エラー分類からユーザー向け文

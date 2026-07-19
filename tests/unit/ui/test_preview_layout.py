@@ -31,6 +31,76 @@ def test_preview_layout_keeps_all_controls_in_bounds_without_unintended_overlap(
 
 
 @pytest.mark.parametrize(
+    ("size", "expected_bounds"),
+    [
+        ((480, 300), (0.0, 0.0, 480.0, 300.0)),
+        ((1200, 520), (184.0, 0.0, 832.0, 520.0)),
+        ((600, 900), (0.0, 262.5, 600.0, 375.0)),
+    ],
+)
+def test_preview_layout_centers_an_eight_by_five_content_region(
+    size: tuple[int, int],
+    expected_bounds: tuple[float, float, float, float],
+) -> None:
+    content = preview_layout(*size).content_bounds
+
+    assert (content.left, content.top, content.width, content.height) == expected_bounds
+    assert content.width / content.height == pytest.approx(8 / 5)
+
+
+@pytest.mark.parametrize("size", [(480, 300), (1200, 520), (600, 900)])
+def test_preview_layout_keeps_round_controls_circular(size: tuple[int, int]) -> None:
+    controls = preview_layout(*size).controls
+    round_control_ids = {
+        "a",
+        "b",
+        "x",
+        "y",
+        "dpad_up",
+        "dpad_right",
+        "dpad_down",
+        "dpad_left",
+        "left_stick",
+        "left_stick_click",
+        "right_stick",
+        "right_stick_click",
+    }
+
+    for control_id in round_control_ids:
+        bounds = controls[control_id]
+        assert bounds.width == pytest.approx(bounds.height), control_id
+
+
+@pytest.mark.parametrize("size", [(480, 300), (960, 640), (1200, 520), (600, 900)])
+def test_preview_layout_keeps_major_regions_inside_content_without_overlap(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
+    content = layout.content_bounds
+    regions = {
+        "body": layout.body_bounds,
+        "status": layout.status_bounds,
+        "gyro": layout.gyro_bounds,
+        "accel": layout.accel_bounds,
+        **layout.controls,
+    }
+
+    for region_id, bounds in regions.items():
+        assert bounds.left >= content.left, region_id
+        assert bounds.top >= content.top, region_id
+        assert bounds.right <= content.right, region_id
+        assert bounds.bottom <= content.bottom, region_id
+
+    assert not layout.body_bounds.intersects(layout.gyro_bounds)
+    assert not layout.body_bounds.intersects(layout.accel_bounds)
+    assert not layout.gyro_bounds.intersects(layout.accel_bounds)
+    for control_id, bounds in layout.controls.items():
+        assert not bounds.intersects(layout.status_bounds), control_id
+        assert not bounds.intersects(layout.gyro_bounds), control_id
+        assert not bounds.intersects(layout.accel_bounds), control_id
+
+
+@pytest.mark.parametrize(
     ("value", "expected"),
     [
         ((0.25, -0.75), (0.25, -0.75)),
