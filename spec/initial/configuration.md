@@ -74,7 +74,7 @@ pitch_limit_degrees = 75.0
 toggle_capture = ["CTRL+C"]
 quit = ["CTRL+Q"]
 connection = ["CTRL+RETURN", "CTRL+ENTER"]
-release_capture = ["F12"]
+release_capture = ["F4"]
 
 [[profiles]]
 id = "default"
@@ -135,7 +135,7 @@ source = "KEY:X"
 target = "BUTTON:PLUS"
 
 [[profiles.bindings]]
-source = "KEY:ESCAPE"
+source = "KEY:F1"
 target = "BUTTON:HOME"
 
 [[profiles.bindings]]

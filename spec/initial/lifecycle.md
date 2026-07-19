@@ -78,7 +78,7 @@ virtual pitch: 0 rad
 
 主スレッドは `ControllerFrame` としてこの状態を生成し、接続ワーカーは完全な `InputState` へ変換して `apply()` する。swbt-pythonの `controller.neutral()` は通常経路ではなく、rest状態の送信に失敗した場合や終了時の最終フォールバックに限定する。
 
-## 4. 入力捕捉開始
+## 4. マウス捕捉開始
 
 前提:
 
@@ -90,23 +90,22 @@ virtual pitch: 0 rad
 シーケンス:
 
 ```text
-1. PhysicalInputState.clear()
-2. RotationPoseModel.reset()
-3. increment capture_epoch
-4. PointerCapturePort.set_pointer_capture(True)
-5. AppState = CAPTURED
-6. publish initial neutral ControllerFrame(capture_active=True)
-7. update toolbar and border
+1. PhysicalInputState.clear_mouse()
+2. increment capture_epoch
+3. PointerCapturePort.set_pointer_capture(True)
+4. AppState = CAPTURED
+5. publish ControllerFrame(capture_active=True, pointer_capture_active=True)
+6. update toolbar and status
 ```
 
 排他マウス設定に失敗した場合は `IDLE` のままとし、入力を送らない。
 
-## 5. 入力捕捉終了
+## 5. マウス捕捉終了と全入力中立化
 
 契機:
 
 - ツールバー
-- F12
+- F4
 - Ctrl+C
 - フォーカス喪失
 - 設定モーダル
@@ -117,16 +116,16 @@ virtual pitch: 0 rad
 シーケンス:
 
 ```text
-1. AppState leaves CAPTURED
+1. AppState = IDLE
 2. increment capture_epoch
 3. PointerCapturePort.release(), best effort
-4. PhysicalInputState.clear()
-5. RotationPoseModel.reset()
-6. create neutral ControllerFrame(capture_active=False)
-7. ControllerPort.offer_frame(neutral)
-8. update ControllerPreviewWidget immediately
-9. show reason when not user initiated
+4. PhysicalInputState.clear_mouse()
+5. create ControllerFrame(capture_active=True, pointer_capture_active=False)
+6. keyboard bindingとkeyboard由来poseを維持する
+7. update ControllerPreviewWidget immediately
 ```
+
+フォーカス喪失、設定モーダル、停止監視、終了ではmouseだけでなくkeyboardとposeも消去し、`capture_active=False`の安全ニュートラルを発行する。
 
 ## 6. 接続
 
@@ -203,7 +202,7 @@ on_activate
   -> no automatic recapture
 ```
 
-Linux環境で排他マウス中のOSショートカットが制約される場合も、F12とツールバーによる解除を維持する。
+Linux環境で排他マウス中のOSショートカットが制約される場合も、F4とツールバーによる解除を維持する。
 
 ## 9. 色変更と再接続
 
@@ -315,7 +314,7 @@ show warning
 - 接続中の切断要求を順序化
 - 切断中の終了
 - 捕捉中の設定モーダル
-- フォーカス喪失とF12の同時発生
+- フォーカス喪失とF4の同時発生
 - 停止監視後の遅延フレーム破棄
 - 色再接続中の接続失敗
 - 初回起動でアダプターなし
