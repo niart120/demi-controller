@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QWidget
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
-from demi.ui.preview_layout import CONTROL_IDS
+from demi.ui.preview_layout import CONTROL_IDS, normalized_stick_position
 
 type RepaintRequest = Callable[[], object]
 
@@ -72,6 +72,8 @@ class ControllerPreviewModel:
     pressed_control_ids: frozenset[str]
     left_stick: StickVector
     right_stick: StickVector
+    left_stick_position: tuple[float, float]
+    right_stick_position: tuple[float, float]
     gyro_rate: GyroRate
     accel_g: AccelG
     capture_active: bool
@@ -101,6 +103,8 @@ def controller_preview_model(
         pressed_control_ids=frozenset(_control_id(button) for button in frame.buttons),
         left_stick=frame.left_stick,
         right_stick=frame.right_stick,
+        left_stick_position=normalized_stick_position(frame.left_stick.x, frame.left_stick.y),
+        right_stick_position=normalized_stick_position(frame.right_stick.x, frame.right_stick.y),
         gyro_rate=frame.gyro_rate,
         accel_g=frame.accel_g,
         capture_active=frame.capture_active,

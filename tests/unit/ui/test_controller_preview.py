@@ -48,7 +48,7 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
         sequence=4,
         capture_epoch=2,
         monotonic_ns=1_008_000_000,
-        buttons=frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT}),
+        buttons=frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT, LogicalButton.LEFT_STICK}),
         left_stick=StickVector(x=-0.5, y=0.25),
         right_stick=StickVector(x=0.75, y=-0.5),
         gyro_rate=GyroRate(1.25, -2.5, 0.5),
@@ -93,10 +93,14 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     assert model.buttons_color == "#405060"
     assert model.left_grip_color == "#708090"
     assert model.right_grip_color == "#A0B0C0"
-    assert model.pressed_buttons == frozenset({LogicalButton.A, LogicalButton.DPAD_LEFT})
-    assert model.pressed_control_ids == frozenset({"a", "dpad_left"})
+    assert model.pressed_buttons == frozenset(
+        {LogicalButton.A, LogicalButton.DPAD_LEFT, LogicalButton.LEFT_STICK}
+    )
+    assert model.pressed_control_ids == frozenset({"a", "dpad_left", "left_stick_click"})
     assert model.left_stick == StickVector(x=-0.5, y=0.25)
     assert model.right_stick == StickVector(x=0.75, y=-0.5)
+    assert model.left_stick_position == (-0.5, 0.25)
+    assert model.right_stick_position == (0.75, -0.5)
     assert model.gyro_rate == GyroRate(1.25, -2.5, 0.5)
     assert model.accel_g == AccelG(0.1, -0.2, 1.05)
     assert model.capture_active is True

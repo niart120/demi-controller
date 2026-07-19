@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from demi.ui.preview_layout import preview_layout
+from demi.ui.preview_layout import normalized_stick_position, preview_layout
 
 
 @pytest.mark.parametrize("size", [(800, 520), (960, 640), (1440, 900)])
@@ -28,3 +28,17 @@ def test_preview_layout_keeps_all_controls_in_bounds_without_unintended_overlap(
         if frozenset({first_id, second_id}) in allowed_intersections:
             continue
         assert not first.intersects(second), f"{first_id} overlaps {second_id}"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ((0.25, -0.75), (0.25, -0.75)),
+        ((2.0, -2.0), (1.0, -1.0)),
+        ((-1.5, 1.5), (-1.0, 1.0)),
+    ],
+)
+def test_stick_display_position_clamps_each_axis(
+    value: tuple[float, float], expected: tuple[float, float]
+) -> None:
+    assert normalized_stick_position(*value) == expected

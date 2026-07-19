@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from math import isfinite
 
 from demi.domain.errors import DomainValueError
 
@@ -65,6 +66,13 @@ _RELATIVE_CONTROLS = {
     "right_stick_click": (0.665, 0.64, 0.05, 0.06),
 }
 CONTROL_IDS = frozenset(_RELATIVE_CONTROLS)
+
+
+def normalized_stick_position(x: float, y: float) -> tuple[float, float]:
+    """Clamp finite stick display coordinates to the normalized square."""
+    if isinstance(x, bool) or isinstance(y, bool) or not isfinite(x) or not isfinite(y):
+        raise DomainValueError
+    return max(-1.0, min(1.0, x)), max(-1.0, min(1.0, y))
 
 
 def preview_layout(width: int, height: int) -> PreviewLayout:
