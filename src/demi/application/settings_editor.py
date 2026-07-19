@@ -16,6 +16,8 @@ from demi.domain.settings import (
 
 type ColorField = Literal["body", "buttons", "left_grip", "right_grip"]
 
+RESERVED_BINDING_SOURCES = frozenset({"KEY:F4"})
+
 
 @dataclass(frozen=True, slots=True)
 class BindingConflict:
@@ -58,7 +60,7 @@ class SettingsEditor:
         except IndexError:
             raise DomainValueError from None
         next_source = current.source if source is None else source
-        if next_source == "KEY:F4":
+        if next_source in RESERVED_BINDING_SOURCES:
             raise DomainValueError
         updated = Binding(
             source=next_source,

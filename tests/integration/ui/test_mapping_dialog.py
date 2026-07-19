@@ -117,15 +117,18 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         )
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:A"
-        assert release_requests == [True]
+        assert release_requests == []
+        assert dialog.capture_label.text() == "F4 is reserved for mouse capture release"
+        assert dialog.mapping_model.capture_row == 0
 
-        dialog.capture_button.click()
         QCoreApplication.sendEvent(
             dialog.table,
             QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F12, Qt.KeyboardModifier.NoModifier),
         )
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
+        reloaded = MappingDialog(SettingsEditor(editor.draft))
+        assert reloaded.mapping_model.data(reloaded.mapping_model.index(0, 1)) == "KEY:F12"
 
         dialog.table.selectRow(1)
         dialog.capture_button.click()
@@ -204,6 +207,41 @@ def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_an
 
     reopened = MappingDialog(SettingsEditor(saved[-1]))
     assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:ESCAPE"
+
+
+def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    saved: list[AppSettings] = []
+    release_requests: list[bool] = []
+    dialog = MappingDialog(
+        editor,
+        on_release_capture=lambda: release_requests.append(True),
+        on_save=lambda: saved.append(editor.draft) is None,
+    )
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    _send_key(dialog.table, Qt.Key.Key_F4)
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
+    assert dialog.capture_label.text() == "F4 is reserved for mouse capture release"
+    assert dialog.mapping_model.capture_row == 0
+    assert release_requests == []
+
+    _send_key(dialog.table, Qt.Key.Key_F12)
+    qt_application.processEvents()
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"
+
+    save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
+    assert save_button is not None
+    save_button.click()
+    qt_application.processEvents()
+    reopened = MappingDialog(SettingsEditor(saved[-1]))
+    assert reopened.mapping_model.data(reopened.mapping_model.index(0, 1)) == "KEY:F12"
 
 
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(

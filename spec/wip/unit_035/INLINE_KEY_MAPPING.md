@@ -88,7 +88,7 @@
 | refactor-done | 待受中は対象input cellにinstruction、actionにCancelを表示し、他rowの表示は変えない | new | unit | 12件green。dialogとmodelの二重状態を同時resetする境界へ整理 |
 | refactor-done | Escape keyとCancel actionは待受前のdraftを保持して待受だけを中止する | new / regression | integration | 13件green。keyとactionを共通取消処理へ集約し、action clickをsource captureから除外 |
 | refactor-skipped | context menuとkeyboardからAssign Escapeを実行でき、KEY:ESCAPEを保存・再表示できる | new / regression | integration | 14件green。context menuとshortcutが単一QActionを共有し追加の構造変更なし |
-| todo | F4は理由付きで拒否され、F12は通常bindingとしてcapture、save、reloadできる | regression | unit / integration | unit_033の予約規則と共通化する |
+| refactor-skipped | F4は理由付きで拒否され、F12は通常bindingとしてcapture、save、reloadできる | regression | unit / integration | 20件green。SettingsEditorの予約規則を維持しdialog待受だけ理由表示を追加 |
 | todo | conflict dialogはsource、変更先、既存割り当て先を示し、cancel時はdraftを一切変更しない | regression | unit / integration | replace時だけ旧rowを解除する |
 | todo | canonical sourceとfriendly display roleを分離し、locale変更で永続値が変わらない | new / regression | unit | unit_032に依存する |
 | todo | Bindings / Mouse gyro間のtab移動は待受を残さず、Tab順がrow actionとSave / Cancelへ到達する | new / edge | integration | hidden capture stateを禁止する |
@@ -126,6 +126,7 @@
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-rowstate-green3 tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | pass | 12 passed。対象行だけのinstruction / Cancel表示と既存capture往復を確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-cancel-green2 tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 13 passed。Escapeと行内Cancelがdraftとdialogを保持することを確認 |
 | `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-escape-green tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py -q` | pass | 14 passed。Assign Escape actionのcontext menu登録、shortcut、保存、再表示を確認 |
+| `uv run pytest -p no:cacheprovider --basetemp tmp/pytest/unit035-f4-green tests/unit/application/test_settings_editor.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_dialog_validation.py -q` | pass | 20 passed。F4理由表示と待受継続、F12 captureと再表示、予約source拒否を確認 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/unit/application/test_settings_editor.py` | not run | 実装前の仕様作成段階 |
 | `uv run pytest tests/integration/ui/test_mapping_dialog.py` | not run | Qt eventとfocus実装後に実行する |
 | 標準gate | not run | settings保存とinput capture境界変更のため実装時に必須 |

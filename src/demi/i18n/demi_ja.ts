@@ -50,6 +50,7 @@
     <message><source>Key mapping conflicts</source><translation>キー割り当ての競合</translation></message>
     <message><source>Mappings conflict with duplicates or local actions.</source><translation>重複またはローカル操作との競合があります。</translation></message>
     <message><source>Input capture released with F4</source><translation>F4で入力捕捉を解除しました</translation></message>
+    <message><source>F4 is reserved for mouse capture release</source><translation>F4はマウス捕捉解除用の予約キーです</translation></message>
     <message><source>Could not save settings</source><translation>設定を保存できませんでした</translation></message>
   </context>
   <context>

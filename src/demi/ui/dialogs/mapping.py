@@ -35,7 +35,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from demi.application.settings_editor import BindingConflict, SettingsEditor
+from demi.application.settings_editor import (
+    RESERVED_BINDING_SOURCES,
+    BindingConflict,
+    SettingsEditor,
+)
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import Binding, is_button_target
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
@@ -554,10 +558,12 @@ class MappingDialog(QDialog):
                 self.cancel_capture()
                 event.accept()
                 return True
-            if event.key() == Qt.Key.Key_F4:
-                self._capture_row = None
-                self.capture_label.setText(self.tr("Input capture released with F4"))
-                _invoke(self._on_release_capture)
+            if event.key() == Qt.Key.Key_F4 and "KEY:F4" in RESERVED_BINDING_SOURCES:
+                if self._capture_row is not None:
+                    self.capture_label.setText(self.tr("F4 is reserved for mouse capture release"))
+                else:
+                    self.capture_label.setText(self.tr("Input capture released with F4"))
+                    _invoke(self._on_release_capture)
                 event.accept()
                 return True
             return self._capture_source(key_source_for_event(event))
