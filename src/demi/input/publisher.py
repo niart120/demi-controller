@@ -163,13 +163,13 @@ class InputPublisher:
 
         if first_evaluation or epoch_changed:
             dt_seconds = 0.0
+            sample_duration_ns = 0
         else:
             elapsed_ns = now_ns - self._last_monotonic_ns
-            dt_seconds = (
-                self._evaluation_interval_ms / 1_000.0
-                if elapsed_ns == 0
-                else elapsed_ns / 1_000_000_000.0
+            sample_duration_ns = (
+                self._evaluation_interval_ms * 1_000_000 if elapsed_ns == 0 else elapsed_ns
             )
+            dt_seconds = sample_duration_ns / 1_000_000_000.0
 
         dx, dy = self._state.consume_mouse_motion()
         if capture_active:
@@ -222,6 +222,7 @@ class InputPublisher:
             gyro_rate=gyro_rate,
             accel_g=accel_g,
             capture_active=capture_active,
+            sample_duration_ns=sample_duration_ns,
             pointer_capture_active=mouse_active,
         )
         self._last_monotonic_ns = now_ns

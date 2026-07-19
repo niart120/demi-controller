@@ -116,6 +116,7 @@ class ControllerFrame:
     gyro_rate: GyroRate
     accel_g: AccelG
     capture_active: bool
+    sample_duration_ns: int = 0
     pointer_capture_active: bool = False
 
     def __post_init__(self) -> None:
@@ -123,6 +124,7 @@ class ControllerFrame:
         _require_counter(self.sequence)
         _require_counter(self.capture_epoch)
         _require_counter(self.monotonic_ns)
+        _require_counter(self.sample_duration_ns)
         if not isinstance(self.buttons, frozenset) or not all(
             isinstance(button, LogicalButton) for button in self.buttons
         ):

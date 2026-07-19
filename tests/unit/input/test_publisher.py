@@ -65,9 +65,23 @@ def test_publisher_uses_elapsed_clock_time_and_current_input_state() -> None:
     frame = publisher.publish(capture_active=True, capture_epoch=1)
 
     assert frame.sequence == 2
+    assert frame.sample_duration_ns == 10_000_000
     assert frame.buttons == frozenset({LogicalButton.A})
     assert frame.gyro_rate.z_radians_per_second < 0.0
     assert frame.accel_g == AccelG(0.0, 0.0, 1.0)
+
+
+def test_publisher_records_zero_boundary_time_and_configured_catch_up_time() -> None:
+    clock = FakeClock()
+    publisher = InputPublisher(clock=clock, sink=FakeSink(), evaluation_interval_ms=16)
+
+    initial = publisher.publish(capture_active=True, capture_epoch=1)
+    catch_up = publisher.publish(capture_active=True, capture_epoch=1)
+    epoch_boundary = publisher.publish(capture_active=True, capture_epoch=2)
+
+    assert initial.sample_duration_ns == 0
+    assert catch_up.sample_duration_ns == 16_000_000
+    assert epoch_boundary.sample_duration_ns == 0
 
 
 def test_operational_keyboard_is_evaluated_while_pointer_capture_is_inactive() -> None:
