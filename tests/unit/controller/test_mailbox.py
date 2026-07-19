@@ -1,8 +1,17 @@
+import pytest
+
 from demi.controller.mailbox import LatestFrameMailbox
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, StickVector
 
 
-def make_frame(*, sequence: int, epoch: int, capture_active: bool = True) -> ControllerFrame:
+def make_frame(
+    *,
+    sequence: int,
+    epoch: int,
+    capture_active: bool = True,
+    duration_ns: int = 0,
+    gyro_z: float = 0.0,
+) -> ControllerFrame:
     """Build a minimal valid frame for mailbox tests."""
     return ControllerFrame(
         sequence=sequence,
@@ -11,9 +20,10 @@ def make_frame(*, sequence: int, epoch: int, capture_active: bool = True) -> Con
         buttons=frozenset(),
         left_stick=StickVector(x=0.0, y=0.0),
         right_stick=StickVector(x=0.0, y=0.0),
-        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        gyro_rate=GyroRate(0.0, 0.0, gyro_z),
         accel_g=AccelG(0.0, 0.0, 1.0),
         capture_active=capture_active,
+        sample_duration_ns=duration_ns,
     )
 
 
@@ -50,3 +60,20 @@ def test_mailbox_accepts_a_new_epoch_and_capture_release_frame() -> None:
     assert mailbox.offer(next_capture) is True
     assert mailbox.current_epoch == 2
     assert mailbox.peek() == next_capture
+
+
+def test_mailbox_coalesces_pending_gyro_angle_while_keeping_latest_state() -> None:
+    mailbox = LatestFrameMailbox()
+    first = make_frame(sequence=1, epoch=1, duration_ns=4_000_000, gyro_z=3.0)
+    newest = make_frame(sequence=2, epoch=1, duration_ns=12_000_000, gyro_z=-1.0)
+
+    assert mailbox.offer(first) is True
+    assert mailbox.offer(newest) is True
+
+    sent = mailbox.take()
+
+    assert sent is not None
+    assert sent.sequence == 2
+    assert sent.sample_duration_ns == 16_000_000
+    assert sent.gyro_rate.z_radians_per_second == pytest.approx(0.0)
+    assert mailbox.peek() == newest
