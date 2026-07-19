@@ -233,24 +233,20 @@ USBアダプター
 
 ## 7. カラー設定ダイアログ
 
-`QDialog`、`QColorDialog`、`QLineEdit`、`QDialogButtonBox` を使い、色選択と `#RRGGBB` 入力を同期する。
+`QDialog`、`QColorDialog`、無文字の `QPushButton`、`QDialogButtonBox` を使う。各buttonは現在色で塗った色見本であり、mouse click、Enter、Spaceから標準色選択を開く。
 
 4行の色設定を持つ。
 
 ```text
-本体          [swatch] #323232
-ボタン        [swatch] #0F0F0F
-左グリップ    [swatch] #323232
-右グリップ    [swatch] #323232
+本体          [          ]
+ボタン        [          ]
+左グリップ    [          ]
+右グリップ    [          ]
 ```
 
-0.1.0では大型の色相環を作らず、次で十分とする。
+色見本の可視テキストと可視hexラベルは空にする。正確な現在値と操作説明はtooltipとaccessible descriptionへ置き、accessible nameには行のfield名を設定する。白、黒、ウィンドウ背景同色でも輪郭が消えないよう、fillとは独立したborder、hover、pressed、focus規則を使う。focusは色差だけに依存せず太いhighlight枠で示す。
 
-- `#RRGGBB` 文字入力
-- 色見本
-- `QColorDialog` による色選択
-- 既定値へ戻す
-- 左右を同じ色にする
+pickerを確定した場合だけ対象色のdraft、色見本、local previewを更新する。picker取消では変更signalを発行しない。dialog取消は複数色のdraftを破棄して保存済みpreviewへ戻し、保存時の再接続確認は既存契約を維持する。custom color wheel、可視hex editor、preset、左右同色操作は0.1.0の対象外とする。
 
 接続中に保存した場合:
 
