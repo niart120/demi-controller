@@ -62,3 +62,26 @@ This record is not a gyro acceptance result. Project_Demi reached the saved-bond
 | exact test cases | application startup: passed; Raw Input capability: passed; USB adapter discovery: passed; saved-bond reconnect: failed; input capture and low/medium/high horizontal/vertical gyro movement: not run |
 | result | GUI moved from `接続中` to `準備完了` and displayed `保存済み接続に失敗しました`; log recorded `Controller error: RECONNECT_FAILED` at 12:38:39 JST |
 | observed limitations | target power, reconnect screen, pairing state, target model, and firmware were not verified; no conclusion can be drawn about game-camera smoothness |
+
+## Unit 039 Direct送信実機試験 — 2026-07-20 JST
+
+この記録はProject_Demiを通した実機試験の結果である。受入試験は未完了であり、成功した接続系と失敗した入力系を分けて記録する。
+
+| item | value |
+|---|---|
+| Project_Demi implementation reference | `3958cb5` |
+| execution status | partial failure; 接続系は通過、入力系に未解決の不具合あり |
+| date, time, timezone | 2026-07-20 JST; 実行時刻は記録されていない |
+| Python / swbt-python / Bumble | Python 3.12.10 / swbt-python 0.4.0 / Bumble 0.0.230 |
+| PySide6 / Qt | PySide6 6.11.1 / Qt 6.11.1 |
+| operating system | Microsoft Windows 11 Pro 10.0.26200 |
+| USB adapter | CSR8510 A10, VID `0A12`, PID `0001` |
+| driver | libwdi 6.1.7600.16385, dated 2012-06-02, unsigned; Unit 024記録から再利用し、この試験時には再取得していない |
+| adapter identifier | `usb:0`; aliases `usb:0A12:0001` |
+| target device and firmware | Nintendo Switch 2, firmware 22.5.0 |
+| pairing or reconnect flow | 明示的なpairing、接続、切断を実施。saved-bond reconnectはこの記録の対象外 |
+| exact test cases | pairing、接続、切断、`Start mouse`なしのF→A、`Start mouse`ありのF→A、マウスジャイロ操作 |
+| result | pairing、接続、切断: passed。`Start mouse`なし: GUIプレビューではAが押下表示になるがSwitchはAとして認識しない。`Start mouse`あり: キーボード入力を認識する。ジャイロ: カクつきを観測 |
+| observed limitations | この試験ではDirect送信のDEBUG記録を採取していない。キーボード差分がIMU値と送信タイミングのどちらに起因するか、ジャイロのカクつきとframe集約の関係は未確認 |
+
+`ac37dfc`以降はDEBUGログに送信済みボタン状態とframe集約区間を出力する。次の実機試験では同ログを採取し、同じ操作列と対応付ける。
