@@ -253,13 +253,13 @@ class Clock(Protocol):
 ワーカースレッドが所有するもの:
 
 - 専用 `asyncio` イベントループ
-- `swbt.ProController`
+- `swbt.DirectProController`
 - 接続・切断タスク
-- 入力状態の適用
+- Direct入力状態の送信
 - 接続停止監視
 - swbt診断値の抽出
 
-`swbt.ProController` はワーカースレッド内で生成し、同じスレッド内で閉じる。別スレッドへ参照を返さない。
+`swbt.DirectProController` はワーカースレッド内で生成し、同じスレッド内で閉じる。別スレッドへ参照を返さない。
 
 ### 5.3 主スレッドからワーカー
 
@@ -273,15 +273,15 @@ main thread
 
 終了要求は順序付きコマンドの後ろへ積まない。`ControllerRuntime.close()` が停止開始を同期的に確定し、`loop.call_soon_threadsafe(shutdown_event.set)` でワーカーを起こす。ワーカーは進行中の adapter operation task を cancel して回収してから、rest、disconnect、close へ進む。停止開始後の `post()` は `RuntimeError`、`offer_frame()` は `False` で拒否する。
 
-入力フレームはロック保護した1スロットへ置く。
+入力フレームはロック保護した表示用latestと送信用pending集約へ置く。
 
 ```text
-latest_frame = newest frame only
-generation   = incrementing integer
+latest_frame = newest frame for display/status
+pending_send = newest sustained state + accumulated gyro angle
 frame_event  = asyncio.Event
 ```
 
-新しいフレームで古い未処理フレームを置換する。キューを無制限に積むと、遅延後に古い入力を再生してしまうためである。
+send中に届く複数frameはpendingへ集約する。ボタン・スティック・加速度は最新値、ジャイロは各軸の角変位を保存する。安全境界ではpendingを破棄する。キューを無制限に積まない。
 
 ### 5.4 ワーカーから主スレッド
 
@@ -354,10 +354,10 @@ ControllerRuntime.post()
 SwbtAdapter
   │
   ├── list_adapters()
-  ├── ProController(...)
+  ├── DirectProController(...)
   ├── connect()/reconnect()
-  ├── apply(InputState)
-  ├── apply(rest InputState)
+  ├── send(InputState)
+  ├── send(rest InputState)
   └── close()
 ```
 

@@ -27,7 +27,7 @@ class FailingGamepad:
     open_error: Exception | None = None
     reconnect_error: Exception | None = None
     connect_error: Exception | None = None
-    apply_error: Exception | None = None
+    send_error: Exception | None = None
 
     async def open(self) -> None:
         """Open or raise the configured error."""
@@ -51,11 +51,11 @@ class FailingGamepad:
         if self.connect_error is not None:
             raise self.connect_error
 
-    async def apply(self, state: InputState) -> None:
-        """Apply or raise the configured error."""
+    async def send(self, state: InputState) -> None:
+        """Send or raise the configured error."""
         del state
-        if self.apply_error is not None:
-            raise self.apply_error
+        if self.send_error is not None:
+            raise self.send_error
 
     async def close(self, *, neutral: bool = True) -> None:
         """Close the fake gamepad."""
@@ -137,8 +137,8 @@ def test_pairing_timeout_and_transport_open_errors_are_classified() -> None:
     assert open_raised.value.category is ControllerErrorCategory.ADAPTER_OPEN_FAILED
 
 
-def test_invalid_input_from_apply_is_classified_as_invalid_input() -> None:
-    gamepad = FailingGamepad(apply_error=InvalidInputError())
+def test_invalid_input_from_send_is_classified_as_invalid_input() -> None:
+    gamepad = FailingGamepad(send_error=InvalidInputError())
     adapter = SwbtControllerAdapter(gamepad_factory=lambda **_kwargs: gamepad)
 
     async def exercise() -> None:
@@ -148,7 +148,7 @@ def test_invalid_input_from_apply_is_classified_as_invalid_input() -> None:
             30.0,
             ControllerColorSettings(),
         )
-        await adapter.apply_frame(frame())
+        await adapter.send_frame(frame())
 
     with pytest.raises(ControllerAdapterError) as raised:
         asyncio.run(exercise())

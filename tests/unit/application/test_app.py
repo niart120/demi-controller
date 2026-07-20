@@ -265,7 +265,7 @@ def test_application_runner_aligns_report_period_with_saved_input_interval() -> 
     with patch("demi.app.SwbtControllerAdapter", create_adapter):
         assert run_application(dependencies) == 0
 
-    assert adapter_kwargs["report_period_us"] == 16_000
+    assert adapter_kwargs == {}
 
 
 def test_application_runner_configures_the_optional_input_window_boundary() -> None:

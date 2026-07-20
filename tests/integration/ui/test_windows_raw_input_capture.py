@@ -53,7 +53,7 @@ class RecordingFrameSink:
 class RecordingGamepad:
     """Record complete swbt states without opening Bluetooth hardware."""
 
-    applied_states: list[InputState] = field(default_factory=list)
+    sent_states: list[InputState] = field(default_factory=list)
 
     async def open(self) -> None:
         """Accept the transport-open boundary."""
@@ -71,9 +71,9 @@ class RecordingGamepad:
         """Accept an explicit connection without hardware."""
         del timeout, allow_pairing
 
-    async def apply(self, state: InputState) -> None:
+    async def send(self, state: InputState) -> None:
         """Record one complete state passed to the public swbt boundary."""
-        self.applied_states.append(state)
+        self.sent_states.append(state)
 
     async def close(self, *, neutral: bool = True) -> None:
         """Accept transport cleanup without hardware."""
@@ -432,18 +432,18 @@ def test_steady_low_speed_raw_mouse_motion_has_no_zero_gyro_gaps() -> None:
             ControllerColorSettings(),
         )
         for frame in frames:
-            await adapter.apply_frame(frame)
+            await adapter.send_frame(frame)
         await adapter.close()
 
     asyncio.run(apply_frames())
 
-    gyro_z_rates = [state.imu_frames[0].to_gyro_rate()[2] for state in gamepad.applied_states]
+    gyro_z_rates = [state.imu_frames[0].to_gyro_rate()[2] for state in gamepad.sent_states]
 
     assert all(rate < 0.0 for rate in gyro_z_rates), gyro_z_rates
     assert len(set(gyro_z_rates)) == 1, gyro_z_rates
     assert all(
         len({imu.to_gyro_rate()[2] for imu in state.imu_frames}) == 1
-        for state in gamepad.applied_states
+        for state in gamepad.sent_states
     )
 
 
@@ -507,12 +507,12 @@ def test_sparse_raw_mouse_and_keyboard_rotation_reach_limited_three_slot_imu() -
             ControllerColorSettings(),
         )
         for frame in frames:
-            await adapter.apply_frame(frame)
+            await adapter.send_frame(frame)
         await adapter.close()
 
     asyncio.run(apply_frames())
 
-    converted_imu = [state.imu_frames[0] for state in gamepad.applied_states]
+    converted_imu = [state.imu_frames[0] for state in gamepad.sent_states]
     total_yaw = sum(
         -hypot(gyro_x, gyro_z) * 0.008
         for gyro_x, _gyro_y, gyro_z in (imu.to_gyro_rate() for imu in converted_imu)
@@ -532,7 +532,7 @@ def test_sparse_raw_mouse_and_keyboard_rotation_reach_limited_three_slot_imu() -
     )
     assert all(
         len({(imu.to_gyro_rate(), imu.to_accel_g()) for imu in state.imu_frames}) == 1
-        for state in gamepad.applied_states
+        for state in gamepad.sent_states
     )
 
 

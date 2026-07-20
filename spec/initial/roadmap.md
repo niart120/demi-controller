@@ -111,7 +111,7 @@ uv run python -m demi --version
 成果:
 
 - アダプター列挙
-- ProController生成
+- DirectProController生成
 - 再接続
 - 新規ペアリング
 - InputState変換

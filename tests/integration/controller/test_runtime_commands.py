@@ -1,6 +1,8 @@
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event, get_ident
+from time import sleep
 
 from demi.application.state import ConnectionState
 from demi.controller.adapter import ControllerAdapterError
@@ -88,6 +90,9 @@ class RecordingAdapter:
     connect_started: Event | None = None
     connect_release: Event | None = None
     active_frame_error: Exception | None = None
+    send_started: Event | None = None
+    send_release: Event | None = None
+    disconnect_neutral_values: list[bool] = field(default_factory=list)
 
     def _record(self, name: str) -> None:
         self.operations.append(name)
@@ -125,22 +130,31 @@ class RecordingAdapter:
         self.pairing_bond_paths.append(bond_path)
         self._record("pairing")
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Record a disconnect request."""
+        self.disconnect_neutral_values.append(neutral)
         self._record("disconnect")
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Record a color recreation request."""
-        del colors
+        del colors, neutral
         self._record("colors")
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Record a complete frame application."""
-        self._record("apply_frame")
+        self._record("send_frame")
         if frame.capture_active:
             self.active_frame_attempts.append(frame)
             if self.active_frame_error is not None:
                 raise self.active_frame_error
+            if self.send_started is not None:
+                self.send_started.set()
+            if self.send_release is not None and not await asyncio.to_thread(
+                self.send_release.wait, 1.0
+            ):
+                raise TimeoutError
         self.applied_frames.append(frame)
         self.applied.set()
         if frame.capture_active:
@@ -179,8 +193,9 @@ def test_commands_are_ordered_on_worker_and_events_return_to_the_sink() -> None:
 
     runtime.close()
 
-    assert adapter.operations[:4] == ["discover", "connect_saved", "apply_frame", "apply_frame"]
+    assert adapter.operations[:4] == ["discover", "connect_saved", "send_frame", "send_frame"]
     assert "disconnect" in adapter.operations
+    assert adapter.disconnect_neutral_values == [False]
     assert adapter.operations[-1] == "close"
     assert len(set(adapter.thread_ids)) == 1
 
@@ -191,6 +206,8 @@ def make_frame(
     epoch: int,
     active: bool = True,
     zero_g: bool = False,
+    duration_ns: int = 0,
+    gyro_z: float = 0.0,
 ) -> ControllerFrame:
     """Build a valid frame for runtime mailbox integration tests."""
     return ControllerFrame(
@@ -200,9 +217,10 @@ def make_frame(
         buttons=frozenset(),
         left_stick=StickVector(x=0.0, y=0.0),
         right_stick=StickVector(x=0.0, y=0.0),
-        gyro_rate=GyroRate(0.0, 0.0, 0.0),
+        gyro_rate=GyroRate(0.0, 0.0, gyro_z),
         accel_g=AccelG(0.0, 0.0, 0.0 if zero_g else 1.0),
         capture_active=active,
+        sample_duration_ns=duration_ns,
     )
 
 
@@ -421,4 +439,45 @@ def test_connection_loss_returns_to_ready_and_stops_active_frame_delivery() -> N
         and event.category is ControllerErrorCategory.CONNECTION_LOST
         for event in events.events
     )
+    runtime.close()
+
+
+def test_send_in_progress_coalesces_pending_gyro_angle_into_one_next_frame() -> None:
+    send_started = Event()
+    send_release = Event()
+    adapter = RecordingAdapter(send_started=send_started, send_release=send_release)
+    events = RecordingEvents()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    runtime.post(
+        ConnectSaved(
+            adapter_id="usb:0",
+            bond_path=Path("bonds/default.json"),
+            timeout_seconds=30.0,
+            colors=ControllerColorSettings(),
+        )
+    )
+    assert events.connected.wait(timeout=1.0)
+    first = make_frame(sequence=1, epoch=1, duration_ns=4_000_000, gyro_z=2.0)
+    second = make_frame(sequence=2, epoch=1, duration_ns=4_000_000, gyro_z=3.0)
+    third = make_frame(sequence=3, epoch=1, duration_ns=12_000_000, gyro_z=-1.0)
+
+    assert runtime.offer_frame(first) is True
+    assert send_started.wait(timeout=1.0)
+    assert runtime.offer_frame(second) is True
+    assert runtime.offer_frame(third) is True
+    send_release.set()
+    for _ in range(20):
+        if len(adapter.active_frame_attempts) == 2:
+            break
+        sleep(0.05)
+
+    active_frames = adapter.active_frame_attempts
+    assert [frame.sequence for frame in active_frames] == [1, 3]
+    assert active_frames[1].sample_duration_ns == 16_000_000
+    assert active_frames[1].gyro_rate.z_radians_per_second == 0.0
     runtime.close()

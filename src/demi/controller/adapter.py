@@ -42,14 +42,16 @@ class ControllerAdapter(Protocol):
     ) -> None:
         """Start an explicitly requested pairing operation."""
 
-    async def disconnect(self) -> None:
-        """Disconnect the active controller."""
+    async def disconnect(self, *, neutral: bool = True) -> None:
+        """Disconnect the active controller with the requested neutral policy."""
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
-        """Recreate the controller using new colors."""
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
+        """Recreate the controller using new colors and close policy."""
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
-        """Apply one complete Project_Demi controller frame."""
+    async def send_frame(self, frame: ControllerFrame) -> None:
+        """Send one complete Project_Demi controller frame."""
 
     async def close(self) -> None:
         """Release all adapter resources."""

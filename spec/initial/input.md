@@ -360,7 +360,7 @@ gyro_rate = GyroRate(0.0, 0.0, 0.0)
 accel_g = AccelG(0.0, 0.0, 1.0)
 ```
 
-接続直後、捕捉解除、フォーカス喪失、停止監視、切断前には、このIMUを含む完全な `InputState` を `apply()` する。現行swbt-pythonの `IMUFrame.neutral()` / `InputState.neutral()` は加速度も0にするため、定常的な静止状態の生成には使わない。`controller.neutral()` は明示フレーム送信に失敗した場合や終了時の最終フォールバックに限定する。
+接続直後、捕捉解除、フォーカス喪失、停止監視、切断前には、このIMUを含む完全な `InputState` を `send()` し、完了を待つ。現行swbt-pythonの `IMUFrame.neutral()` / `InputState.neutral()` は加速度も0にするため、定常的な静止状態の生成には使わない。rest送信成功後は `close(neutral=False)`、送信失敗時だけ `close(neutral=True)` を使う。
 
 | 項目 | 規則 |
 |---|---|

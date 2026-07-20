@@ -136,6 +136,7 @@ class ControllerRuntime:
             accepted = self._mailbox.offer(frame)
             if not accepted:
                 return False
+            self._latest_frame = frame
             loop = self._loop
             frame_event = self._frame_event
             if loop is not None and frame_event is not None and self.is_alive:
@@ -229,6 +230,7 @@ class ControllerRuntime:
                     frame_task = asyncio.create_task(frame_event.wait())
                 if watchdog_task in done:
                     watchdog_task.result()
+                    await self._neutralize_for_watchdog()
                     watchdog_task = asyncio.create_task(self._watchdog_loop())
         except Exception as error:  # noqa: BLE001
             self._emit_error(
@@ -267,7 +269,7 @@ class ControllerRuntime:
         while True:
             await asyncio.sleep(FrameWatchdog.monitor_interval_ms / 1000.0)
             if self._watchdog.check():
-                await self._neutralize_for_watchdog()
+                return
 
     async def _handle_command(self, command: ControllerCommand) -> None:
         if isinstance(command, DiscoverAdapters):
@@ -365,8 +367,8 @@ class ControllerRuntime:
         self._set_connection_state(ConnectionState.DISCONNECTING)
         try:
             if self._connected:
-                await self._apply_rest_state()
-                await adapter.disconnect()
+                self._mailbox.discard_pending(reason="disconnect")
+                await self._disconnect_after_rest(adapter)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),
@@ -387,12 +389,15 @@ class ControllerRuntime:
         self._watchdog.set_connected(False)
         self._set_connection_state(ConnectionState.CONNECTING, adapter_id)
         try:
-            await adapter.recreate_with_colors(command.colors)
+            self._mailbox.discard_pending(reason="color_recreate")
+            await self._apply_rest_state()
+            await adapter.recreate_with_colors(command.colors, neutral=False)
             self._connected = True
             self._watchdog.set_connected(True)
             await self._apply_connection_initial_state()
             self._set_connection_state(ConnectionState.CONNECTED, adapter_id)
         except Exception as error:  # noqa: BLE001
+            self._mailbox.discard_pending(reason="send_failure")
             self._connected = False
             self._connected_adapter_id = None
             self._watchdog.set_connected(False)
@@ -405,14 +410,13 @@ class ControllerRuntime:
         frame = self._mailbox.take()
         if frame is None:
             return
-        self._latest_frame = frame
         self._watchdog.note_frame(frame)
         if not self._connected or self._adapter is None:
             return
         if frame.capture_active and self._watchdog.watchdog_tripped:
             return
         try:
-            await self._adapter.apply_frame(frame)
+            await self._adapter.send_frame(frame)
         except Exception as error:  # noqa: BLE001
             self._connected = False
             self._watchdog.set_connected(False)
@@ -439,11 +443,21 @@ class ControllerRuntime:
 
     async def _apply_rest_state(self) -> None:
         if self._adapter is not None:
-            await self._adapter.apply_frame(self._neutral_frame())
+            await self._adapter.send_frame(self._neutral_frame())
 
     async def _apply_connection_initial_state(self) -> None:
         if self._adapter is not None:
-            await self._adapter.apply_frame(self._connection_initial_frame())
+            await self._adapter.send_frame(self._connection_initial_frame())
+
+    async def _disconnect_after_rest(self, adapter: "ControllerAdapter") -> None:
+        """Send Project_Demi rest before closing without a duplicate neutral."""
+        rest_sent = False
+        try:
+            self._mailbox.discard_pending(reason="watchdog")
+            await self._apply_rest_state()
+            rest_sent = True
+        finally:
+            await adapter.disconnect(neutral=not rest_sent)
 
     def _connection_initial_frame(self) -> ControllerFrame:
         frame = self._neutral_frame()
@@ -473,16 +487,8 @@ class ControllerRuntime:
             if adapter is not None:
                 if self._connected:
                     try:
-                        await self._apply_rest_state()
-                    except Exception as error:  # noqa: BLE001
-                        self._emit_error(
-                            self._category_for_error(
-                                error, ControllerErrorCategory.SHUTDOWN_FAILED
-                            ),
-                            error,
-                        )
-                    try:
-                        await adapter.disconnect()
+                        self._mailbox.discard_pending(reason="shutdown")
+                        await self._disconnect_after_rest(adapter)
                     except Exception as error:  # noqa: BLE001
                         self._emit_error(
                             self._category_for_error(
@@ -525,8 +531,9 @@ class ControllerRuntime:
         self._adapter = None
         if adapter is None:
             return
+        self._mailbox.discard_pending(reason="recovery")
         try:
-            await adapter.disconnect()
+            await adapter.disconnect(neutral=True)
         except Exception as error:  # noqa: BLE001
             self._emit_error(
                 self._category_for_error(error, ControllerErrorCategory.SHUTDOWN_FAILED),

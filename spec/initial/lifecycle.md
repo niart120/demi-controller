@@ -76,7 +76,7 @@ accel: (0, 0, +1) G
 virtual pitch: 0 rad
 ```
 
-主スレッドは `ControllerFrame` としてこの状態を生成し、接続ワーカーは完全な `InputState` へ変換して `apply()` する。swbt-pythonの `controller.neutral()` は通常経路ではなく、rest状態の送信に失敗した場合や終了時の最終フォールバックに限定する。
+主スレッドは `ControllerFrame` としてこの状態を生成し、接続ワーカーは完全な `InputState` へ変換して `send()` の完了を待つ。rest送信成功後は `close(neutral=False)`、送信失敗時だけ `close(neutral=True)` を最終フォールバックにする。
 
 ## 4. マウス捕捉開始
 
@@ -135,17 +135,17 @@ virtual pitch: 0 rad
 UI Connect
   -> validate adapter and slot
   -> state CONNECTING
-  -> worker constructs ProController
+  -> worker constructs DirectProController
   -> reconnect without pairing
-  -> apply physical rest state
+  -> send physical rest state and await completion
   -> state CONNECTED
 ```
 
 失敗時:
 
 ```text
-apply physical rest state, best effort
-controller.neutral() only as final fallback
+send physical rest state, best effort
+close(neutral=True) only if rest send failed
 close controller
 state ERROR
 emit categorized error
@@ -161,7 +161,7 @@ open connection dialog
   -> verify adapter
   -> state CONNECTING
   -> connect(allow_pairing=True)
-  -> apply physical rest state
+  -> send physical rest state and await completion
   -> state CONNECTED
 ```
 
@@ -175,8 +175,8 @@ open connection dialog
 1. leave CAPTURED if needed
 2. stop accepting non-neutral frames
 3. state DISCONNECTING
-4. await apply_rest_state()
-5. controller.neutral() only if rest apply failed
+4. await send_rest_state()
+5. close(neutral=False), or close(neutral=True) only if rest send failed
 6. close controller
 7. state READY
 ```
@@ -217,12 +217,12 @@ save colors
 
 ```text
 leave CAPTURED
-apply physical rest state
+send physical rest state and await completion
 disconnect
-destroy ProController
+destroy DirectProController
 construct with new ControllerColors
 reconnect saved bond
-apply physical rest state
+send physical rest state and await completion
 CONNECTED
 remain IDLE
 ```

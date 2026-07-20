@@ -131,19 +131,22 @@ class FakeAdapter:
         """Complete a fake pairing operation."""
         del adapter_id, bond_path, timeout_seconds, colors
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Complete a fake disconnect."""
+        del neutral
         if self.disconnect_error is not None:
             raise self.disconnect_error
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Complete a fake color recreation."""
-        del colors
+        del colors, neutral
         self.recreate_calls += 1
         if self.recreate_error is not None:
             raise self.recreate_error
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Accept a frame without hardware."""
         del frame
         self.apply_calls += 1
@@ -213,9 +216,11 @@ class WaitingRecreateAdapter(FakeAdapter):
     recreate_started: Event = field(default_factory=Event)
     recreate_cancelled: Event = field(default_factory=Event)
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Wait indefinitely and record task cancellation."""
-        del colors
+        del colors, neutral
         self.recreate_calls += 1
         self.recreate_started.set()
         try:
@@ -248,7 +253,7 @@ class WaitingFrameAdapter(FakeAdapter):
     frame_cancelled: Event = field(default_factory=Event)
     active_sequences: list[int] = field(default_factory=list)
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Block active input but allow rest-state cleanup."""
         self.apply_calls += 1
         if not frame.capture_active:
@@ -270,7 +275,7 @@ class CleanupRecordingAdapter(FakeAdapter):
     cleanup_operations: list[str] = field(default_factory=list)
     rest_calls: int = 0
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
+    async def send_frame(self, frame: ControllerFrame) -> None:
         """Record initial and shutdown rest-state application."""
         self.apply_calls += 1
         if frame.capture_active:
@@ -282,8 +287,9 @@ class CleanupRecordingAdapter(FakeAdapter):
         if self.fail_stage == "rest":
             raise RuntimeError
 
-    async def disconnect(self) -> None:
+    async def disconnect(self, *, neutral: bool = True) -> None:
         """Record disconnect and optionally fail it."""
+        del neutral
         self.cleanup_operations.append("disconnect")
         if self.fail_stage == "disconnect":
             raise RuntimeError
@@ -532,6 +538,18 @@ def test_runtime_starts_worker_and_closes_without_leaking_the_thread() -> None:
     assert runtime.is_alive is False
     assert adapter.close_thread_id is not None
     assert adapter.close_thread_id != main_thread_id
+
+
+def test_runtime_retains_the_latest_accepted_frame_for_status_before_send() -> None:
+    runtime = ControllerRuntime(
+        adapter_factory=FakeAdapter,
+        event_sink=EventRecorder(),
+        clock=FakeClock(),
+    )
+    frame = make_frame(sequence=1)
+
+    assert runtime.offer_frame(frame) is True
+    assert runtime.latest_frame == frame
 
 
 def test_runtime_preserves_adapter_error_category_in_runtime_event() -> None:

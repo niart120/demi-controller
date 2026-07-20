@@ -1,5 +1,6 @@
 """swbt-python public API adapter for the controller runtime."""
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn, Protocol
@@ -12,11 +13,11 @@ from swbt import (
     ConnectionFailedError,
     ConnectionTimeoutError,
     ControllerColors,
+    DirectProController,
     IMUFrame,
     InputState,
     InvalidInputError,
     InvalidKeyStoreError,
-    ProController,
     Stick,
     SwbtError,
     TransportOpenError,
@@ -27,6 +28,8 @@ from demi.controller.adapter import ControllerAdapter, ControllerAdapterError
 from demi.controller.events import AdapterDescriptor, ControllerErrorCategory
 from demi.domain.controller import ControllerFrame, LogicalButton
 from demi.domain.settings import ControllerColorSettings
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SwbtGamepad(Protocol):
@@ -46,8 +49,8 @@ class SwbtGamepad(Protocol):
     ) -> None:
         """Connect through reconnect and optional pairing."""
 
-    async def apply(self, state: InputState) -> None:
-        """Replace the complete input state."""
+    async def send(self, state: InputState) -> None:
+        """Send one complete input state and wait for completion."""
 
     async def close(self, *, neutral: bool = True) -> None:
         """Close the gamepad and optionally send neutral."""
@@ -85,25 +88,25 @@ class SwbtControllerAdapter(ControllerAdapter):
     def __init__(
         self,
         *,
-        gamepad_factory: GamepadFactory = ProController,
+        gamepad_factory: GamepadFactory = DirectProController,
         adapter_lister: AdapterLister = list_adapters,
-        report_period_us: int = 8_000,
     ) -> None:
         """Initialize an adapter with injectable public-API boundaries.
 
         Args:
             gamepad_factory: Public swbt gamepad constructor.
             adapter_lister: Public swbt adapter discovery function.
-            report_period_us: Periodic input report interval in microseconds.
         """
         self._gamepad_factory = gamepad_factory
         self._adapter_lister = adapter_lister
-        self._report_period_us = report_period_us
         self._gamepad: SwbtGamepad | None = None
         self._adapter_id: str | None = None
         self._bond_path: Path | None = None
         self._colors: ControllerColorSettings | None = None
         self._timeout_seconds: float | None = None
+        self._last_logged_input_signature: (
+            tuple[int, bool, bool, frozenset[LogicalButton]] | None
+        ) = None
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """List USB Bluetooth candidates without opening a controller."""
@@ -146,34 +149,37 @@ class SwbtControllerAdapter(ControllerAdapter):
             await self._discard_failed_gamepad()
             _raise_adapter_failure(error, ControllerErrorCategory.PAIRING_TIMEOUT)
 
-    async def disconnect(self) -> None:
-        """Close the current gamepad with a final neutral attempt."""
+    async def disconnect(self, *, neutral: bool = True) -> None:
+        """Close the current gamepad with the requested neutral policy."""
         gamepad = self._gamepad
         if gamepad is None:
             return
         try:
-            await gamepad.close(neutral=True)
+            await gamepad.close(neutral=neutral)
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
         finally:
             self._clear_gamepad()
 
-    async def recreate_with_colors(self, colors: ControllerColorSettings) -> None:
+    async def recreate_with_colors(
+        self, colors: ControllerColorSettings, *, neutral: bool = True
+    ) -> None:
         """Recreate and reconnect the current saved controller with new colors."""
         adapter_id = self._adapter_id
         bond_path = self._bond_path
         timeout_seconds = self._timeout_seconds
         if adapter_id is None or bond_path is None:
             return
-        await self.disconnect()
+        await self.disconnect(neutral=neutral)
         await self.connect_saved(adapter_id, bond_path, timeout_seconds or 30.0, colors)
 
-    async def apply_frame(self, frame: ControllerFrame) -> None:
-        """Convert and apply one complete Project_Demi frame."""
+    async def send_frame(self, frame: ControllerFrame) -> None:
+        """Convert and send one complete Project_Demi frame."""
         try:
-            await self._require_gamepad().apply(frame_to_input_state(frame))
+            await self._require_gamepad().send(frame_to_input_state(frame))
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
+        self._log_input_delivery(frame)
 
     async def close(self) -> None:
         """Release the current gamepad idempotently."""
@@ -191,7 +197,6 @@ class SwbtControllerAdapter(ControllerAdapter):
             adapter=adapter_id,
             key_store_path=str(bond_path),
             controller_colors=to_swbt_colors(colors),
-            report_period_us=self._report_period_us,
         )
         self._adapter_id = adapter_id
         self._bond_path = bond_path
@@ -223,6 +228,28 @@ class SwbtControllerAdapter(ControllerAdapter):
         self._bond_path = None
         self._colors = None
         self._timeout_seconds = None
+        self._last_logged_input_signature = None
+
+    def _log_input_delivery(self, frame: ControllerFrame) -> None:
+        signature = (
+            frame.capture_epoch,
+            frame.capture_active,
+            frame.pointer_capture_active,
+            frame.buttons,
+        )
+        if signature == self._last_logged_input_signature:
+            return
+        self._last_logged_input_signature = signature
+        buttons = ",".join(sorted(button.value for button in frame.buttons)) or "-"
+        _LOGGER.debug(
+            "direct-input sent sequence=%d capture_epoch=%d capture_active=%s "
+            "pointer_capture_active=%s buttons=%s",
+            frame.sequence,
+            frame.capture_epoch,
+            frame.capture_active,
+            frame.pointer_capture_active,
+            buttons,
+        )
 
     @staticmethod
     def _descriptor(info: AdapterInfo) -> AdapterDescriptor:
