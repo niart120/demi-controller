@@ -1,5 +1,6 @@
 """swbt-python public API adapter for the controller runtime."""
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import NoReturn, Protocol
@@ -27,6 +28,8 @@ from demi.controller.adapter import ControllerAdapter, ControllerAdapterError
 from demi.controller.events import AdapterDescriptor, ControllerErrorCategory
 from demi.domain.controller import ControllerFrame, LogicalButton
 from demi.domain.settings import ControllerColorSettings
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SwbtGamepad(Protocol):
@@ -101,6 +104,9 @@ class SwbtControllerAdapter(ControllerAdapter):
         self._bond_path: Path | None = None
         self._colors: ControllerColorSettings | None = None
         self._timeout_seconds: float | None = None
+        self._last_logged_input_signature: (
+            tuple[int, bool, bool, frozenset[LogicalButton]] | None
+        ) = None
 
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """List USB Bluetooth candidates without opening a controller."""
@@ -173,6 +179,7 @@ class SwbtControllerAdapter(ControllerAdapter):
             await self._require_gamepad().send(frame_to_input_state(frame))
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.CONNECTION_LOST)
+        self._log_input_delivery(frame)
 
     async def close(self) -> None:
         """Release the current gamepad idempotently."""
@@ -221,6 +228,28 @@ class SwbtControllerAdapter(ControllerAdapter):
         self._bond_path = None
         self._colors = None
         self._timeout_seconds = None
+        self._last_logged_input_signature = None
+
+    def _log_input_delivery(self, frame: ControllerFrame) -> None:
+        signature = (
+            frame.capture_epoch,
+            frame.capture_active,
+            frame.pointer_capture_active,
+            frame.buttons,
+        )
+        if signature == self._last_logged_input_signature:
+            return
+        self._last_logged_input_signature = signature
+        buttons = ",".join(sorted(button.value for button in frame.buttons)) or "-"
+        _LOGGER.debug(
+            "direct-input sent sequence=%d capture_epoch=%d capture_active=%s "
+            "pointer_capture_active=%s buttons=%s",
+            frame.sequence,
+            frame.capture_epoch,
+            frame.capture_active,
+            frame.pointer_capture_active,
+            buttons,
+        )
 
     @staticmethod
     def _descriptor(info: AdapterInfo) -> AdapterDescriptor:

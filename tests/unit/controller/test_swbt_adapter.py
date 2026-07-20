@@ -1,7 +1,9 @@
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pytest
 from swbt import AdapterInfo, Button, ControllerColors, IMUFrame, InputState, Stick
 
 from demi.controller.events import AdapterDescriptor
@@ -41,7 +43,10 @@ class RecordingGamepad:
         del neutral
 
 
-def test_controller_frame_is_converted_to_one_public_input_state() -> None:
+def test_controller_frame_is_converted_to_one_public_input_state(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger="demi.controller.swbt_adapter")
     gamepad = RecordingGamepad()
 
     def gamepad_factory(**kwargs: object) -> RecordingGamepad:
@@ -86,6 +91,10 @@ def test_controller_frame_is_converted_to_one_public_input_state() -> None:
         z_rad_s=3.0,
     ).with_accel_g(x_g=0.25, y_g=-0.5, z_g=0.75)
     assert state.imu_frames == (expected_imu, expected_imu, expected_imu)
+    assert (
+        "direct-input sent sequence=1 capture_epoch=1 "
+        "capture_active=True pointer_capture_active=False buttons=A,ZR" in caplog.messages
+    )
 
 
 def test_neutral_frame_uses_one_g_acceleration_in_all_three_imu_slots() -> None:

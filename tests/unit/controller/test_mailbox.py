@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from demi.controller.mailbox import LatestFrameMailbox
@@ -62,7 +64,10 @@ def test_mailbox_accepts_a_new_epoch_and_capture_release_frame() -> None:
     assert mailbox.peek() == next_capture
 
 
-def test_mailbox_coalesces_pending_gyro_angle_while_keeping_latest_state() -> None:
+def test_mailbox_coalesces_pending_gyro_angle_while_keeping_latest_state(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger="demi.controller.mailbox")
     mailbox = LatestFrameMailbox()
     first = make_frame(sequence=1, epoch=1, duration_ns=4_000_000, gyro_z=3.0)
     newest = make_frame(sequence=2, epoch=1, duration_ns=12_000_000, gyro_z=-1.0)
@@ -77,6 +82,9 @@ def test_mailbox_coalesces_pending_gyro_angle_while_keeping_latest_state() -> No
     assert sent.sample_duration_ns == 16_000_000
     assert sent.gyro_rate.z_radians_per_second == pytest.approx(0.0)
     assert mailbox.peek() == newest
+    assert any(
+        "count=2 sequence=1..2 duration_ns=16000000" in message for message in caplog.messages
+    )
 
 
 def test_mailbox_discards_pending_frame_without_losing_latest_view() -> None:

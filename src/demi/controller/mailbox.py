@@ -69,13 +69,11 @@ class LatestFrameMailbox:
             self._clear_pending()
         if frame is not None and count > 1:
             _LOGGER.debug(
-                "Coalesced controller frames",
-                extra={
-                    "frame_count": count,
-                    "first_sequence": first_sequence,
-                    "last_sequence": frame.sequence,
-                    "sample_duration_ns": frame.sample_duration_ns,
-                },
+                "direct-frame coalesced count=%d sequence=%d..%d duration_ns=%d",
+                count,
+                first_sequence,
+                frame.sequence,
+                frame.sample_duration_ns,
             )
         return frame
 
