@@ -65,12 +65,12 @@ This record is not a gyro acceptance result. Project_Demi reached the saved-bond
 
 ## Unit 039 Direct送信実機試験 — 2026-07-20 JST
 
-この記録はProject_Demiを通した実機試験の結果である。受入試験は未完了であり、成功した接続系と失敗した入力系を分けて記録する。
+この記録はProject_Demiを通した実機試験と、その後の診断ログ採取の結果である。#44 の受入条件である実機結果の記録は完了した。ジャイロ操作感の未解決事項は #45 で追跡し、この記録を受入成功として扱わない。
 
 | item | value |
 |---|---|
-| Project_Demi implementation reference | `3958cb5` |
-| execution status | partial failure; 接続系は通過、入力系に未解決の不具合あり |
+| Project_Demi implementation reference | 初回実機試験: `3958cb5`; 診断ログ採取: `ac37dfc` 以降 |
+| execution status | #44 の実機結果を記録済み。ジャイロ操作感は未解決で #45 に分離 |
 | date, time, timezone | 2026-07-20 JST; 実行時刻は記録されていない |
 | Python / swbt-python / Bumble | Python 3.12.10 / swbt-python 0.4.0 / Bumble 0.0.230 |
 | PySide6 / Qt | PySide6 6.11.1 / Qt 6.11.1 |
@@ -80,8 +80,8 @@ This record is not a gyro acceptance result. Project_Demi reached the saved-bond
 | adapter identifier | `usb:0`; aliases `usb:0A12:0001` |
 | target device and firmware | Nintendo Switch 2, firmware 22.5.0 |
 | pairing or reconnect flow | 明示的なpairing、接続、切断を実施。saved-bond reconnectはこの記録の対象外 |
-| exact test cases | pairing、接続、切断、`Start mouse`なしのF→A、`Start mouse`ありのF→A、マウスジャイロ操作 |
-| result | pairing、接続、切断: passed。`Start mouse`なし: GUIプレビューではAが押下表示になるがSwitchはAとして認識しない。`Start mouse`あり: キーボード入力を認識する。ジャイロ: カクつきを観測 |
-| observed limitations | この試験ではDirect送信のDEBUG記録を採取していない。キーボード差分がIMU値と送信タイミングのどちらに起因するか、ジャイロのカクつきとframe集約の関係は未確認 |
+| exact test cases | pairing、接続、切断、`Start mouse`なしのF→A、`Start mouse`ありのF→A、マウスジャイロ操作、Direct送信DEBUGログの採取 |
+| result | pairing、接続、切断: passed。F→A: `Start mouse`ありでSwitchが認識し、診断ログではポインター未捕捉時を含むAの`send()`完了を記録した。ジャイロ: カクつきを観測 |
+| observed limitations | Direct送信のDEBUGログは、F→Aの送信完了とframe集約を記録するが、送信時間とIMU slotごとの時系列を記録しない。ジャイロのカクつきとframe集約の因果関係は未確認であり、#45 で追跡する |
 
-`ac37dfc`以降はDEBUGログに送信済みボタン状態とframe集約区間を出力する。次の実機試験では同ログを採取し、同じ操作列と対応付ける。
+`ac37dfc`以降のDEBUGログで、送信済みボタン状態とframe集約区間を採取した。#45 では同じ操作列に送信時間とIMU時系列の記録を加え、実機操作感と対応付ける。
