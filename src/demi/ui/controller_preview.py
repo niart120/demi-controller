@@ -7,13 +7,14 @@ from math import hypot
 from typing import Protocol
 
 from PySide6.QtCore import QCoreApplication, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPaintEvent, QPen
 from PySide6.QtWidgets import QWidget
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
 from demi.domain.settings import ControllerColorSettings
 from demi.ui.preview_layout import (
     CONTROL_IDS,
+    PreviewLayout,
     PreviewRect,
     normalized_stick_position,
     preview_layout,
@@ -97,6 +98,7 @@ class ControllerPreviewModel:
     accel_display: SensorDisplay
     capture_active: bool
     pointer_capture_active: bool
+    mouse_input_active: bool
     control_ids: frozenset[str]
 
 
@@ -130,6 +132,7 @@ def controller_preview_model(
         accel_display=accel_display(frame.accel_g),
         capture_active=frame.capture_active,
         pointer_capture_active=frame.pointer_capture_active,
+        mouse_input_active=frame.pointer_capture_active,
         control_ids=CONTROL_IDS,
     )
 
@@ -222,15 +225,21 @@ class ControllerPreviewWidget(QWidget):
         canvas_width = self.width()
         canvas_height = self.height()
         layout = preview_layout(canvas_width, canvas_height)
-        painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
+        silhouette = _controller_silhouette_path(layout)
+        painter.setPen(Qt.PenStyle.NoPen)
+        self._draw_grip(painter, layout.left_grip_bounds, model.left_grip_color, left=True)
+        self._draw_grip(painter, layout.right_grip_bounds, model.right_grip_color, left=False)
         painter.setBrush(QColor(model.body_color))
-        painter.drawRoundedRect(_qrect(layout.body_bounds), 36.0, 36.0)
-        self._draw_grip(painter, layout.left_grip_bounds, model.left_grip_color)
-        self._draw_grip(painter, layout.right_grip_bounds, model.right_grip_color)
+        painter.drawPath(_controller_faceplate_path(layout))
+        painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(silhouette)
+        painter.drawPath(_controller_faceplate_path(layout))
         for control_id, bounds in layout.controls.items():
-            if control_id in _STICK_CLICK_IDS:
+            if control_id in _STICK_CLICK_IDS or control_id.startswith("dpad_"):
                 continue
             self._draw_control(painter, control_id, bounds, model)
+        self._draw_directional_pad(painter, layout, model)
         self._draw_status(painter, model, layout.status_bounds)
         self._draw_sensors(painter, model, layout.gyro_bounds, layout.accel_bounds)
 
@@ -302,11 +311,65 @@ class ControllerPreviewWidget(QWidget):
         painter.setFont(font)
 
     @staticmethod
-    def _draw_grip(painter: QPainter, bounds: PreviewRect, color: str) -> None:
-        painter.setPen(QPen(QColor("#B8B8B8"), 1.5))
+    def _draw_grip(painter: QPainter, bounds: PreviewRect, color: str, *, left: bool) -> None:
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(color))
-        radius = min(bounds.width, bounds.height) * 0.45
-        painter.drawRoundedRect(_qrect(bounds), radius, radius)
+        painter.drawPath(_grip_path(bounds, left=left))
+
+    def _draw_directional_pad(
+        self,
+        painter: QPainter,
+        layout: PreviewLayout,
+        model: ControllerPreviewModel,
+    ) -> None:
+        control_ids = ("dpad_up", "dpad_left", "dpad_right", "dpad_down")
+        path = _directional_pad_path(layout)
+        pressed_ids = model.pressed_control_ids.intersection(control_ids)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(model.buttons_color))
+        painter.drawPath(path)
+
+        painter.save()
+        painter.setClipPath(path)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(_PRESSED_FILL_COLOR))
+        for control_id in pressed_ids:
+            painter.drawRect(_qrect(layout.controls[control_id]))
+        painter.restore()
+
+        painter.setPen(
+            QPen(
+                QColor(_PRESSED_OUTLINE_COLOR if pressed_ids else "#F5F5F5"),
+                3.0 if pressed_ids else 1.5,
+            )
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(path)
+
+        labels = {
+            "dpad_up": "▲",
+            "dpad_left": "◀",
+            "dpad_right": "▶",
+            "dpad_down": "▼",
+        }
+        original_font = painter.font()
+        for control_id in control_ids:
+            bounds = layout.controls[control_id]
+            label_font = painter.font()
+            label_font.setPixelSize(_control_label_pixel_size(bounds))
+            painter.setFont(label_font)
+            painter.setPen(
+                QPen(
+                    QColor(_PRESSED_TEXT_COLOR if control_id in pressed_ids else "#F5F5F5"),
+                    1.0,
+                )
+            )
+            painter.drawText(
+                _qrect(bounds),
+                Qt.AlignmentFlag.AlignCenter,
+                labels[control_id],
+            )
+        painter.setFont(original_font)
 
     def _draw_status(
         self,
@@ -315,16 +378,17 @@ class ControllerPreviewWidget(QWidget):
         bounds: PreviewRect,
     ) -> None:
         translate = QCoreApplication.translate
-        keyboard = translate("ControllerPreviewWidget", "Keyboard input")
-        mouse = translate("ControllerPreviewWidget", "Mouse capture")
         on = translate("ControllerPreviewWidget", "On")
         off = translate("ControllerPreviewWidget", "Off")
+        mouse_input = translate("ControllerPreviewWidget", "Mouse input")
+        mouse_color = "#176B3A" if model.mouse_input_active else "#7A1F1F"
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
+        painter.setBrush(QColor(mouse_color))
+        painter.drawRoundedRect(_qrect(bounds), 5.0, 5.0)
         painter.drawText(
             _qrect(bounds),
             Qt.AlignmentFlag.AlignCenter,
-            f"{keyboard}: {on if model.capture_active else off}  ·  "
-            f"{mouse}: {on if model.pointer_capture_active else off}",
+            f"{mouse_input}: {on if model.mouse_input_active else off} (F5)",
         )
 
     def _draw_sensors(
@@ -428,6 +492,157 @@ def _circle(center: QPointF, radius: float) -> QRectF:
 
 def _qrect(bounds: PreviewRect) -> QRectF:
     return QRectF(bounds.left, bounds.top, bounds.width, bounds.height)
+
+
+def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
+    return (
+        _controller_faceplate_path(layout)
+        .united(_grip_path(layout.left_grip_bounds, left=True))
+        .united(_grip_path(layout.right_grip_bounds, left=False))
+    )
+
+
+def _directional_pad_path(layout: PreviewLayout) -> QPainterPath:
+    up = _qrect(layout.controls["dpad_up"])
+    left = _qrect(layout.controls["dpad_left"])
+    right = _qrect(layout.controls["dpad_right"])
+    down = _qrect(layout.controls["dpad_down"])
+    path = QPainterPath()
+    path.moveTo(up.left(), up.top())
+    path.lineTo(up.right(), up.top())
+    path.lineTo(up.right(), left.top())
+    path.lineTo(right.right(), left.top())
+    path.lineTo(right.right(), right.bottom())
+    path.lineTo(down.right(), right.bottom())
+    path.lineTo(down.right(), down.bottom())
+    path.lineTo(down.left(), down.bottom())
+    path.lineTo(down.left(), left.bottom())
+    path.lineTo(left.left(), left.bottom())
+    path.lineTo(left.left(), left.top())
+    path.lineTo(up.left(), left.top())
+    path.closeSubpath()
+    return path
+
+
+def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
+    bounds = _qrect(layout.body_bounds)
+    path = QPainterPath()
+    path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
+    path.lineTo(bounds.right() - bounds.width() * 0.14, bounds.top())
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.04,
+        bounds.top(),
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.10,
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.25,
+    )
+    path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
+    path.cubicTo(
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.84,
+        bounds.right() - bounds.width() * 0.09,
+        bounds.bottom(),
+        bounds.center().x() + bounds.width() * 0.06,
+        bounds.bottom(),
+    )
+    path.lineTo(bounds.center().x() - bounds.width() * 0.06, bounds.bottom())
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.09,
+        bounds.bottom(),
+        bounds.left(),
+        bounds.top() + bounds.height() * 0.84,
+        bounds.left(),
+        bounds.top() + bounds.height() * 0.60,
+    )
+    path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.25)
+    path.cubicTo(
+        bounds.left(),
+        bounds.top() + bounds.height() * 0.10,
+        bounds.left() + bounds.width() * 0.04,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.14,
+        bounds.top(),
+    )
+    path.closeSubpath()
+    return path
+
+
+def _grip_path(bounds: PreviewRect, *, left: bool) -> QPainterPath:
+    rect = _qrect(bounds)
+    path = QPainterPath()
+    if left:
+        path.moveTo(rect.left() + rect.width() * 0.43, rect.top())
+        path.lineTo(rect.right(), rect.top() + rect.height() * 0.58)
+        path.cubicTo(
+            rect.left() + rect.width() * 0.92,
+            rect.top() + rect.height() * 0.58,
+            rect.left() + rect.width() * 0.82,
+            rect.top() + rect.height() * 0.78,
+            rect.left() + rect.width() * 0.70,
+            rect.top() + rect.height() * 0.90,
+        )
+        path.cubicTo(
+            rect.left() + rect.width() * 0.57,
+            rect.bottom(),
+            rect.left() + rect.width() * 0.30,
+            rect.bottom(),
+            rect.left() + rect.width() * 0.18,
+            rect.top() + rect.height() * 0.91,
+        )
+        path.cubicTo(
+            rect.left() + rect.width() * 0.02,
+            rect.top() + rect.height() * 0.78,
+            rect.left(),
+            rect.top() + rect.height() * 0.48,
+            rect.left() + rect.width() * 0.12,
+            rect.top() + rect.height() * 0.24,
+        )
+        path.cubicTo(
+            rect.left() + rect.width() * 0.20,
+            rect.top() + rect.height() * 0.08,
+            rect.left() + rect.width() * 0.30,
+            rect.top(),
+            rect.left() + rect.width() * 0.43,
+            rect.top(),
+        )
+    else:
+        path.moveTo(rect.right() - rect.width() * 0.43, rect.top())
+        path.lineTo(rect.left(), rect.top() + rect.height() * 0.58)
+        path.cubicTo(
+            rect.right() - rect.width() * 0.92,
+            rect.top() + rect.height() * 0.58,
+            rect.right() - rect.width() * 0.82,
+            rect.top() + rect.height() * 0.78,
+            rect.right() - rect.width() * 0.70,
+            rect.top() + rect.height() * 0.90,
+        )
+        path.cubicTo(
+            rect.right() - rect.width() * 0.57,
+            rect.bottom(),
+            rect.right() - rect.width() * 0.30,
+            rect.bottom(),
+            rect.right() - rect.width() * 0.18,
+            rect.top() + rect.height() * 0.91,
+        )
+        path.cubicTo(
+            rect.right() - rect.width() * 0.02,
+            rect.top() + rect.height() * 0.78,
+            rect.right(),
+            rect.top() + rect.height() * 0.48,
+            rect.right() - rect.width() * 0.12,
+            rect.top() + rect.height() * 0.24,
+        )
+        path.cubicTo(
+            rect.right() - rect.width() * 0.20,
+            rect.top() + rect.height() * 0.08,
+            rect.right() - rect.width() * 0.30,
+            rect.top(),
+            rect.right() - rect.width() * 0.43,
+            rect.top(),
+        )
+    path.closeSubpath()
+    return path
 
 
 def _control_label_pixel_size(bounds: PreviewRect) -> int:

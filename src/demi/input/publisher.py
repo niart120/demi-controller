@@ -11,7 +11,8 @@ from demi.domain.settings import MouseSettings
 
 from .mapper import (
     aggregate_buttons,
-    is_accel_zero_active,
+    is_imu_neutral_active,
+    synthesize_diagnostic_gyro_rate,
     synthesize_diagnostic_rotation_intent,
     synthesize_stick,
 )
@@ -202,8 +203,17 @@ class InputPublisher:
                 intent=mouse_rotation_intent + diagnostic_rotation_intent,
                 dt_seconds=dt_seconds,
             )
-            if is_accel_zero_active(self._profile, evaluation_state):
-                accel_g = AccelG(0.0, 0.0, 0.0)
+            direct_diagnostic_gyro = synthesize_diagnostic_gyro_rate(
+                self._profile, evaluation_state
+            )
+            gyro_rate = GyroRate(
+                gyro_rate.x_radians_per_second + direct_diagnostic_gyro.x_radians_per_second,
+                gyro_rate.y_radians_per_second,
+                gyro_rate.z_radians_per_second,
+            )
+            if is_imu_neutral_active(self._profile, evaluation_state):
+                gyro_rate = GyroRate(0.0, 0.0, 0.0)
+                accel_g = AccelG(0.0, 0.0, 1.0)
         else:
             buttons = frozenset()
             left_stick = StickVector(x=0.0, y=0.0)

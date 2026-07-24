@@ -145,7 +145,6 @@ class LocalActions:
 
     toggle_capture: tuple[str, ...] = ("CTRL+C",)
     quit: tuple[str, ...] = ("CTRL+Q",)
-    release_capture: tuple[str, ...] = ("F4",)
     connection: tuple[str, ...] = ("CTRL+RETURN", "CTRL+ENTER")
 
     def __post_init__(self) -> None:
@@ -154,7 +153,6 @@ class LocalActions:
             self.toggle_capture,
             self.quit,
             self.connection,
-            self.release_capture,
         ):
             if not isinstance(action, tuple) or not all(
                 isinstance(value, str) and value for value in action

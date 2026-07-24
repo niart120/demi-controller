@@ -176,7 +176,6 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
             "toggle_capture": list(settings.local_actions.toggle_capture),
             "quit": list(settings.local_actions.quit),
             "connection": list(settings.local_actions.connection),
-            "release_capture": list(settings.local_actions.release_capture),
         },
         "profiles": [
             {
@@ -276,7 +275,7 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
     local_actions = _require_table(raw["local_actions"])
     _check_keys(
         local_actions,
-        frozenset({"toggle_capture", "quit", "release_capture"}),
+        frozenset({"toggle_capture", "quit"}),
         frozenset({"connection"}),
     )
 
@@ -328,10 +327,6 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
                         local_actions.get("connection", ["CTRL+RETURN", "CTRL+ENTER"])
                     )
                 ),
-                release_capture=tuple(
-                    _require_string(value)
-                    for value in _require_list(local_actions["release_capture"])
-                ),
             ),
             profiles=tuple(_decode_profile(item) for item in _require_list(raw["profiles"])),
         )
@@ -341,10 +336,6 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
 
 
 def _migrate_legacy_input_defaults(settings: AppSettings) -> AppSettings:
-    local_actions = settings.local_actions
-    if local_actions.release_capture == ("F12",):
-        local_actions = replace(local_actions, release_capture=("F4",))
-
     profiles = tuple(
         replace(
             profile,
@@ -359,7 +350,7 @@ def _migrate_legacy_input_defaults(settings: AppSettings) -> AppSettings:
         else profile
         for profile in settings.profiles
     )
-    return replace(settings, local_actions=local_actions, profiles=profiles)
+    return replace(settings, profiles=profiles)
 
 
 def dumps_settings(settings: AppSettings) -> str:

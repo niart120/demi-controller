@@ -25,12 +25,13 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     assert draft.controller_colors.body == "#ABCDEF"
 
 
-def test_editor_rejects_f4_allows_f12_and_restores_the_default_profile() -> None:
+def test_editor_allows_f4_rejects_f5_and_restores_the_default_profile() -> None:
     editor = SettingsEditor(AppSettings.default())
     editor.update_binding(0, source="KEY:1", target=BindingTarget.BUTTON_B)
 
+    editor.update_binding(0, source="KEY:F4")
     with pytest.raises(DomainValueError):
-        editor.update_binding(0, source="KEY:F4")
+        editor.update_binding(0, source="KEY:F5")
 
     editor.update_binding(0, source="KEY:F12")
     assert editor.draft.profiles[0].bindings[0].source == "KEY:F12"

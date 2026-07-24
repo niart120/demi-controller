@@ -50,7 +50,7 @@ def test_default_settings_match_the_initial_configuration() -> None:
     assert settings.input.mouse.invert_y is False
     assert settings.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
     assert settings.profiles[0].name == "Default"
-    assert len(settings.profiles[0].bindings) == 33
+    assert len(settings.profiles[0].bindings) == 34
 
 
 def test_color_values_are_normalized_to_uppercase_hex() -> None:

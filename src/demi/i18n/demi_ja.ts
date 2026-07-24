@@ -203,9 +203,9 @@
         <translation>キーボード入力</translation>
     </message>
     <message>
-        <location filename="../ui/controller_preview.py" line="319"/>
-        <source>Mouse capture</source>
-        <translation>マウス捕捉</translation>
+        <location filename="../ui/controller_preview.py" line="322"/>
+        <source>Mouse input</source>
+        <translation>マウス入力</translation>
     </message>
     <message>
         <location filename="../ui/controller_preview.py" line="320"/>
@@ -431,12 +431,6 @@
         <translation>接続</translation>
     </message>
     <message>
-        <location filename="../ui/toolbar.py" line="43"/>
-        <location filename="../ui/toolbar.py" line="99"/>
-        <source>Start mouse</source>
-        <translation>マウス捕捉開始</translation>
-    </message>
-    <message>
         <source>Mappings</source>
         <translation type="vanished">割り当て</translation>
     </message>
@@ -469,11 +463,6 @@
         <location filename="../ui/toolbar.py" line="95"/>
         <source>Disconnect</source>
         <translation>切断</translation>
-    </message>
-    <message>
-        <location filename="../ui/toolbar.py" line="99"/>
-        <source>Stop mouse</source>
-        <translation>マウス捕捉解除</translation>
     </message>
 </context>
 <context>
@@ -606,9 +595,9 @@
         <translation>重複またはローカル操作との競合があります。</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/mapping.py" line="829"/>
-        <source>F4 is reserved for mouse capture release</source>
-        <translation>F4はマウス捕捉解除用の予約キーです</translation>
+        <location filename="../ui/dialogs/mapping.py" line="832"/>
+        <source>F5 is reserved for mouse input toggle</source>
+        <translation>F5はマウス入力切替用の予約キーです</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/mapping.py" line="863"/>

@@ -72,7 +72,6 @@ pitch_limit_degrees = 75.0
 toggle_capture = ["CTRL+C"]
 quit = ["CTRL+Q"]
 connection = ["CTRL+RETURN", "CTRL+ENTER"]
-release_capture = ["F4"]
 
 [[profiles]]
 id = "default"
@@ -218,20 +217,24 @@ target = "GYRO:Z_NEGATIVE"
 
 [[profiles.bindings]]
 source = "KEY:O"
-target = "ACCEL:ZERO"
+target = "GYRO:X_NEGATIVE"
+
+[[profiles.bindings]]
+source = "KEY:P"
+target = "IMU:NEUTRAL"
 ```
 
 組み込みプロファイルはアプリ内の正本から生成し、ユーザー設定には編集後の完全なbinding配列を保存する。0.1.0では差分保存を採用しない。旧版の組み込み Default profile に診断targetが不足する場合、読み込み時に不足行だけをメモリ上で末尾へ補い、既存bindingと変更済みsourceを保持する。補完結果は `MIGRATED` とし、次回の明示保存で設定ファイルへ反映する。
 
 `local_actions.connection` は主キーボードとテンキーの Ctrl+Enter を表す。項目追加前の `demi.settings/v1` では欠落を許可し、`["CTRL+RETURN", "CTRL+ENTER"]` をメモリ上の既定値とする。次回の明示保存では項目を出力する。
 
-`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。マウス差分は `MouseRotationMapper` でラジアンへ変換し、`RotationPoseModel` はラジアン、ラジアン毎秒、Gだけを扱う。静的加速度は通常経路で仮想姿勢から常時生成するため、有効化や尺度を変更する設定は設けない。完全な0Gはprofileの診断targetで一時的に上書きする。
+`horizontal_sensitivity` と `vertical_sensitivity` は独立した無次元倍率であり、`1.0` を標準値とする。一方を他方の比率として扱わない。マウス差分は `MouseRotationMapper` でラジアンへ変換し、`RotationPoseModel` はラジアン、ラジアン毎秒、Gだけを扱う。静的加速度は通常経路で仮想姿勢から常時生成する。
 
 `inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
 
-キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示して確認し、置換を選んだ場合だけ既存行を未割り当てへ戻す。`KEY:F4` はマウス捕捉解除用のため保存できず、`KEY:F12` と `KEY:ESCAPE` は保存できる。
+キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示して確認し、置換を選んだ場合だけ既存行を未割り当てへ戻す。`KEY:F5` はマウス入力切替用のため保存できず、`KEY:F4`、`KEY:F12`、`KEY:ESCAPE` は保存できる。
 
-診断targetは `GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`ACCEL:ZERO` とする。既定sourceは I/K/J/L/O だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
+診断targetは `GYRO:X_POSITIVE`、`GYRO:X_NEGATIVE`、`GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`IMU:NEUTRAL` とする。既定sourceは U/O/K/J/L/P だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
 
 ## 3. 型と制約
 

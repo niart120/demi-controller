@@ -33,7 +33,7 @@ def test_default_user_interface_uses_english_source_text(
         on_reconnect=lambda: None,
     )
     assert window.main_toolbar.connection_action.text() == "Connect"
-    assert window.main_toolbar.capture_action.text() == "Start mouse"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
     assert window.main_toolbar.settings_button.text() == "Settings"
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
         "Connection",
@@ -186,7 +186,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
             5,
             Qt.Orientation.Horizontal,
         )
-        == "削除"
+        == ""
     )
     assert settings_dialog.connection_page.profile_group.title() == ("コントローラープロファイル")
     assert settings_dialog.connection_page.global_settings_group.title() == "全体設定"

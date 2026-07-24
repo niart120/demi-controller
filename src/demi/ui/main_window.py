@@ -120,6 +120,9 @@ class MainWindow(QMainWindow):
         self._quit_action.setShortcut(QKeySequence.StandardKey.Quit)
         self._quit_action.triggered.connect(self.close)
         self.addAction(self._quit_action)
+        self._mouse_input_toggle_action = QAction(self)
+        self._mouse_input_toggle_action.setShortcut(QKeySequence("F5"))
+        self.addAction(self._mouse_input_toggle_action)
         if spec.maximized:
             self.showMaximized()
 
@@ -364,7 +367,7 @@ class MainWindow(QMainWindow):
             state=publisher.state,
             is_captured=lambda: coordinator.is_captured,
             is_keyboard_active=lambda: coordinator.operational_input_active,
-            on_stop_capture=self._stop_input_capture,
+            on_toggle_capture=self._toggle_input_capture,
             on_focus_lost=self._handle_input_focus_loss,
             on_focus_gained=self._handle_input_focus_gain,
             on_dialog_opened=self._open_input_configuration,
@@ -467,8 +470,8 @@ class MainWindow(QMainWindow):
         if isinstance(backend, QtRelativePointerBackend):
             backend.handle_position(x, y, capture_epoch=capture_epoch)
 
-    def _stop_input_capture(self) -> None:
-        self._run_input_transition(lambda coordinator: coordinator.stop_capture())
+    def _toggle_input_capture(self) -> None:
+        self._run_input_transition(lambda coordinator: coordinator.toggle_capture())
 
     def _handle_input_focus_loss(self) -> None:
         self._run_input_transition(lambda coordinator: coordinator.on_focus_lost())

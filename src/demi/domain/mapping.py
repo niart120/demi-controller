@@ -38,11 +38,13 @@ class BindingTarget(StrEnum):
     RIGHT_STICK_DOWN = "RIGHT_STICK:DOWN"
     RIGHT_STICK_LEFT = "RIGHT_STICK:LEFT"
     RIGHT_STICK_RIGHT = "RIGHT_STICK:RIGHT"
+    GYRO_X_POSITIVE = "GYRO:X_POSITIVE"
+    GYRO_X_NEGATIVE = "GYRO:X_NEGATIVE"
     GYRO_Y_NEGATIVE = "GYRO:Y_NEGATIVE"
     GYRO_Y_POSITIVE = "GYRO:Y_POSITIVE"
     GYRO_Z_POSITIVE = "GYRO:Z_POSITIVE"
     GYRO_Z_NEGATIVE = "GYRO:Z_NEGATIVE"
-    ACCEL_ZERO = "ACCEL:ZERO"
+    IMU_NEUTRAL = "IMU:NEUTRAL"
 
 
 _SOURCE_PATTERN = re.compile(r"(?:KEY:[A-Z0-9_]+(?:\+[A-Z0-9_]+)*|MOUSE:[A-Z0-9_]+)")
@@ -69,11 +71,13 @@ _BUTTON_TARGETS: dict[BindingTarget, LogicalButton] = {
 }
 _DIAGNOSTIC_TARGETS = frozenset(
     {
+        BindingTarget.GYRO_X_POSITIVE,
+        BindingTarget.GYRO_X_NEGATIVE,
         BindingTarget.GYRO_Y_NEGATIVE,
         BindingTarget.GYRO_Y_POSITIVE,
         BindingTarget.GYRO_Z_POSITIVE,
         BindingTarget.GYRO_Z_NEGATIVE,
-        BindingTarget.ACCEL_ZERO,
+        BindingTarget.IMU_NEUTRAL,
     }
 )
 
@@ -162,7 +166,7 @@ def default_profile() -> InputProfile:
     """Return the immutable built-in ``Default`` input profile.
 
     Returns:
-        The 33-binding profile defined by the initial configuration.
+        The 34-binding profile defined by the initial configuration.
     """
     return InputProfile(
         id="default",
@@ -197,10 +201,11 @@ def default_profile() -> InputProfile:
             Binding("KEY:2", BindingTarget.BUTTON_DPAD_RIGHT),
             Binding("KEY:3", BindingTarget.BUTTON_DPAD_DOWN),
             Binding("KEY:4", BindingTarget.BUTTON_DPAD_LEFT),
-            Binding("KEY:I", BindingTarget.GYRO_Y_NEGATIVE),
+            Binding("KEY:U", BindingTarget.GYRO_X_POSITIVE),
+            Binding("KEY:O", BindingTarget.GYRO_X_NEGATIVE),
             Binding("KEY:K", BindingTarget.GYRO_Y_POSITIVE),
             Binding("KEY:J", BindingTarget.GYRO_Z_POSITIVE),
             Binding("KEY:L", BindingTarget.GYRO_Z_NEGATIVE),
-            Binding("KEY:O", BindingTarget.ACCEL_ZERO),
+            Binding("KEY:P", BindingTarget.IMU_NEUTRAL),
         ),
     )

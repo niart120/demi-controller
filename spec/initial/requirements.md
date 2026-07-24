@@ -94,13 +94,13 @@ Project_Demiは `demi`、`project-demi`、`python -m demi` で同じアプリケ
 
 ### FR-007A 設定可能な IMU 診断入力
 
-operational keyboard中はprofileに保存されたkeyboard診断targetを評価し、マウス捕捉中だけmouse診断targetを評価して、pitch / yawの回転要求または完全な0G加速度を生成しなければならない。
+operational keyboard中はprofileに保存されたkeyboard診断targetを評価し、マウス捕捉中だけmouse診断targetを評価して、pitch / yawの回転要求または物理ニュートラルIMUを生成しなければならない。
 
 受入条件:
 
 - `GYRO:Y_NEGATIVE / Y_POSITIVE` はpitchへ `-1.0 / +1.0 rad/s`、`GYRO:Z_POSITIVE / Z_NEGATIVE` はyawへ `+1.0 / -1.0 rad/s` の回転要求を生成する。
-- `ACCEL:ZERO` は保持中の最終フレーム加速度を `(0, 0, 0) G` とし、解放後は内部pitchに対応する静的1Gへ戻す。
-- Default profileの既定sourceは I/K/J/L/O とし、キー割り当て画面と設定ファイルで変更できる。
+- `GYRO:X_POSITIVE / X_NEGATIVE` はX軸へ `+1.0 / -1.0 rad/s` を出力する。`IMU:NEUTRAL` は保持中の最終フレームをgyro `(0, 0, 0)`、accel `(0, 0, 1)` にする。
+- Default profileの既定sourceは U/O/K/J/L/P とし、キー割り当て画面と設定ファイルで変更できる。
 - 同一軸の反対方向を同時に保持すると、その軸の固定角速度を 0 にする。
 - 固定角速度の回転要求はマウス移動量とマウスジャイロ設定に依存させず、正の実経過時間を掛けて周期内角変位へ変換する。
 - マウス由来と診断target由来のyaw / pitch角変位を軸ごとに加算してから姿勢を更新する。
@@ -158,7 +158,7 @@ operational keyboard中はprofileに保存されたkeyboard診断targetを評価
 - ローカル操作とコントローラー操作の競合を表示する。
 - ジャイロ4方向と加速度0Gの診断targetを通常の割り当て行として表示する。
 - 標準へ戻す操作がある。
-- `F4` のマウス捕捉解除は変更できない。
+- `F5` のマウス入力切替は変更できない。
 
 ### FR-011 接続設定
 
@@ -246,7 +246,7 @@ operational keyboard中はprofileに保存されたkeyboard診断targetを評価
 ### NFR-002 安全停止
 
 - 捕捉中にUIから250ミリ秒以上フレームが届かなければ、接続ワーカーは物理的な静止状態を表すニュートラルを1回以上適用する。
-- 切断、捕捉解除、watchdog、終了時のニュートラルIMUはジャイロ0 rad/s、加速度 `(0, 0, +1) G` とする。加速度0Gは明示的な `ACCEL:ZERO` 診断中のフレームと接続初期診断に限定し、安全ニュートラルまたは定常状態として送らない。
+- 切断、捕捉解除、watchdog、終了時のニュートラルIMUはジャイロ0 rad/s、加速度 `(0, 0, +1) G` とする。
 - 未処理例外時はニュートラル、切断、ワーカー停止の順で最善努力する。
 - `os._exit` を通常終了経路で使用しない。
 

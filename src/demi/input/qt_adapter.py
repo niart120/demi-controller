@@ -23,7 +23,7 @@ class QtInputAdapter(QObject):
         state: PhysicalInputState,
         is_captured: CaptureActivity,
         is_keyboard_active: CaptureActivity | None = None,
-        on_stop_capture: CaptureTransition | None = None,
+        on_toggle_capture: CaptureTransition | None = None,
         on_focus_lost: CaptureTransition | None = None,
         on_focus_gained: CaptureTransition | None = None,
         on_dialog_opened: CaptureTransition | None = None,
@@ -38,7 +38,7 @@ class QtInputAdapter(QObject):
             is_captured: Returns whether pointer capture is active.
             is_keyboard_active: Returns whether operational keyboard input is
                 active. Defaults to ``is_captured`` for legacy callers.
-            on_stop_capture: Handles an F4 pointer-capture release request.
+            on_toggle_capture: Handles an F5 pointer-capture toggle request.
             on_focus_lost: Handles a window or application focus loss.
             on_focus_gained: Handles a window or application focus gain.
             on_dialog_opened: Neutralizes capture before a dialog opens.
@@ -51,7 +51,7 @@ class QtInputAdapter(QObject):
         self._state = state
         self._is_captured = is_captured
         self._is_keyboard_active = is_captured if is_keyboard_active is None else is_keyboard_active
-        self._on_stop_capture = on_stop_capture
+        self._on_toggle_capture = on_toggle_capture
         self._on_focus_lost = on_focus_lost
         self._on_focus_gained = on_focus_gained
         self._on_dialog_opened = on_dialog_opened
@@ -68,9 +68,8 @@ class QtInputAdapter(QObject):
         if event_type in _FOCUS_GAIN_EVENTS and self._accepts_focus_event(watched):
             _invoke(self._on_focus_gained)
             return False
-        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F4:
-            if self._is_captured():
-                _invoke(self._on_stop_capture)
+        if isinstance(event, QKeyEvent) and event.key() == Qt.Key.Key_F5:
+            _invoke(self._on_toggle_capture)
             return False
 
         if isinstance(event, QKeyEvent):

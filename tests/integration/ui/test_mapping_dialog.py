@@ -70,7 +70,7 @@ class FakeRepository:
         self.saved = settings
 
 
-def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
+def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f5(
     qt_application: QApplication,
 ) -> None:
     editor = SettingsEditor(AppSettings.default())
@@ -82,14 +82,12 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
     adapter = QtInputAdapter(
         state=coordinator.publisher.state,
         is_captured=lambda: coordinator.is_captured,
-        on_stop_capture=coordinator.stop_capture,
+        on_toggle_capture=coordinator.toggle_capture,
         on_dialog_opened=coordinator.open_configuration,
     )
-    release_requests: list[bool] = []
     dialog = MappingDialog(
         editor,
         on_dialog_opened=adapter.on_dialog_opened,
-        on_release_capture=lambda: release_requests.append(True),
     )
     qt_application.installEventFilter(adapter)
     try:
@@ -102,7 +100,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
         )
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
         assert coordinator.publisher.state.held_keys == set()
@@ -111,23 +109,22 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
         dialog.begin_capture_row(0)
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
-        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 1)) == "U"
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:F4"
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 1)) == "F4"
         assert coordinator.publisher.state.held_keys == set()
 
         dialog.begin_capture_row(0)
         QCoreApplication.sendEvent(
             dialog.table,
-            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F5, Qt.KeyboardModifier.NoModifier),
         )
 
-        assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
-        assert release_requests == []
+        assert editor.draft.profiles[0].bindings[0].source == "KEY:F4"
         assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
-            "F4 is reserved for mouse capture release"
+            "F5 is reserved for mouse input toggle"
         )
         assert dialog.mapping_model.capture_row == 0
 
@@ -230,30 +227,27 @@ def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_an
     )
 
 
-def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
+def test_mapping_dialog_rejects_f5_with_reason_but_saves_and_reloads_f12(
     qt_application: QApplication,
 ) -> None:
     editor = SettingsEditor(AppSettings.default())
     saved: list[AppSettings] = []
-    release_requests: list[bool] = []
     dialog = MappingDialog(
         editor,
-        on_release_capture=lambda: release_requests.append(True),
         on_save=lambda: saved.append(editor.draft) is None,
     )
     dialog.show()
     qt_application.processEvents()
     dialog.begin_capture_row(0)
 
-    _send_key(dialog.table, Qt.Key.Key_F4)
+    _send_key(dialog.table, Qt.Key.Key_F5)
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
     assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
-        "F4 is reserved for mouse capture release"
+        "F5 is reserved for mouse input toggle"
     )
     assert dialog.mapping_model.capture_row == 0
-    assert release_requests == []
 
     _send_key(dialog.table, Qt.Key.Key_F12)
     qt_application.processEvents()
@@ -372,7 +366,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     assert modal.open(DialogKind.MAPPING, original) is True
     editor = modal.editor
     assert editor is not None
-    editor.update_binding(0, source="KEY:P")
+    editor.update_binding(0, source="KEY:F4")
 
     def save_modal() -> bool:
         try:
@@ -392,7 +386,7 @@ def test_mapping_dialog_keeps_a_failed_draft_and_cancel_does_not_save(
     assert dialog.isVisible()
     assert dialog.save_error_label.text() == "Could not save settings"
     assert modal.editor is editor
-    assert editor.draft.profiles[0].bindings[0].source == "KEY:P"
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F4"
     assert repository.saved == original
     assert repository.save_calls == 1
 
@@ -454,15 +448,15 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.rowCount() == 33
-    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "I"
-    assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
-    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
+    assert model.rowCount() == 34
+    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
+    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "U"
+    assert model.data(model.index(33, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
+    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
 
-    assert model.data(model.index(32, 2), Qt.ItemDataRole.CheckStateRole) is None
-    assert dialog.set_source(32, "KEY:P") is True
-    assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
+    assert model.data(model.index(33, 2), Qt.ItemDataRole.CheckStateRole) is None
+    assert dialog.set_source(33, "KEY:F4") is True
+    assert editor.draft.profiles[0].bindings[33].source == "KEY:F4"
 
     dialog.close()
     qt_application.processEvents()
@@ -692,7 +686,11 @@ def test_mapping_dialog_shows_default_columns_without_text_clipping(
     for column in range(model.columnCount()):
         visible_text = [
             str(model.headerData(column, Qt.Orientation.Horizontal)),
-            *(str(model.data(model.index(row, column))) for row in range(model.rowCount())),
+            *(
+                str(model.data(model.index(row, column)))
+                for row in range(model.rowCount())
+                if not (column == 5 and model.data(model.index(row, column)) is None)
+            ),
         ]
         required_width = max(font_metrics.horizontalAdvance(text) for text in visible_text)
 

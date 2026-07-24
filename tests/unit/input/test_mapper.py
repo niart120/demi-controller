@@ -17,7 +17,6 @@ from demi.input.rotation_intent import RotationIntent
 @pytest.mark.parametrize(
     ("key", "expected"),
     [
-        ("I", RotationIntent(0.0, -0.25)),
         ("K", RotationIntent(0.0, 0.25)),
         ("J", RotationIntent(0.25, 0.0)),
         ("L", RotationIntent(-0.25, 0.0)),
@@ -41,7 +40,7 @@ def test_diagnostic_gyro_keys_integrate_to_rotation_intent(
 
 def test_opposing_diagnostic_rotation_and_capture_outside_are_zero() -> None:
     state = PhysicalInputState()
-    for key in ("I", "K", "J", "L"):
+    for key in ("J", "L"):
         state.press_key(key)
 
     assert synthesize_diagnostic_rotation_intent(

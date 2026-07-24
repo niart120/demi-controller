@@ -66,10 +66,8 @@ def test_codec_omits_removed_connection_choices_and_ignores_their_legacy_values(
     assert "timeout_seconds" not in reencoded_connection
 
 
-def test_codec_migrates_only_exact_legacy_home_and_release_defaults() -> None:
+def test_codec_migrates_only_exact_legacy_home_default() -> None:
     legacy = encode_settings(AppSettings.default())
-    legacy_actions = cast("dict[str, object]", legacy["local_actions"])
-    legacy_actions["release_capture"] = ["F12"]
     legacy_profiles = cast("list[object]", legacy["profiles"])
     legacy_profile = cast("dict[str, object]", legacy_profiles[0])
     legacy_bindings = cast("list[object]", legacy_profile["bindings"])
@@ -88,11 +86,8 @@ def test_codec_migrates_only_exact_legacy_home_and_release_defaults() -> None:
         if binding.target is BindingTarget.BUTTON_HOME
     )
     assert migrated_home.source == "KEY:F1"
-    assert migrated.local_actions.release_capture == ("F4",)
 
     customized = encode_settings(AppSettings.default())
-    customized_actions = cast("dict[str, object]", customized["local_actions"])
-    customized_actions["release_capture"] = ["F8"]
     customized_profiles = cast("list[object]", customized["profiles"])
     customized_profile = cast("dict[str, object]", customized_profiles[0])
     customized_bindings = cast("list[object]", customized_profile["bindings"])
@@ -111,7 +106,6 @@ def test_codec_migrates_only_exact_legacy_home_and_release_defaults() -> None:
         if binding.target is BindingTarget.BUTTON_HOME
     )
     assert preserved_home.source == "KEY:F2"
-    assert preserved.local_actions.release_capture == ("F8",)
 
 
 def test_codec_supplies_english_for_existing_v1_settings_and_round_trips_languages() -> None:
@@ -196,8 +190,8 @@ def test_codec_preserves_configurable_imu_diagnostic_targets() -> None:
         name="Diagnostic",
         builtin=False,
         bindings=(
-            Binding(source="KEY:U", target=BindingTarget.GYRO_Y_NEGATIVE),
-            Binding(source="MOUSE:MIDDLE", target=BindingTarget.ACCEL_ZERO),
+            Binding(source="KEY:U", target=BindingTarget.GYRO_X_POSITIVE),
+            Binding(source="MOUSE:MIDDLE", target=BindingTarget.IMU_NEUTRAL),
         ),
     )
     settings = replace(

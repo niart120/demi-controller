@@ -16,7 +16,7 @@ from demi.domain.settings import (
 
 type ColorField = Literal["body", "buttons", "left_grip", "right_grip"]
 
-RESERVED_BINDING_SOURCES = frozenset({"KEY:F4"})
+RESERVED_BINDING_SOURCES = frozenset({"KEY:F5"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +52,7 @@ class SettingsEditor:
         """Replace one active-profile binding in the draft.
 
         Raises:
-            DomainValueError: The index, binding values, or reserved F4 source is invalid.
+        DomainValueError: The index, binding values, or reserved F5 source is invalid.
         """
         profile = self._active_profile()
         try:
@@ -282,7 +282,6 @@ class SettingsEditor:
             *self._draft.local_actions.toggle_capture,
             *self._draft.local_actions.quit,
             *self._draft.local_actions.connection,
-            *self._draft.local_actions.release_capture,
         )
         local_action_set = set(local_actions)
         for index, binding in enumerate(profile.bindings):
@@ -311,7 +310,7 @@ class SettingsEditor:
     def validate(self) -> None:
         """Validate reserved modal rules before a repository save."""
         if any(
-            binding.source == "KEY:F4"
+            binding.source == "KEY:F5"
             for profile in self._draft.profiles
             for binding in profile.bindings
         ):

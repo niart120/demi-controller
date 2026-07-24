@@ -175,7 +175,7 @@ def test_pointer_epoch_preserves_opposed_ijkl_keys_without_residual_gyro() -> No
         mouse_settings=MouseSettings(gyro_enabled=False),
     )
     publisher.publish(capture_active=True, capture_epoch=1)
-    for symbol in ("I", "K", "J", "L"):
+    for symbol in ("U", "O", "J", "L"):
         publisher.state.press_key(symbol)
     clock.now_ns += 8_000_000
 
@@ -184,21 +184,19 @@ def test_pointer_epoch_preserves_opposed_ijkl_keys_without_residual_gyro() -> No
     assert cancelled.gyro_rate == GyroRate(0.0, 0.0, 0.0)
     assert cancelled.right_stick == StickVector(x=0.0, y=0.0)
 
-    publisher.state.release_key("K")
+    publisher.state.release_key("O")
     publisher.state.release_key("L")
     clock.now_ns += 8_000_000
     remaining = publisher.publish(capture_active=True, capture_epoch=1)
 
-    assert remaining.gyro_rate.x_radians_per_second == pytest.approx(sin(0.004))
-    assert remaining.gyro_rate.y_radians_per_second == -1.0
-    assert remaining.gyro_rate.z_radians_per_second == pytest.approx(cos(0.004))
+    assert remaining.gyro_rate == GyroRate(1.0, 0.0, 1.0)
 
     epoch_reset = publisher.publish(capture_active=True, capture_epoch=2)
 
-    assert epoch_reset.gyro_rate == GyroRate(0.0, 0.0, 0.0)
-    assert {source.symbol for source in publisher.state.held_keys} == {"I", "J"}
+    assert epoch_reset.gyro_rate == GyroRate(1.0, 0.0, 0.0)
+    assert {source.symbol for source in publisher.state.held_keys} == {"U", "J"}
 
-    publisher.state.press_key("I")
+    publisher.state.press_key("K")
     released = publisher.publish(capture_active=False, capture_epoch=3)
 
     assert released.gyro_rate == GyroRate(0.0, 0.0, 0.0)
@@ -213,13 +211,13 @@ def test_keyboard_pitch_gyro_updates_pose_consistent_acceleration() -> None:
         mouse_settings=MouseSettings(gyro_enabled=False),
     )
     publisher.publish(capture_active=True, capture_epoch=1)
-    publisher.state.press_key("I")
+    publisher.state.press_key("K")
     clock.now_ns += 250_000_000
 
     frame = publisher.publish(capture_active=True, capture_epoch=1)
 
-    expected_pitch = -0.25
-    assert frame.gyro_rate == GyroRate(0.0, -1.0, 0.0)
+    expected_pitch = 0.25
+    assert frame.gyro_rate == GyroRate(0.0, 1.0, 0.0)
     assert frame.accel_g.x_g == pytest.approx(-sin(expected_pitch))
     assert frame.accel_g.y_g == 0.0
     assert frame.accel_g.z_g == pytest.approx(cos(expected_pitch))
@@ -287,14 +285,14 @@ def test_mouse_and_ijkl_rotation_are_combined_before_pose_projection() -> None:
     combined.publish(capture_active=True, capture_epoch=1)
     baseline.state.add_mouse_motion(2.0, 3.0)
     combined.state.add_mouse_motion(2.0, 3.0)
-    combined.state.press_key("I")
+    combined.state.press_key("K")
     combined.state.press_key("J")
     clock.now_ns += 8_000_000
 
     mouse_only = baseline.publish(capture_active=True, capture_epoch=1)
     mouse_and_keys = combined.publish(capture_active=True, capture_epoch=1)
 
-    expected_pitch = 1.5 * BASE_PITCH_RADIANS_PER_INPUT_UNIT - 0.008
+    expected_pitch = 1.5 * BASE_PITCH_RADIANS_PER_INPUT_UNIT + 0.008
     expected_yaw = -BASE_YAW_RADIANS_PER_INPUT_UNIT + 0.008
     middle_pitch = expected_pitch * 0.5
     assert mouse_and_keys.gyro_rate.x_radians_per_second == pytest.approx(
@@ -313,7 +311,6 @@ def test_mouse_and_ijkl_rotation_are_combined_before_pose_projection() -> None:
 @pytest.mark.parametrize(
     ("dy", "key"),
     [
-        (-2.0, "I"),
         (2.0, "K"),
     ],
 )
@@ -336,15 +333,15 @@ def test_default_mouse_vertical_direction_matches_ijkl(dy: float, key: str) -> N
     )
 
 
-def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
+def test_profile_imu_neutral_is_temporary_without_resetting_pitch() -> None:
     clock = FakeClock()
     profile = InputProfile(
         id="diagnostic",
         name="Diagnostic",
         builtin=False,
         bindings=(
-            Binding("KEY:P", BindingTarget.ACCEL_ZERO),
-            Binding("KEY:U", BindingTarget.GYRO_Y_NEGATIVE),
+            Binding("KEY:P", BindingTarget.IMU_NEUTRAL),
+            Binding("KEY:U", BindingTarget.GYRO_X_POSITIVE),
             Binding("KEY:P", BindingTarget.BUTTON_A),
         ),
     )
@@ -360,18 +357,18 @@ def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
     publisher.state.press_key("P")
     publisher.state.press_key("U")
     clock.now_ns += 8_000_000
-    zero_g = publisher.publish(capture_active=True, capture_epoch=1)
+    neutral = publisher.publish(capture_active=True, capture_epoch=1)
 
-    assert zero_g.accel_g == AccelG(0.0, 0.0, 0.0)
-    assert zero_g.gyro_rate == GyroRate(0.0, -1.0, 0.0)
-    assert zero_g.buttons == frozenset()
+    assert neutral.accel_g == AccelG(0.0, 0.0, 1.0)
+    assert neutral.gyro_rate == GyroRate(0.0, 0.0, 0.0)
+    assert neutral.buttons == frozenset()
 
     publisher.state.release_key("P")
     publisher.state.release_key("U")
     clock.now_ns += 8_000_000
     restored = publisher.publish(capture_active=True, capture_epoch=1)
 
-    expected_pitch = 4.0 * BASE_PITCH_RADIANS_PER_INPUT_UNIT - 0.008
+    expected_pitch = 4.0 * BASE_PITCH_RADIANS_PER_INPUT_UNIT
     assert restored.accel_g.x_g == pytest.approx(-sin(expected_pitch))
     assert restored.accel_g.y_g == 0.0
     assert restored.accel_g.z_g == pytest.approx(cos(expected_pitch))
@@ -384,7 +381,7 @@ def test_profile_accel_zero_is_temporary_without_resetting_pitch() -> None:
     assert publisher.state.held_keys == set()
 
 
-def test_accel_zero_keeps_updating_the_shared_pitch_limited_pose() -> None:
+def test_imu_neutral_keeps_the_shared_pitch_limited_pose() -> None:
     clock = FakeClock()
     publisher = InputPublisher(
         clock=clock,
@@ -393,16 +390,16 @@ def test_accel_zero_keeps_updating_the_shared_pitch_limited_pose() -> None:
     )
     publisher.publish(capture_active=True, capture_epoch=1)
     publisher.state.press_key("K")
-    publisher.state.press_key("O")
+    publisher.state.press_key("P")
     clock.now_ns += 400_000_000
 
-    zero_g = publisher.publish(capture_active=True, capture_epoch=1)
+    neutral = publisher.publish(capture_active=True, capture_epoch=1)
 
-    assert zero_g.accel_g == AccelG(0.0, 0.0, 0.0)
-    assert zero_g.gyro_rate.y_radians_per_second == pytest.approx(radians(10.0) / 0.4)
+    assert neutral.accel_g == AccelG(0.0, 0.0, 1.0)
+    assert neutral.gyro_rate == GyroRate(0.0, 0.0, 0.0)
 
     publisher.state.release_key("K")
-    publisher.state.release_key("O")
+    publisher.state.release_key("P")
     clock.now_ns += 8_000_000
     restored = publisher.publish(capture_active=True, capture_epoch=1)
 

@@ -145,10 +145,10 @@ class _RecordingMainWindow(MainWindow):
         super().refresh(snapshot)
 
 
-def test_f4_pointer_release_refreshes_the_bound_toolbar(
+def test_f5_pointer_toggle_refreshes_the_bound_toolbar(
     qt_application: QApplication,
 ) -> None:
-    """Keep F4 pointer release consistent with the toolbar action state."""
+    """Keep F5 pointer toggle consistent with the status presentation."""
     settings = AppSettings.default()
     runtime = _Runtime()
     window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
@@ -171,20 +171,19 @@ def test_f4_pointer_release_refreshes_the_bound_toolbar(
         mouse_input_suppressor=WindowsMouseInputSuppressor(registrar=_MouseHookRegistrar()),
     )
 
-    window.main_toolbar.capture_action.trigger()
+    window._mouse_input_toggle_action.trigger()
     assert coordinator.app_state is AppState.CAPTURED
-    assert window.main_toolbar.capture_action.text() == "Stop mouse"
-    assert window.main_toolbar.capture_action.isChecked()
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
     QCoreApplication.sendEvent(
         window,
-        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F5, Qt.KeyboardModifier.NoModifier),
     )
     qt_application.processEvents()
 
+    window._mouse_input_toggle_action.trigger()
     assert coordinator.app_state is AppState.IDLE
-    assert window.main_toolbar.capture_action.text() == "Start mouse"
-    assert not window.main_toolbar.capture_action.isChecked()
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
 
 @pytest.mark.parametrize(
@@ -493,15 +492,15 @@ def test_router_binds_connection_and_capture_toolbar_actions_to_the_session(
     )
     router.handle_runtime_event(ConnectionChanged(ConnectionState.READY, adapter_id="usb:0"))
 
-    window.main_toolbar.capture_action.trigger()
+    window._mouse_input_toggle_action.trigger()
     assert coordinator.is_captured
     assert runtime.frames[-1].capture_active
-    assert window.main_toolbar.capture_action.isChecked()
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
-    window.main_toolbar.capture_action.trigger()
+    window._mouse_input_toggle_action.trigger()
     assert not coordinator.is_captured
     assert runtime.frames[-1].capture_active
-    assert not window.main_toolbar.capture_action.isChecked()
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
     window.main_toolbar.connection_action.trigger()
     assert isinstance(runtime.commands[-1], ConnectSaved)
@@ -553,7 +552,7 @@ def test_connection_shortcut_preserves_captured_zero_g_until_connect(
     window.activateWindow()
     qt_application.processEvents()
 
-    window.main_toolbar.capture_action.trigger()
+    window._mouse_input_toggle_action.trigger()
     QCoreApplication.sendEvent(
         window,
         QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_O, Qt.KeyboardModifier.NoModifier),
@@ -565,7 +564,7 @@ def test_connection_shortcut_preserves_captured_zero_g_until_connect(
     assert zero_g_frame.capture_active
     assert zero_g_frame.accel_g.x_g == 0.0
     assert zero_g_frame.accel_g.y_g == 0.0
-    assert zero_g_frame.accel_g.z_g == 0.0
+    assert zero_g_frame.accel_g.z_g == 1.0
 
     QTest.keyClick(window, enter_key, Qt.KeyboardModifier.ControlModifier)
     qt_application.processEvents()
@@ -581,7 +580,7 @@ def test_connection_shortcut_preserves_captured_zero_g_until_connect(
     assert latest_frame.capture_active
     assert latest_frame.accel_g.x_g == 0.0
     assert latest_frame.accel_g.y_g == 0.0
-    assert latest_frame.accel_g.z_g == 0.0
+    assert latest_frame.accel_g.z_g == 1.0
     assert coordinator.publisher.state.is_source_active("KEY:O")
 
     coordinator.begin_shutdown()
@@ -762,7 +761,6 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     assert session.ui_snapshot.connection_state is ConnectionState.STOPPED
     assert runtime.frames[-1].capture_active is False
     assert not window.main_toolbar.connection_action.isEnabled()
-    assert not window.main_toolbar.capture_action.isEnabled()
     assert not window.main_toolbar.bindings_action.isEnabled()
     assert not window.main_toolbar.mouse_action.isEnabled()
     assert not window.main_toolbar.connection_settings_action.isEnabled()

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -92,6 +93,7 @@ class ControllerColorsDialog(QDialog):
         color_form = QFormLayout()
         for field, label in _COLOR_LABELS.items():
             button = QPushButton(self)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
             button.setProperty("swatchBorderIndependent", True)
             button.setProperty("swatchFocusIndicator", "palette-highlight")

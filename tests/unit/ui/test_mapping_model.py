@@ -12,11 +12,11 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     editor.update_binding(1, source="KEY:F")
     model = MappingTableModel(editor)
 
-    assert model.rowCount() == 33
+    assert model.rowCount() == 34
     assert model.columnCount() == 6
     assert [
         model.headerData(column, Qt.Orientation.Horizontal) for column in range(model.columnCount())
-    ] == ["Target", "Input", "Inverted", "Action", "Conflict", "Remove"]
+    ] == ["Target", "Input", "Inverted", "Action", "Conflict", ""]
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DisplayRole) == "BUTTON:A"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "F"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.UserRole) == "KEY:F"
@@ -25,18 +25,18 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) is None
     assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
     assert model.data(model.index(1, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
-    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "I"
-    assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
-    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
+    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
+    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "U"
+    assert model.data(model.index(33, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
+    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
     model.update_source(0, "KEY:1")
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:1"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "1"
 
-    model.update_source(32, "KEY:P")
+    model.update_source(33, "KEY:O")
 
-    assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
+    assert editor.draft.profiles[0].bindings[33].source == "KEY:O"
 
 
 def test_mapping_model_exposes_remove_as_an_icon_with_a_text_tooltip(
@@ -55,7 +55,7 @@ def test_mapping_model_exposes_remove_as_an_icon_with_a_text_tooltip(
     model.restore_default_profile()
 
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "F"
-    assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
+    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
 
 
 def test_mapping_model_changes_only_the_armed_row_to_instruction_and_cancel(
