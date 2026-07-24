@@ -481,9 +481,12 @@ def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row
     assert not hasattr(dialog, "remove_binding_button")
     assert not hasattr(dialog, "target_combo")
     assert dialog.add_binding_button.menu() is dialog.add_binding_menu
-    assert [
-        action.text() for action in dialog.add_binding_menu.actions()
-    ] == ["Buttons", "Left stick", "Right stick", "Diagnostics"]
+    assert [action.text() for action in dialog.add_binding_menu.actions()] == [
+        "Buttons",
+        "Left stick",
+        "Right stick",
+        "Diagnostics",
+    ]
     assert {
         action.data()
         for group_menu in dialog.add_binding_group_menus.values()

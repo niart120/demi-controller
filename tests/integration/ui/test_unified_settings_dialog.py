@@ -50,9 +50,7 @@ def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
     dialog.connection_page.reconnect_on_start_checkbox.setChecked(True)
     button_menu = dialog.mapping_page.add_binding_group_menus["Buttons"]
     add_button_a = next(
-        action
-        for action in button_menu.actions()
-        if action.data() == BindingTarget.BUTTON_A
+        action for action in button_menu.actions() if action.data() == BindingTarget.BUTTON_A
     )
     add_button_a.trigger()
     assert dialog.colors_page.set_color("body", "#ABCDEF")

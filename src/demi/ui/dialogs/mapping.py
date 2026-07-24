@@ -66,11 +66,7 @@ _BINDING_TARGET_GROUPS = (
     ),
     (
         "Diagnostics",
-        tuple(
-            target
-            for target in BindingTarget
-            if target.value.startswith(("GYRO:", "ACCEL:"))
-        ),
+        tuple(target for target in BindingTarget if target.value.startswith(("GYRO:", "ACCEL:"))),
     ),
 )
 
@@ -172,11 +168,7 @@ class MappingTableModel(QAbstractTableModel):
             return binding.source
         if index.column() == 2:
             if role == Qt.ItemDataRole.CheckStateRole and is_button_target(binding.target):
-                return (
-                    Qt.CheckState.Checked
-                    if binding.inverted
-                    else Qt.CheckState.Unchecked
-                )
+                return Qt.CheckState.Checked if binding.inverted else Qt.CheckState.Unchecked
             if role == Qt.ItemDataRole.DisplayRole:
                 return None
         if role != Qt.ItemDataRole.DisplayRole:
@@ -201,11 +193,7 @@ class MappingTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         """Return checkbox editing support only for invertible binding rows."""
         flags = super().flags(index)
-        if (
-            index.isValid()
-            and index.column() == 2
-            and self.is_invertible_at(index.row())
-        ):
+        if index.isValid() and index.column() == 2 and self.is_invertible_at(index.row()):
             return flags | Qt.ItemFlag.ItemIsUserCheckable
         return flags
 
@@ -460,9 +448,7 @@ class MappingDialog(QDialog):
                 action = group_menu.addAction(target.value)
                 action.setData(target)
                 action.triggered.connect(
-                    lambda _checked=False, selected_target=target: self.add_binding(
-                        selected_target
-                    )
+                    lambda _checked=False, selected_target=target: self.add_binding(selected_target)
                 )
         self.add_binding_button = QToolButton(self)
         self.add_binding_button.setText(self.tr("Add binding"))
@@ -789,11 +775,7 @@ class MappingDialog(QDialog):
                 self._activate_row_action(current.row())
                 event.accept()
                 return True
-            if (
-                watched is self.table
-                and current.column() == 2
-                and event.key() == Qt.Key.Key_Space
-            ):
+            if watched is self.table and current.column() == 2 and event.key() == Qt.Key.Key_Space:
                 state = self._mapping_model.data(
                     current,
                     Qt.ItemDataRole.CheckStateRole,
