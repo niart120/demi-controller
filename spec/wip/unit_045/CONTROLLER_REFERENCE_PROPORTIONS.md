@@ -50,6 +50,9 @@
 |---|---|---|---|---|
 | refactor-skipped | Grips extend outside the faceplate and finish above the mouse-input status | regression | unit | ui: red 2026-07-25, green 2026-07-25 |
 | refactor-skipped | The left stick is above the directional pad in the controller layout | regression | unit | ui: red 2026-07-25, green 2026-07-25 |
+| refactor-skipped | The controller silhouette contains each complete colored grip region without crossing it | regression | unit | self-review finding 1: red and green 2026-07-25 |
+| deferred | IMU indicators remain readable at 800x520 | regression | integration | self-review finding 2; next cycle |
+| deferred | Directional-pad directions render as one connected cross | regression | unit | self-review finding 3; later cycle |
 
 ## 7. 設計メモ
 
@@ -75,14 +78,20 @@
 | `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-integration-unit_045-final` | pass | 131 passed |
 | `uv build` | pass | sdistとwheelを生成 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-lower-grips` | pass | Windows Qt描画で外周、グリップ位置、ON/OFF、押下を確認 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-green-2` | pass | 15 passed。外周外に残るグリップ面積がないことを確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-union` | pass | グリップ内部の外周線が消え、左右グリップが本体外周へ連続することを確認 |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 外周修正後のstatic gate |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-full` | pass | 308 passed |
+| `uv run pytest tests/integration` / `uv build` | not run | 残る2件の修正後、unit_045再完了時に実行する |
 
 ## 10. 先送り事項
 
-- none
+- 800x520でIMU表示が圧縮される問題は、外周修正後の次サイクルで扱う。
+- 十字キーが4つの枠に見える問題は、IMU表示修正後のサイクルで扱う。
 
 ## 11. チェックリスト
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を更新した
-- [x] 検証結果を記録した
+- [ ] 再開後の検証結果を記録した
 - [x] package / release / public API は対象外であることを確認した

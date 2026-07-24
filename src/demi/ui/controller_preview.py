@@ -461,8 +461,6 @@ def _qrect(bounds: PreviewRect) -> QRectF:
 
 def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
-    left_grip = _qrect(layout.left_grip_bounds)
-    right_grip = _qrect(layout.right_grip_bounds)
     path = QPainterPath()
     path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
     path.lineTo(bounds.right() - bounds.width() * 0.14, bounds.top())
@@ -476,16 +474,8 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
     )
     path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
     path.cubicTo(
-        right_grip.right(),
-        right_grip.top() + right_grip.height() * 0.18,
-        right_grip.right(),
-        right_grip.top() + right_grip.height() * 0.72,
-        right_grip.right() - right_grip.width() * 0.18,
-        right_grip.bottom(),
-    )
-    path.cubicTo(
-        right_grip.left() + right_grip.width() * 0.42,
-        right_grip.bottom(),
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.84,
         bounds.right() - bounds.width() * 0.09,
         bounds.bottom(),
         bounds.center().x() + bounds.width() * 0.06,
@@ -495,16 +485,8 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
     path.cubicTo(
         bounds.left() + bounds.width() * 0.09,
         bounds.bottom(),
-        left_grip.right() - left_grip.width() * 0.42,
-        left_grip.bottom(),
-        left_grip.left() + left_grip.width() * 0.18,
-        left_grip.bottom(),
-    )
-    path.cubicTo(
-        left_grip.left(),
-        left_grip.top() + left_grip.height() * 0.72,
-        left_grip.left(),
-        left_grip.top() + left_grip.height() * 0.18,
+        bounds.left(),
+        bounds.top() + bounds.height() * 0.84,
         bounds.left(),
         bounds.top() + bounds.height() * 0.60,
     )
@@ -518,7 +500,9 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
         bounds.top(),
     )
     path.closeSubpath()
-    return path
+    return path.united(_grip_path(layout.left_grip_bounds, left=True)).united(
+        _grip_path(layout.right_grip_bounds, left=False)
+    )
 
 
 def _grip_path(bounds: PreviewRect, *, left: bool) -> QPainterPath:

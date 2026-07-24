@@ -197,6 +197,16 @@ def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
     assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
 
 
+def test_controller_silhouette_contains_both_complete_grip_regions() -> None:
+    layout = preview_layout(960, 600)
+    silhouette = preview_module._controller_silhouette_path(layout)
+    left_grip = preview_module._grip_path(layout.left_grip_bounds, left=True)
+    right_grip = preview_module._grip_path(layout.right_grip_bounds, left=False)
+
+    assert left_grip.subtracted(silhouette).isEmpty()
+    assert right_grip.subtracted(silhouette).isEmpty()
+
+
 def test_controller_layout_places_the_left_stick_above_the_directional_pad() -> None:
     layout = preview_layout(960, 600)
 
