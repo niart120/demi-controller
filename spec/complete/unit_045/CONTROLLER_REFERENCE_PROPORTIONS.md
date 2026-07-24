@@ -53,7 +53,7 @@
 | refactor-skipped | The complete controller silhouette contains both colored grip regions | regression | unit | geometry guard: red and green 2026-07-25 |
 | green | Rendered grips visually match the reference's broad sloped shoulders, front-panel seam, and vertical handles | acceptance | manual | red: `unit_045-grip-union`, `unit_045-grip-visual-3`; green: `unit_045-grip-layer`,目視確認 2026-07-25 |
 | refactor-skipped | IMU indicators remain readable at 800x520 | regression | unit + manual | geometry red/green 2026-07-25; visual green: `unit_045-imu-green/00-minimum-window.png` |
-| deferred | Directional-pad directions render as one connected cross | regression | unit | self-review finding 3; later cycle |
+| refactor-skipped | Directional-pad directions render as one connected cross | regression | unit + manual | path test red/green 2026-07-25; visual green: `unit_045-dpad-green-3` |
 
 ## 7. 設計メモ
 
@@ -68,6 +68,7 @@
 | `src/demi/ui/preview_layout.py` | modify | フェイスプレート、グリップ、状態、操作部の配置 |
 | `src/demi/ui/controller_preview.py` | modify | 本体・グリップ外形の描画 |
 | `tests/unit/ui/test_controller_preview.py` | modify | 比率と操作部位置の回帰 |
+| `tests/unit/ui/test_preview_layout.py` | modify | 最低ウィンドウでのIMU領域高の回帰 |
 | `spec/initial/ui.md` | modify | 図形の契約 |
 
 ## 9. 検証
@@ -75,10 +76,10 @@
 | command | result | notes |
 |---|---|---|
 | `uv lock --check` | pass | lockfile変更なし |
-| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 2026-07-25 |
-| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-final` | pass | 307 passed |
-| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-integration-unit_045-final` | pass | 131 passed |
-| `uv build` | pass | sdistとwheelを生成 |
+| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 最終差分、2026-07-25 |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-complete` | pass | 310 passed |
+| `$env:PYTHONUTF8='1'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-integration-unit_045-complete-network` | pass | 131 passed。隔離環境の依存取得失敗後、ネットワーク利用可能な環境で再実行 |
+| `uv build` | pass | sdistとwheelを生成。ネットワーク利用可能な環境で再実行 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-lower-grips` | pass | Windows Qt描画で外周、グリップ位置、ON/OFF、押下を確認 |
 | `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-green-2` | pass | 15 passed。外周外に残るグリップ面積がないことを確認 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-union` | fail | グリップが細い接点から吊られた涙滴形であり、本体前面とグリップの継ぎ目も消えているため不合格 |
@@ -86,18 +87,15 @@
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-layer` | pass | 実機画像と目視比較し、グリップが背面、本体前面が手前となり、外側の肩、継ぎ目、縦長の把持部が読めることを確認 |
 | `uv run pytest tests/unit/ui/test_preview_layout.py tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-imu-green` | pass | 32 passed。最低ウィンドウ相当で各IMU領域33.6pxを確保 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/self_review_045/scenario.py --output tmp/gui-audit/unit_045-imu-green` | pass | 800x520のWindows Qt描画を目視し、見出し、軸ラベル、グラフが分離して読めることを確認 |
-| `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 外周修正後のstatic gate |
-| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-full` | pass | 308 passed |
-| `uv run pytest tests/integration` / `uv build` | not run | 残る2件の修正後、unit_045再完了時に実行する |
-
+| `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-dpad-green-3` | pass | 16 passed。十字キーが穴のない単一パスであることを確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-dpad-green-3` | pass | 通常時は内枠のない十字、左押下時は左腕だけが押下色となることを目視確認 |
 ## 10. 先送り事項
 
-- 800x520でIMU表示が圧縮される問題は、外周修正後の次サイクルで扱う。
-- 十字キーが4つの枠に見える問題は、IMU表示修正後のサイクルで扱う。
+- none
 
 ## 11. チェックリスト
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を更新した
-- [ ] 再開後の検証結果を記録した
+- [x] 再開後の検証結果を記録した
 - [x] package / release / public API は対象外であることを確認した

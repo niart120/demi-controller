@@ -322,20 +322,54 @@ class ControllerPreviewWidget(QWidget):
         layout: PreviewLayout,
         model: ControllerPreviewModel,
     ) -> None:
-        controls = layout.controls
-        for control_id in ("dpad_up", "dpad_left", "dpad_right", "dpad_down"):
-            bounds = controls[control_id]
-            pressed = control_id in model.pressed_control_ids
+        control_ids = ("dpad_up", "dpad_left", "dpad_right", "dpad_down")
+        path = _directional_pad_path(layout)
+        pressed_ids = model.pressed_control_ids.intersection(control_ids)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(model.buttons_color))
+        painter.drawPath(path)
+
+        painter.save()
+        painter.setClipPath(path)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(_PRESSED_FILL_COLOR))
+        for control_id in pressed_ids:
+            painter.drawRect(_qrect(layout.controls[control_id]))
+        painter.restore()
+
+        painter.setPen(
+            QPen(
+                QColor(_PRESSED_OUTLINE_COLOR if pressed_ids else "#F5F5F5"),
+                3.0 if pressed_ids else 1.5,
+            )
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(path)
+
+        labels = {
+            "dpad_up": "▲",
+            "dpad_left": "◀",
+            "dpad_right": "▶",
+            "dpad_down": "▼",
+        }
+        original_font = painter.font()
+        for control_id in control_ids:
+            bounds = layout.controls[control_id]
+            label_font = painter.font()
+            label_font.setPixelSize(_control_label_pixel_size(bounds))
+            painter.setFont(label_font)
             painter.setPen(
                 QPen(
-                    QColor(_PRESSED_OUTLINE_COLOR if pressed else "#F5F5F5"),
-                    3.0 if pressed else 1.5,
+                    QColor(_PRESSED_TEXT_COLOR if control_id in pressed_ids else "#F5F5F5"),
+                    1.0,
                 )
             )
-            painter.setBrush(
-                QColor(_PRESSED_FILL_COLOR) if pressed else QColor(model.buttons_color)
+            painter.drawText(
+                _qrect(bounds),
+                Qt.AlignmentFlag.AlignCenter,
+                labels[control_id],
             )
-            painter.drawRoundedRect(_qrect(bounds), 4.0, 4.0)
+        painter.setFont(original_font)
 
     def _draw_status(
         self,
@@ -466,6 +500,28 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
         .united(_grip_path(layout.left_grip_bounds, left=True))
         .united(_grip_path(layout.right_grip_bounds, left=False))
     )
+
+
+def _directional_pad_path(layout: PreviewLayout) -> QPainterPath:
+    up = _qrect(layout.controls["dpad_up"])
+    left = _qrect(layout.controls["dpad_left"])
+    right = _qrect(layout.controls["dpad_right"])
+    down = _qrect(layout.controls["dpad_down"])
+    path = QPainterPath()
+    path.moveTo(up.left(), up.top())
+    path.lineTo(up.right(), up.top())
+    path.lineTo(up.right(), left.top())
+    path.lineTo(right.right(), left.top())
+    path.lineTo(right.right(), right.bottom())
+    path.lineTo(down.right(), right.bottom())
+    path.lineTo(down.right(), down.bottom())
+    path.lineTo(down.left(), down.bottom())
+    path.lineTo(down.left(), left.bottom())
+    path.lineTo(left.left(), left.bottom())
+    path.lineTo(left.left(), left.top())
+    path.lineTo(up.left(), left.top())
+    path.closeSubpath()
+    return path
 
 
 def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:

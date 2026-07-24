@@ -213,6 +213,17 @@ def test_controller_layout_places_the_left_stick_above_the_directional_pad() -> 
     assert layout.controls["left_stick"].bottom <= layout.controls["dpad_up"].top
 
 
+def test_directional_pad_uses_one_connected_cross_path() -> None:
+    layout = preview_layout(960, 600)
+
+    path = preview_module._directional_pad_path(layout)
+
+    assert len(path.toFillPolygons()) == 1
+    for control_id in ("dpad_up", "dpad_left", "dpad_right", "dpad_down"):
+        bounds = preview_module._qrect(layout.controls[control_id])
+        assert path.contains(bounds.center())
+
+
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(
     qt_application: object,
 ) -> None:
