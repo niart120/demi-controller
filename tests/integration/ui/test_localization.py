@@ -36,15 +36,28 @@ def test_default_user_interface_uses_english_source_text(
     assert window.main_toolbar.capture_action.text() == "Start mouse"
     assert window.main_toolbar.settings_button.text() == "Settings"
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
-        "Mappings",
         "Connection",
+        "Bindings",
+        "Mouse",
         "Colors",
     ]
     assert window.status_bar.adapter_label.text() == "Adapter: None"
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"
-    assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "No"
+    assert (
+        mapping.table.model().data(
+            mapping.table.model().index(0, 2),
+            Qt.ItemDataRole.CheckStateRole,
+        )
+        == Qt.CheckState.Unchecked
+    )
     assert mapping.mouse_gyro_group.title() == "Mouse gyro settings"
+    assert [action.text() for action in mapping.add_binding_menu.actions()] == [
+        "Buttons",
+        "Left stick",
+        "Right stick",
+        "Diagnostics",
+    ]
     assert connection.windowTitle() == "Connection settings"
     assert connection.rescan_button.text() == "Rescan"
     assert connection.pairing_button.text() == "Pair new controller"
@@ -111,7 +124,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     color_picker = QColorDialog()
     settings_dialog = SettingsDialog(
         SettingsEditor(AppSettings.default()),
-        initial_tab=SettingsTab.MAPPINGS,
+        initial_tab=SettingsTab.BINDINGS,
         connected=False,
         on_rescan=lambda: None,
         on_save=lambda: True,
@@ -126,15 +139,22 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert window.main_toolbar.connection_action.text() == "接続"
     assert window.main_toolbar.settings_button.text() == "設定"
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
-        "割り当て",
         "接続",
+        "割り当て",
+        "マウス",
         "色",
     ]
     assert window.status_bar.adapter_label.text() == "アダプター: なし"
     assert mapping.windowTitle() == "キー割り当て"
     assert mapping.tabs.tabText(0) == "割り当て"
     assert mapping.tabs.tabText(1) == "マウスジャイロ"
-    assert mapping.table.model().data(mapping.table.model().index(0, 2)) == "いいえ"
+    assert (
+        mapping.table.model().data(
+            mapping.table.model().index(0, 2),
+            Qt.ItemDataRole.CheckStateRole,
+        )
+        == Qt.CheckState.Unchecked
+    )
     assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
     assert (
         mapping.table.model().data(mapping.table.model().index(4, 1), Qt.ItemDataRole.UserRole)
@@ -156,9 +176,18 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert settings_dialog.windowTitle() == "設定"
     assert [
         settings_dialog.tabs.tabText(index) for index in range(settings_dialog.tabs.count())
-    ] == ["割り当て", "接続", "色"]
+    ] == ["接続", "割り当て", "マウス", "色"]
     assert settings_dialog.mapping_page.add_binding_button.text() == "割り当てを追加"
-    assert settings_dialog.mapping_page.remove_binding_button.text() == "割り当てを削除"
+    assert [
+        action.text() for action in settings_dialog.mapping_page.add_binding_menu.actions()
+    ] == ["ボタン", "左スティック", "右スティック", "診断"]
+    assert (
+        settings_dialog.mapping_page.mapping_model.headerData(
+            5,
+            Qt.Orientation.Horizontal,
+        )
+        == "削除"
+    )
     assert settings_dialog.connection_page.profile_group.title() == ("コントローラープロファイル")
     assert settings_dialog.connection_page.global_settings_group.title() == "全体設定"
     assert settings_dialog.connection_page.delete_profile_button.text() == ("プロファイルを削除")

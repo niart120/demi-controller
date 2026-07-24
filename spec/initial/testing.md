@@ -191,15 +191,16 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - 複数色変更後のdialog取消、未接続保存、接続中の再接続確認を回帰する
 - エラー分類からユーザー向け文
 - モーダル排他
-- Mappings tabでマウスジャイロの有効、水平・垂直感度、水平・垂直反転、pitch上限を現在値から編集する
+- Mouse tabでマウスジャイロの有効、水平・垂直感度、水平・垂直反転、pitch上限を現在値から編集する
 - マウスジャイロ設定の保存がrepository、session、実行中のPublisherへ反映され、取消では編集前の値を維持する
 - キー割り当て表の行内変更操作がmouse、Enter、Spaceで同じ行を待受にし、待受行だけ入力指示と取消を表示する
-- targetを選んだ未割り当てbinding行の追加と、選択行だけの削除
+- 分類menuでtargetを選んだ未割り当てbinding行の追加、Inverted列の行内トグル、Remove列からの同一行削除
 - Escによる待受取消と「Escを割り当てる」を分離し、F4の理由付き拒否、F12の保存往復を確認する
 - 重複sourceの置換確認で取消時はdraft不変、置換時だけ既存行を未割り当てへ戻す
 - friendly表示とcanonical roleを分離し、言語変更、保存、再読込でcanonical sourceを保持する
-- 割り当てとマウスジャイロのtab移動で隠れた待受を残さず、Save / Cancelへkeyboardで到達できる
-- `Settings`階層の各actionが1つの設定ダイアログを対応tabで開き、全tabが1つのdraftとSave / Cancelを共有する
+- Bindingsと他tabの移動で隠れた待受を残さず、Save / Cancelへkeyboardで到達できる
+- `Settings`階層と設定ダイアログが`Connection`、`Bindings`、`Mouse`、`Colors`を同じ順序で表示し、各actionが同名tabを開く
+- 4つのtabが1つのdraftとSave / Cancelを共有する
 - Connection tabで接続プロファイル操作と全体設定を区別し、Saveでは接続commandを発行しない
 - 接続プロファイル削除の取消、確認後削除、存在表示更新
 - 捕捉中の Ctrl+Return / Ctrl+Enter が保持入力を解除せず、状態依存の接続actionを1回発行
