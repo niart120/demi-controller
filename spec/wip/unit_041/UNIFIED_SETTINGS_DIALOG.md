@@ -20,6 +20,9 @@
 | user review | ツールバーのSettingsメニューもタブと同じ名称・順序へ揃える | conversation |
 | user review | タブとSettingsメニューを`Connection`、`Bindings`、`Mouse`、`Colors`の順にする | conversation |
 | user review | binding追加UIを利用者の選択負荷と画面占有の観点から再検討する | conversation |
+| user review | Connectionタブでは`Global settings`を`Controller profile`より上に置く | conversation |
+| user review | Bindings表の`Action`を`Inverted`と`Conflict`の間へ置く | conversation |
+| user review | binding削除セルは`Remove`文字列ではなくゴミ箱アイコンで示す | conversation |
 | initial design | Qt標準部品、単一モーダル、draftの保存・取消契約 | `spec/initial/ui.md` |
 | initial design | 設定 schema と旧設定読み込み | `spec/initial/configuration.md` |
 
@@ -85,10 +88,12 @@
 | binding追加 | 分類された一覧からtargetを選択 | `KEY:UNASSIGNED`、amount `1.0`、非反転の行を末尾へ追加する | 常設のtarget選択欄で表の横幅を消費しない |
 | binding削除 | 行内の削除操作を実行 | 対象行だけを削除し、残りの順序を維持する | 不正indexではdraftを変更しない |
 | binding反転 | 行内の反転トグルを操作 | button targetだけが更新され、stickと診断targetは変更不可 | 表外の選択行用checkboxを置かない |
+| binding列順 | Bindingsタブを表示 | `Target`、`Input`、`Inverted`、`Action`、`Conflict`、`Remove`の順に表示する | 行の変更操作を入力と反転の近くへ置く |
+| binding削除表示 | Removeセルを表示 | Qt標準のゴミ箱アイコンを表示し、ツールチップで`Remove`を説明する | フォント依存の絵文字を使わない |
 | タブ平坦化 | 設定ダイアログを開く | `Connection`、`Bindings`、`Mouse`、`Colors` が同じ階層に並ぶ | `Mappings`内の入れ子タブを表示しない |
 | メニュー整合 | ツールバーの`Settings`を開く | `Connection`、`Bindings`、`Mouse`、`Colors` がタブと同じ順序で表示される | 各項目は同名タブを初期表示する |
 | 未割り当て競合 | 未割り当て行が複数ある | `KEY:UNASSIGNED` 同士を競合として扱わない | 実入力sourceの競合判定は維持する |
-| Connection区分 | Connectionタブを表示 | 接続プロファイル操作と全体設定を別groupで表示する | adapter、起動時再接続、診断レベルは全体設定 |
+| Connection区分 | Connectionタブを表示 | 全体設定を上、接続プロファイル操作を下の別groupで表示する | adapter、起動時再接続、診断レベルは全体設定 |
 | 保存 | 有効なConnection draftで `Save` | repositoryへ保存してダイアログを閉じ、`ConnectSaved` を発行しない | adapter未検出でも保存済み選択値は保存可能 |
 | profile削除 | 保存済み固定profileが存在 | 確認後にprofileファイルだけを削除し、削除buttonを無効化する | 取消ではファイルを残す |
 | 接続固定値 | connect、startup reconnect、pairing | 固定profileファイルと30秒の内部タイムアウトをcommandへ渡す | 設定TOMLへ両値を再出力しない |
@@ -115,6 +120,9 @@
 | refactor-done | Settingsは`Connection`、`Bindings`、`Mouse`、`Colors`を入れ子なしで表示する | regression | integration | 既存mapping pagesを外側tabへ移し、入力待受の所有期間を共有dialogへ統合 |
 | refactor-done | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | 4 factoryへ分離し、`mapping_action`と`Mappings`表記を除去 |
 | refactor-done | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換。全31 targetの重複・欠落なし |
+| todo | Connectionタブは`Global settings`を`Controller profile`より上に表示する | regression | integration | groupの表示順だけを変更し、所属controlは維持する |
+| todo | Bindings表は`Action`を`Inverted`と`Conflict`の間に表示する | regression | unit / integration | delegateとkeyboard操作も移動後の列へ追従させる |
+| todo | binding削除セルはQt標準のゴミ箱アイコンを中央表示し、説明用ツールチップを持つ | regression | unit / integration | 削除対象行と操作方法は維持する |
 
 ## 7. 設計メモ
 
