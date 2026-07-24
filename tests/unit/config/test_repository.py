@@ -88,7 +88,7 @@ def test_load_does_not_add_diagnostics_to_a_custom_profile(paths: SettingsPaths)
 
 def test_corrupt_file_is_preserved_and_defaults_are_recovered(paths: SettingsPaths) -> None:
     paths.config_dir.mkdir(parents=True)
-    corrupt = "schema = 'demi.settings/v1'\n[connection]\ntimeout_seconds = 0\n"
+    corrupt = "schema = 'demi.settings/v1'\nunknown = true\n"
     paths.settings_file.write_text(corrupt, encoding="utf-8", newline="\n")
 
     result = SettingsRepository(paths).load()
