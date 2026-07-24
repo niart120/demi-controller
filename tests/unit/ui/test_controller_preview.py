@@ -455,9 +455,11 @@ def test_acceleration_indicator_composes_three_axes_into_one_vector() -> None:
     assert combined_end.y() - center.y() == pytest.approx(
         (x_end.y() - center.y()) + (y_end.y() - center.y()) + (z_end.y() - center.y())
     )
-    assert x_end.y() < center.y()  # +X: trigger direction
-    assert y_end.x() < center.x()  # +Y: controller-left direction
-    assert z_end.x() > center.x()  # +Z: face-outward
+    assert x_end.x() > center.x()  # +X: upper-right
+    assert x_end.y() < center.y()
+    assert y_end.x() > center.x()  # +Y: lower-right
+    assert y_end.y() > center.y()
+    assert z_end.x() == pytest.approx(center.x())  # +Z: screen-down
     assert z_end.y() > center.y()
 
 

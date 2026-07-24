@@ -54,10 +54,10 @@
 | 振る舞い | 入力・状態 | 期待結果 | 備考 |
 |---|---|---|---|
 | 上部外形 | ニュートラル、肩ボタン押下 | 幅広いフェイスプレート上段が各ボタン全体を含む | 外形上端を描画領域上側へ寄せる |
-| 外形比率 | 960x640、800x520 | ショルダー収納部とグリップを含む外接矩形が1.9:1から2.1:1に収まる | Qt論理座標で検査する |
+| 外形比率 | 960x640、800x520のウィンドウ | ショルダー収納部とグリップを含む外接矩形が1.9:1から2.1:1に収まる | プレビュー領域960x600、800x475のQt論理座標で検査する |
 | ABXY配置 | 通常表示 | X-Bの上下距離とY-Aの左右距離が等しい | 各円の中心で比較する |
 | 状態文言 | ON、OFF | `Mouse input: On/Off` または対応する日本語だけを描く | `(F5)`を含めない |
-| IMU面積 | 800x520 | ジャイロと加速度がそれぞれ90px以上の高さを持つ | 状態バッジとの非交差を維持する |
+| IMU面積 | 800x520のウィンドウ | ジャイロと加速度がそれぞれ90px以上の高さを持つ | プレビュー領域800x475、状態バッジとの非交差を維持する |
 | 加速度投影 | 軸ごとの正入力 | +X右上、+Y右下、+Z下 | 指定資料の右Joy-Con画像を根拠にする |
 
 ## 6. TDD Test List
@@ -67,8 +67,8 @@
 | refactor-done | Shoulder buttons are enclosed by a continuous upper faceplate and the complete silhouette stays near a 2:1 ratio | regression | unit | 箱状ツノを廃止し、上段を連続した外形へ変更 |
 | refactor-skipped | ABXY centers use equal horizontal and vertical spacing | regression | unit | 縦横48px、追加整理は不要 |
 | refactor-done | Mouse input status text omits the F5 shortcut in English and Japanese | regression | unit / integration | 翻訳可能な状態文言生成を描画から分離、F5動作は対象外 |
-| todo | Gyro and acceleration regions have at least 90px height in the minimum window | regression | unit | 状態領域との非交差 |
-| todo | Positive acceleration axes project to +X upper-right, +Y lower-right, and +Z downward | regression | unit | 右Joy-Con軸画像 |
+| refactor-skipped | Gyro and acceleration regions have at least 90px height in the minimum window | regression | unit | 800x475のプレビュー領域で95px、追加整理は不要 |
+| refactor-skipped | Positive acceleration axes project to +X upper-right, +Y lower-right, and +Z downward | regression | unit | 右Joy-Con軸画像どおり、追加整理は不要 |
 
 ## 7. 設計メモ
 
@@ -102,6 +102,9 @@
 | `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-status-red` | red | 状態文言生成境界が未実装で3 failed |
 | `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-status-green` | pass | 31 passed、英語・日本語のON/OFF文言からF5を除外 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-status-green` | pass | 日本語の有効状態が `マウス入力: 有効` だけを表示することを確認 |
+| `uv run pytest tests/unit/ui/test_preview_layout.py::test_preview_layout_reserves_readable_height_for_imu_at_minimum_window_size tests/unit/ui/test_controller_preview.py::test_acceleration_indicator_composes_three_axes_into_one_vector -q -p no:cacheprovider --basetemp tmp/pytest-unit047-imu-red` | red | IMU高さ48.45px、+Xが上向きのため2 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-imu-green` | pass | 48 passed、最小表示95pxと右Joy-Con軸投影を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-imu-green` | pass | 通常幅と最小幅でIMU拡大、+X右上、+Y右下、+Z下を確認 |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項
@@ -111,6 +114,6 @@
 ## 11. チェックリスト
 
 - [x] 対象範囲と対象外を確認した
-- [ ] TDD Test Listを更新した
-- [ ] 検証結果または未実行理由を記録した
+- [x] TDD Test Listを更新した
+- [x] 検証結果または未実行理由を記録した
 - [x] package / release / public APIは変更対象外であることを確認した

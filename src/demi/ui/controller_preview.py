@@ -701,7 +701,7 @@ def _accel_vector_geometry(
     plot_height = bounds.height() - heading_height
     center = QPointF(bounds.center().x(), plot_top + plot_height * 0.62)
     axis_length = min(bounds.width() * 0.25, plot_height * 0.40)
-    basis = ((0.0, -1.0), (-0.78, 0.62), (0.78, 0.62))
+    basis = ((0.78, -0.62), (0.78, 0.62), (0.0, 1.0))
     guides = tuple(
         (
             QPointF(center.x() - x * axis_length, center.y() - y * axis_length),
