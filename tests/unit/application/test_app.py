@@ -410,6 +410,7 @@ def test_session_reconnects_once_only_when_the_saved_adapter_is_discovered() -> 
     assert len(reconnects) == 1
     assert reconnects[0].adapter_id == "usb:0"
     assert reconnects[0].bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert reconnects[0].timeout_seconds == 30.0
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.presentation.model.connection_state is ConnectionState.CONNECTING
     assert session.presentation.model.adapter_label == "Adapter"
@@ -583,7 +584,10 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
 
     session.connection_action()
 
-    assert isinstance(runtime.commands[-1], ConnectSaved)
+    connect = runtime.commands[-1]
+    assert isinstance(connect, ConnectSaved)
+    assert connect.bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert connect.timeout_seconds == 30.0
     session.connection_action()
     assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 1
     session.handle_runtime_event(PairingProgress("ペアリング処理中"))
@@ -670,7 +674,10 @@ def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect()
     assert session.request_pairing() is True
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.confirm_pairing() is True
-    assert isinstance(runtime.commands[-1], StartPairing)
+    pairing = runtime.commands[-1]
+    assert isinstance(pairing, StartPairing)
+    assert pairing.bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert pairing.timeout_seconds == 30.0
 
     session.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))
     assert session.open_settings(DialogKind.COLORS) is True
@@ -692,6 +699,36 @@ def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect()
 
     assert coordinator.is_captured is False
     assert isinstance(runtime.commands[-1], RecreateWithColors)
+
+
+def test_session_deletes_only_the_fixed_controller_profile(tmp_path: Path) -> None:
+    settings = AppSettings.default()
+    runtime = FakeRuntime()
+    paths = SettingsPaths(tmp_path / "config", tmp_path / "data", tmp_path / "log")
+    profile_file = paths.controller_profile_file
+    sibling_file = profile_file.with_name("other.json")
+    profile_file.parent.mkdir(parents=True)
+    profile_file.write_text("profile", encoding="utf-8")
+    sibling_file.write_text("other", encoding="utf-8")
+    repository = FakeRepository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED))
+    session = ApplicationSession(
+        settings=settings,
+        paths=paths,
+        repository=repository,
+        runtime=runtime,
+        coordinator=make_coordinator(runtime),
+    )
+
+    assert session.ui_snapshot.controller_profile_exists is True
+
+    assert session.delete_controller_profile() is True
+
+    assert not profile_file.exists()
+    assert sibling_file.read_text(encoding="utf-8") == "other"
+    assert session.ui_snapshot.controller_profile_exists is False
+    assert repository.saved == []
+    assert runtime.commands == []
+    assert session.delete_controller_profile() is True
 
 
 def test_session_reconfigures_diagnostic_logging_and_logs_only_error_category() -> None:

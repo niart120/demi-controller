@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QDialogButtonBox
 
 from demi.application.settings_editor import SettingsEditor
-from demi.domain.settings import AppSettings
+from demi.domain.settings import AppSettings, DiagnosticLevel
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog
 from demi.ui.dialogs.mapping import MappingDialog
@@ -24,21 +24,19 @@ def test_dialogs_keep_invalid_values_out_of_drafts_and_show_an_explanation(
 
     assert not mapping.set_source(0, "KEY:F4")
     assert mapping_editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert mapping.mapping_model.data(mapping.mapping_model.index(0, 3)) == (
+    assert mapping.mapping_model.data(mapping.mapping_model.index(0, 4)) == (
         "Input cannot be assigned"
     )
     assert mapping.isVisible()
 
     connection_editor = SettingsEditor(AppSettings.default())
     connection = ConnectionDialog(connection_editor, on_rescan=lambda: None)
-    connection.bond_slot_edit.setText("invalid slot")
-    connection.timeout_edit.setText("0")
+    connection.diagnostic_level_combo.setCurrentIndex(-1)
     connection.show()
     qt_application.processEvents()
 
     assert not connection.apply_connection_fields()
-    assert connection_editor.draft.connection.bond_slot == "default"
-    assert connection_editor.draft.connection.timeout_seconds == 30.0
+    assert connection_editor.draft.connection.diagnostic_level is DiagnosticLevel.INFO
     assert connection.connection_error_label.text() == "Connection settings are invalid"
     assert connection.isVisible()
 
@@ -84,10 +82,9 @@ def test_settings_dialogs_mark_save_as_primary_and_focus_invalid_connection_inpu
         assert save is not None
         assert save.isDefault()
 
-    connection.bond_slot_edit.setText("default")
-    connection.timeout_edit.setText("invalid")
+    connection.diagnostic_level_combo.setCurrentIndex(-1)
     assert not connection.apply_connection_fields()
     qt_application.processEvents()
 
-    assert connection.timeout_edit.hasFocus()
+    assert connection.diagnostic_level_combo.hasFocus()
     assert connection.connection_error_label.text() == "Connection settings are invalid"

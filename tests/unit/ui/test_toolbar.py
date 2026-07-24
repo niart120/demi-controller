@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QToolBar
+from PySide6.QtWidgets import QMenu, QToolBar, QToolButton
 
 from demi.application.state import AppState, ConnectionState
 from demi.ui.toolbar import MainToolBar, ToolbarState
@@ -25,8 +25,31 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
     assert toolbar.capture_action.text() == "Start mouse"
     assert toolbar.capture_action.isChecked() is False
     assert toolbar.capture_action.isEnabled() is True
-    assert toolbar.mapping_action.isEnabled() is True
+    assert isinstance(toolbar.settings_button, QToolButton)
+    assert toolbar.settings_button.text() == "Settings"
+    assert isinstance(toolbar.settings_menu, QMenu)
+    assert toolbar.settings_button.menu() is toolbar.settings_menu
+    assert toolbar.settings_menu.actions() == [
+        toolbar.connection_settings_action,
+        toolbar.bindings_action,
+        toolbar.mouse_action,
+        toolbar.colors_action,
+    ]
+    assert [action.text() for action in toolbar.settings_menu.actions()] == [
+        "Connection",
+        "Bindings",
+        "Mouse",
+        "Colors",
+    ]
+    assert not hasattr(toolbar, "mapping_action")
+    assert toolbar.connection_settings_action not in toolbar.actions()
+    assert toolbar.bindings_action not in toolbar.actions()
+    assert toolbar.mouse_action not in toolbar.actions()
+    assert toolbar.colors_action not in toolbar.actions()
+    assert toolbar.settings_button.isEnabled() is True
     assert toolbar.connection_settings_action.isEnabled() is True
+    assert toolbar.bindings_action.isEnabled() is True
+    assert toolbar.mouse_action.isEnabled() is True
     assert toolbar.colors_action.isEnabled() is True
 
     toolbar.refresh(
@@ -42,7 +65,7 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
     assert toolbar.capture_action.text() == "Stop mouse"
     assert toolbar.capture_action.isChecked() is True
     assert toolbar.capture_action.isEnabled() is True
-    assert toolbar.mapping_action.isEnabled() is True
+    assert toolbar.bindings_action.isEnabled() is True
 
     toolbar.refresh(
         ToolbarState(
@@ -54,9 +77,11 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
 
     assert toolbar.connection_action.isEnabled() is False
     assert toolbar.capture_action.isEnabled() is False
-    assert toolbar.mapping_action.isEnabled() is False
     assert toolbar.connection_settings_action.isEnabled() is False
+    assert toolbar.bindings_action.isEnabled() is False
+    assert toolbar.mouse_action.isEnabled() is False
     assert toolbar.colors_action.isEnabled() is False
+    assert toolbar.settings_button.isEnabled() is False
 
     toolbar.refresh(
         ToolbarState(
@@ -67,3 +92,4 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
     )
 
     assert all(action.isEnabled() is False for action in toolbar.actions())
+    assert toolbar.settings_button.isEnabled() is False

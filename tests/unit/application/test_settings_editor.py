@@ -12,8 +12,6 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     editor.update_binding(0, source="KEY:1", inverted=False)
     editor.update_connection(
         adapter_id="usb:0",
-        bond_slot="office",
-        timeout_seconds=45.0,
         reconnect_on_start=True,
         diagnostic_level=DiagnosticLevel.DEBUG,
     )
@@ -22,8 +20,6 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     draft = editor.draft
     assert draft.profiles[0].bindings[0].source == "KEY:1"
     assert draft.connection.adapter_id == "usb:0"
-    assert draft.connection.bond_slot == "office"
-    assert draft.connection.timeout_seconds == 45.0
     assert draft.connection.reconnect_on_start is True
     assert draft.connection.diagnostic_level is DiagnosticLevel.DEBUG
     assert draft.controller_colors.body == "#ABCDEF"
@@ -68,6 +64,38 @@ def test_editor_replaces_a_duplicate_source_and_unassigns_the_old_row() -> None:
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
     assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
+
+
+def test_editor_adds_and_removes_binding_rows_without_treating_unassigned_as_a_conflict() -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original_bindings = editor.draft.profiles[0].bindings
+
+    editor.add_binding(BindingTarget.BUTTON_A)
+    editor.add_binding(BindingTarget.RIGHT_STICK_UP)
+
+    added_bindings = editor.draft.profiles[0].bindings
+    assert added_bindings[:-2] == original_bindings
+    assert added_bindings[-2].source == "KEY:UNASSIGNED"
+    assert added_bindings[-2].target is BindingTarget.BUTTON_A
+    assert added_bindings[-2].amount == 1.0
+    assert added_bindings[-2].inverted is False
+    assert added_bindings[-1].target is BindingTarget.RIGHT_STICK_UP
+    assert all(conflict.source != "KEY:UNASSIGNED" for conflict in editor.conflicts())
+
+    editor.remove_binding(len(original_bindings))
+
+    assert editor.draft.profiles[0].bindings == (*original_bindings, added_bindings[-1])
+
+
+@pytest.mark.parametrize("index", [-1, len(default_profile().bindings)])
+def test_editor_rejects_removing_a_binding_outside_the_active_profile(index: int) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+
+    with pytest.raises(DomainValueError):
+        editor.remove_binding(index)
+
+    assert editor.draft == original
 
 
 @pytest.mark.parametrize("source", ["KEY:CTRL+RETURN", "KEY:CTRL+ENTER"])

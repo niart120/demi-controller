@@ -97,12 +97,36 @@ class SettingsEditor:
         bindings[index] = replace(current, source=source)
         self._replace_profile(replace(profile, bindings=tuple(bindings)))
 
+    def add_binding(self, target: BindingTarget) -> None:
+        """Append one unassigned binding for the selected target.
+
+        Args:
+            target: Controller or diagnostic target selected by the user.
+        """
+        profile = self._active_profile()
+        binding = Binding(source="KEY:UNASSIGNED", target=target)
+        self._replace_profile(replace(profile, bindings=(*profile.bindings, binding)))
+
+    def remove_binding(self, index: int) -> None:
+        """Remove one binding row from the active profile.
+
+        Args:
+            index: Zero-based row selected by the user.
+
+        Raises:
+            DomainValueError: The row does not exist in the active profile.
+        """
+        profile = self._active_profile()
+        if not 0 <= index < len(profile.bindings):
+            raise DomainValueError
+        self._replace_profile(
+            replace(profile, bindings=(*profile.bindings[:index], *profile.bindings[index + 1 :]))
+        )
+
     def update_connection(
         self,
         *,
         adapter_id: str | None = None,
-        bond_slot: str | None = None,
-        timeout_seconds: float | None = None,
         reconnect_on_start: bool | None = None,
         diagnostic_level: DiagnosticLevel | None = None,
     ) -> None:
@@ -111,10 +135,6 @@ class SettingsEditor:
         connection = ConnectionSettings(
             adapter_id=current.adapter_id if adapter_id is None else adapter_id,
             controller=current.controller,
-            bond_slot=current.bond_slot if bond_slot is None else bond_slot,
-            timeout_seconds=(
-                current.timeout_seconds if timeout_seconds is None else timeout_seconds
-            ),
             reconnect_on_start=(
                 current.reconnect_on_start if reconnect_on_start is None else reconnect_on_start
             ),
@@ -255,7 +275,7 @@ class SettingsEditor:
 
         conflicts: list[BindingConflict] = []
         for source, indices in indices_by_source.items():
-            if len(indices) >= 2:
+            if source != "KEY:UNASSIGNED" and len(indices) >= 2:
                 conflicts.append(BindingConflict(source=source, binding_indices=tuple(indices)))
 
         local_actions = (

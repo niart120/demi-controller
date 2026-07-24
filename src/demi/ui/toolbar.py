@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QToolBar, QWidget
+from PySide6.QtWidgets import QMenu, QToolBar, QToolButton, QWidget
 
 from demi.application.state import AppState, ConnectionState
 
@@ -42,18 +42,31 @@ class MainToolBar(QToolBar):
         self.connection_action = QAction(self.tr("Connect"), self)
         self.capture_action = QAction(self.tr("Start mouse"), self)
         self.capture_action.setCheckable(True)
-        self.mapping_action = QAction(self.tr("Mappings"), self)
-        self.connection_settings_action = QAction(self.tr("Connection settings"), self)
+        self.connection_settings_action = QAction(self.tr("Connection"), self)
+        self.bindings_action = QAction(self.tr("Bindings"), self)
+        self.mouse_action = QAction(self.tr("Mouse"), self)
         self.colors_action = QAction(self.tr("Colors"), self)
-        for action in (
-            self.connection_action,
-            self.capture_action,
-            self.mapping_action,
-            self.connection_settings_action,
-            self.colors_action,
-        ):
+        self.settings_menu = QMenu(self)
+        self.settings_menu.addActions(
+            (
+                self.connection_settings_action,
+                self.bindings_action,
+                self.mouse_action,
+                self.colors_action,
+            )
+        )
+        self.settings_button = QToolButton(self)
+        self.settings_button.setText(self.tr("Settings"))
+        self.settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.settings_button.setMenu(self.settings_menu)
+        self.settings_button.setEnabled(False)
+        for action in (self.connection_action, self.capture_action):
             action.setEnabled(False)
             self.addAction(action)
+        for action in self.settings_menu.actions():
+            action.setEnabled(False)
+        self.settings_action = self.addWidget(self.settings_button)
+        self.settings_action.setEnabled(False)
 
     def refresh(self, state: ToolbarState) -> None:
         """Update action labels, check state, and enabled state.
@@ -88,11 +101,14 @@ class MainToolBar(QToolBar):
         self.capture_action.setChecked(is_captured)
         self.capture_action.setEnabled(capture_available)
         for action in (
-            self.mapping_action,
             self.connection_settings_action,
+            self.bindings_action,
+            self.mouse_action,
             self.colors_action,
         ):
             action.setEnabled(interaction_available)
+        self.settings_button.setEnabled(interaction_available)
+        self.settings_action.setEnabled(interaction_available)
 
     def bind_connection_action(self, callback: Callable[[], object]) -> None:
         """Route enabled connection action requests to the application layer.

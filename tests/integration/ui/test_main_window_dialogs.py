@@ -25,8 +25,9 @@ def test_main_window_opens_one_injected_settings_dialog_per_toolbar_action(
         return create
 
     window.bind_settings_dialog_factories(
-        mapping=factory("mapping"),
         connection=factory("connection"),
+        bindings=factory("bindings"),
+        mouse=factory("mouse"),
         colors=factory("colors"),
     )
     window.main_toolbar.refresh(
@@ -37,31 +38,40 @@ def test_main_window_opens_one_injected_settings_dialog_per_toolbar_action(
         )
     )
 
-    window.main_toolbar.mapping_action.trigger()
+    window.main_toolbar.connection_settings_action.trigger()
     qt_application.processEvents()
 
-    assert [dialog.objectName() for dialog in opened] == ["mapping"]
+    assert [dialog.objectName() for dialog in opened] == ["connection"]
     assert window.active_settings_dialog is opened[0]
     assert opened[0].parentWidget() is window
     assert opened[0].windowModality() is Qt.WindowModality.WindowModal
     assert opened[0].isVisible()
 
-    window.main_toolbar.connection_settings_action.trigger()
+    window.main_toolbar.bindings_action.trigger()
     qt_application.processEvents()
 
-    assert [dialog.objectName() for dialog in opened] == ["mapping"]
+    assert [dialog.objectName() for dialog in opened] == ["connection"]
 
     opened[0].reject()
     qt_application.processEvents()
 
     assert window.active_settings_dialog is None
 
-    window.main_toolbar.connection_settings_action.trigger()
+    window.main_toolbar.bindings_action.trigger()
     qt_application.processEvents()
     opened[1].reject()
+    qt_application.processEvents()
+    window.main_toolbar.mouse_action.trigger()
+    qt_application.processEvents()
+    opened[2].reject()
     qt_application.processEvents()
     window.main_toolbar.colors_action.trigger()
     qt_application.processEvents()
 
-    assert [dialog.objectName() for dialog in opened] == ["mapping", "connection", "colors"]
-    assert window.active_settings_dialog is opened[2]
+    assert [dialog.objectName() for dialog in opened] == [
+        "connection",
+        "bindings",
+        "mouse",
+        "colors",
+    ]
+    assert window.active_settings_dialog is opened[3]

@@ -15,6 +15,7 @@ from demi.controller.events import RuntimeStopped
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 from demi.ui.dialogs.mapping import MappingDialog
+from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
 from demi.ui.localization import install_translators
 from demi.ui.main_window import MainWindow
 
@@ -148,9 +149,10 @@ class QtApplicationEventRouter:
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
         self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
-            mapping=self._create_mapping_dialog,
-            connection=self._create_connection_dialog,
-            colors=self._create_colors_dialog,
+            connection=lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent),
+            bindings=lambda parent: self._create_settings_dialog(SettingsTab.BINDINGS, parent),
+            mouse=lambda parent: self._create_settings_dialog(SettingsTab.MOUSE, parent),
+            colors=lambda parent: self._create_settings_dialog(SettingsTab.COLORS, parent),
         )
         self.refresh()
 
@@ -204,10 +206,12 @@ class QtApplicationEventRouter:
         if session is not None:
             session.connection_action()
             if (
-                session.dialogs.model.kind is DialogKind.CONNECTION
+                session.dialogs.model.kind is DialogKind.SETTINGS
                 and self._window.active_settings_dialog is None
             ):
-                self._window.open_settings_dialog(self._create_connection_dialog)
+                self._window.open_settings_dialog(
+                    lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent)
+                )
             self.refresh()
 
     def _toggle_capture(self) -> None:
@@ -243,6 +247,52 @@ class QtApplicationEventRouter:
             parent=parent,
         )
 
+    def _create_settings_dialog(
+        self,
+        initial_tab: SettingsTab,
+        parent: QWidget,
+    ) -> SettingsDialog | None:
+        """Create the unified settings dialog on one requested tab."""
+        session = self._session
+        if session is None:
+            return None
+        editor = (
+            session.settings_modal.editor
+            if session.dialogs.model.kind is DialogKind.SETTINGS
+            else self._open_settings_editor(DialogKind.SETTINGS)
+        )
+        if editor is None:
+            return None
+        return self._settings_dialog(editor, initial_tab, parent)
+
+    def _settings_dialog(
+        self,
+        editor: SettingsEditor,
+        initial_tab: SettingsTab,
+        parent: QWidget,
+    ) -> SettingsDialog:
+        """Create one tabbed editor from an already-open session draft."""
+        session = self._session
+        connected = (
+            session is not None
+            and session.ui_snapshot.connection_state is ConnectionState.CONNECTED
+        )
+        return SettingsDialog(
+            editor,
+            initial_tab=initial_tab,
+            connected=connected,
+            on_rescan=self._rescan_adapters,
+            on_save=self._save_settings,
+            on_cancel=self._cancel_settings,
+            on_preview=self._window.set_controller_colors,
+            on_delete_profile=self._delete_controller_profile,
+            on_request_pairing=self._request_pairing,
+            on_defer_reconnect=self._defer_color_reconnect,
+            on_reconnect=self._request_color_reconnect,
+            on_dialog_opened=self._window.on_dialog_opened,
+            parent=parent,
+        )
+
     def _create_connection_dialog(self, parent: QWidget) -> ConnectionDialog | None:
         """Create the connection dialog after opening its application-owned draft."""
         session = self._session
@@ -263,7 +313,8 @@ class QtApplicationEventRouter:
             editor,
             on_rescan=self._rescan_adapters,
             on_request_pairing=self._request_pairing,
-            on_save_and_connect=self._save_connection_and_connect,
+            on_save=self._save_settings,
+            on_delete_profile=self._delete_controller_profile,
             on_cancel=self._cancel_settings,
             parent=parent,
         )
@@ -313,15 +364,14 @@ class QtApplicationEventRouter:
             session.rescan_adapters()
             self.refresh()
 
-    def _save_connection_and_connect(self) -> bool:
-        """Persist a connection draft and request the existing connect action."""
-        if not self._save_settings():
-            return False
+    def _delete_controller_profile(self) -> bool:
+        """Delete the fixed connection profile through the session boundary."""
         session = self._session
-        if session is not None:
-            session.connection_action()
-            self.refresh()
-        return True
+        if session is None:
+            return False
+        deleted = session.delete_controller_profile()
+        self.refresh()
+        return deleted
 
     def _request_pairing(self) -> bool:
         """Replace an editable connection dialog with pairing confirmation."""
@@ -362,7 +412,7 @@ class QtApplicationEventRouter:
             self.refresh()
             return
         self._window.replace_active_settings_dialog(
-            lambda parent: self._connection_dialog(editor, parent)
+            lambda parent: self._settings_dialog(editor, SettingsTab.CONNECTION, parent)
         )
         self.refresh()
 

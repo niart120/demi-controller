@@ -29,7 +29,14 @@ class SettingsSaveResult:
 class SettingsModalController:
     """Coordinate one settings draft with modal and capture lifecycle state."""
 
-    _EDITABLE_DIALOGS = frozenset({DialogKind.MAPPING, DialogKind.CONNECTION, DialogKind.COLORS})
+    _EDITABLE_DIALOGS = frozenset(
+        {
+            DialogKind.SETTINGS,
+            DialogKind.MAPPING,
+            DialogKind.CONNECTION,
+            DialogKind.COLORS,
+        }
+    )
 
     def __init__(
         self,

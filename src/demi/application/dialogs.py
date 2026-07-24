@@ -8,6 +8,7 @@ class DialogKind(StrEnum):
     """Modal kinds available to the settings and error UI."""
 
     NONE = "none"
+    SETTINGS = "settings"
     MAPPING = "mapping"
     CONNECTION = "connection"
     COLORS = "colors"
@@ -26,6 +27,7 @@ class DialogModel:
 
 _DIALOG_TITLES = {
     DialogKind.NONE: "",
+    DialogKind.SETTINGS: "設定",
     DialogKind.MAPPING: "キー割り当て",
     DialogKind.CONNECTION: "接続設定",
     DialogKind.COLORS: "コントローラーカラー",

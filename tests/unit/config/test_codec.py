@@ -43,6 +43,29 @@ def test_codec_supplies_connection_shortcuts_for_existing_v1_settings() -> None:
     assert restored.local_actions.connection == ("CTRL+RETURN", "CTRL+ENTER")
 
 
+def test_codec_omits_removed_connection_choices_and_ignores_their_legacy_values() -> None:
+    encoded = encode_settings(AppSettings.default())
+    connection = cast("dict[str, object]", encoded["connection"])
+
+    assert set(connection) == {
+        "adapter_id",
+        "controller",
+        "reconnect_on_start",
+        "diagnostic_level",
+    }
+
+    connection["bond_slot"] = {"legacy": "value"}
+    connection["timeout_seconds"] = "legacy"
+
+    restored = decode_settings(encoded)
+    reencoded = encode_settings(restored)
+    reencoded_connection = cast("dict[str, object]", reencoded["connection"])
+
+    assert restored == AppSettings.default()
+    assert "bond_slot" not in reencoded_connection
+    assert "timeout_seconds" not in reencoded_connection
+
+
 def test_codec_migrates_only_exact_legacy_home_and_release_defaults() -> None:
     legacy = encode_settings(AppSettings.default())
     legacy_actions = cast("dict[str, object]", legacy["local_actions"])

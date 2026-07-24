@@ -4,7 +4,6 @@ import platformdirs
 import pytest
 
 from demi.config.paths import SettingsPaths, resolve_paths
-from demi.domain.errors import DomainValueError
 
 
 def test_resolve_paths_uses_the_project_platformdirs_configuration(
@@ -42,15 +41,12 @@ def test_resolve_paths_uses_the_explicit_process_test_root(
     assert paths.log_dir == tmp_path / "logs"
 
 
-def test_bond_file_is_scoped_to_the_pro_controller_slot_directory() -> None:
+def test_controller_profile_file_is_one_fixed_pro_controller_path() -> None:
     paths = SettingsPaths(
         config_dir=Path("C:/config"),
         data_dir=Path("C:/data"),
         log_dir=Path("C:/logs"),
     )
 
-    assert paths.bond_file("default") == Path("C:/data/bonds/pro-controller/default.json")
-    with pytest.raises(DomainValueError):
-        paths.bond_file("../escape")
-    with pytest.raises(DomainValueError):
-        paths.bond_file("UpperCase")
+    assert paths.controller_profile_file == Path("C:/data/bonds/pro-controller/default.json")
+    assert not hasattr(paths, "bond_file")

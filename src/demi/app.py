@@ -71,6 +71,8 @@ if TYPE_CHECKING:
     from demi.ui.event_bridge import QtRuntimeEventBridge
     from demi.ui.main_window import MainWindow
 
+_CONNECTION_TIMEOUT_SECONDS = 30.0
+
 
 class Clock(Protocol):
     """Monotonic clock consumed by input and controller boundaries."""
@@ -224,6 +226,7 @@ class ApplicationSession:
             settings.connection.adapter_id
         )
         self._startup_reconnect_discovery_complete = False
+        self._pairing_return_kind = DialogKind.SETTINGS
         if loaded is not None:
             self._presentation.set_recovery_notice(settings_recovery_notice(loaded))
         self._apply_live_settings(settings)
@@ -263,6 +266,7 @@ class ApplicationSession:
             error=presentation.error,
             color_reconnect_pending=presentation.color_reconnect_pending,
             connection_retryable=self._connection_retryable,
+            controller_profile_exists=self._paths.controller_profile_file.is_file(),
         )
 
     def begin(self) -> None:
@@ -366,14 +370,14 @@ class ApplicationSession:
         connection = self._settings.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
             self._presentation.set_warning("Select a USB adapter to connect")
-            self.open_settings(DialogKind.CONNECTION)
+            self.open_settings(DialogKind.SETTINGS)
             return
         self._presentation.acknowledge_error()
         self._runtime.post(
             ConnectSaved(
                 adapter_id=connection.adapter_id,
-                bond_path=self._paths.bond_file(connection.bond_slot),
-                timeout_seconds=connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )
@@ -415,27 +419,42 @@ class ApplicationSession:
 
     def request_pairing(self) -> bool:
         """Move an editable connection draft to its explicit confirmation step."""
-        if (
-            self._dialogs.model.kind is not DialogKind.CONNECTION
-            or self._settings_modal.editor is None
-        ):
+        kind = self._dialogs.model.kind
+        if kind not in {DialogKind.SETTINGS, DialogKind.CONNECTION}:
             return False
+        if self._settings_modal.editor is None:
+            return False
+        self._pairing_return_kind = kind
         return self._dialogs.replace(DialogKind.PAIRING_CONFIRMATION)
 
     def rescan_adapters(self) -> None:
         """Request fresh adapter discovery while a connection draft is open."""
         if self._dialogs.model.kind not in {
+            DialogKind.SETTINGS,
             DialogKind.CONNECTION,
             DialogKind.PAIRING_CONFIRMATION,
         }:
             return
         self._runtime.post(DiscoverAdapters())
 
+    def delete_controller_profile(self) -> bool:
+        """Delete the fixed controller connection profile, if it exists.
+
+        Returns:
+            Whether the profile is absent after the deletion attempt.
+        """
+        try:
+            self._paths.controller_profile_file.unlink(missing_ok=True)
+        except OSError:
+            self._presentation.set_warning("Could not delete controller profile")
+            return False
+        return True
+
     def cancel_pairing(self) -> bool:
         """Return a pairing confirmation to its editable connection draft."""
         if self._dialogs.model.kind is not DialogKind.PAIRING_CONFIRMATION:
             return False
-        return self._dialogs.replace(DialogKind.CONNECTION)
+        return self._dialogs.replace(self._pairing_return_kind)
 
     def confirm_pairing(self) -> bool:
         """Persist a confirmed draft and post one explicit pairing command."""
@@ -445,15 +464,15 @@ class ApplicationSession:
         connection = editor.draft.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
             self._presentation.set_warning("Select a USB adapter to pair")
-            self._dialogs.replace(DialogKind.CONNECTION)
+            self._dialogs.replace(self._pairing_return_kind)
             return False
         if not self.save_settings():
             return False
         self._runtime.post(
             StartPairing(
                 adapter_id=self._settings.connection.adapter_id,
-                bond_path=self._paths.bond_file(self._settings.connection.bond_slot),
-                timeout_seconds=self._settings.connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )
@@ -497,8 +516,8 @@ class ApplicationSession:
         self._runtime.post(
             ConnectSaved(
                 adapter_id=connection.adapter_id,
-                bond_path=self._paths.bond_file(connection.bond_slot),
-                timeout_seconds=connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )

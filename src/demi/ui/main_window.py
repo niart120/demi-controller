@@ -24,6 +24,7 @@ from demi.platform.windows_mouse_hook import WindowsMouseInputSuppressor
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
 from demi.ui.dialogs.connection import ConnectionDialog
+from demi.ui.dialogs.settings import SettingsDialog
 from demi.ui.status_bar import MainStatusBar, StatusBarState
 from demi.ui.toolbar import MainToolBar, ToolbarState
 
@@ -61,16 +62,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._controller_preview)
         self._main_toolbar = MainToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._main_toolbar)
-        self._mapping_dialog_factory: SettingsDialogFactory | None = None
         self._connection_dialog_factory: SettingsDialogFactory | None = None
+        self._bindings_dialog_factory: SettingsDialogFactory | None = None
+        self._mouse_dialog_factory: SettingsDialogFactory | None = None
         self._colors_dialog_factory: SettingsDialogFactory | None = None
         self._active_settings_dialog: QDialog | None = None
         self._latest_snapshot: ApplicationUiSnapshot | None = None
-        self._main_toolbar.mapping_action.triggered.connect(
-            lambda _checked=False: self._open_settings_dialog(self._mapping_dialog_factory)
-        )
         self._main_toolbar.connection_settings_action.triggered.connect(
             lambda _checked=False: self._open_settings_dialog(self._connection_dialog_factory)
+        )
+        self._main_toolbar.bindings_action.triggered.connect(
+            lambda _checked=False: self._open_settings_dialog(self._bindings_dialog_factory)
+        )
+        self._main_toolbar.mouse_action.triggered.connect(
+            lambda _checked=False: self._open_settings_dialog(self._mouse_dialog_factory)
         )
         self._main_toolbar.colors_action.triggered.connect(
             lambda _checked=False: self._open_settings_dialog(self._colors_dialog_factory)
@@ -240,19 +245,22 @@ class MainWindow(QMainWindow):
     def bind_settings_dialog_factories(
         self,
         *,
-        mapping: SettingsDialogFactory,
         connection: SettingsDialogFactory,
+        bindings: SettingsDialogFactory,
+        mouse: SettingsDialogFactory,
         colors: SettingsDialogFactory,
     ) -> None:
-        """Bind application-owned factories for the three editable dialogs.
+        """Bind application-owned factories for the four settings tabs.
 
         Args:
-            mapping: Creates a mapping dialog for this main window.
             connection: Creates a connection settings dialog for this main window.
+            bindings: Creates a settings dialog on the bindings tab.
+            mouse: Creates a settings dialog on the mouse tab.
             colors: Creates a controller-colors dialog for this main window.
         """
-        self._mapping_dialog_factory = mapping
         self._connection_dialog_factory = connection
+        self._bindings_dialog_factory = bindings
+        self._mouse_dialog_factory = mouse
         self._colors_dialog_factory = colors
 
     def open_settings_dialog(self, factory: SettingsDialogFactory) -> None:
@@ -514,6 +522,10 @@ class MainWindow(QMainWindow):
         dialog = self._active_settings_dialog
         if isinstance(dialog, ConnectionDialog):
             dialog.set_adapters(snapshot.adapters)
+            dialog.set_profile_exists(snapshot.controller_profile_exists)
+        elif isinstance(dialog, SettingsDialog):
+            dialog.connection_page.set_adapters(snapshot.adapters)
+            dialog.connection_page.set_profile_exists(snapshot.controller_profile_exists)
 
     def _on_input_evaluation_timeout(self) -> None:
         if not self._shutdown_started and self._input_coordinator is not None:

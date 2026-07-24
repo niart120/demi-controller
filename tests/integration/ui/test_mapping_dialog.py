@@ -19,6 +19,7 @@ from demi.application.settings_modal import SettingsModalController
 from demi.application.state import AppState
 from demi.config.errors import SettingsPersistenceError
 from demi.domain.controller import ControllerFrame
+from demi.domain.mapping import BindingTarget
 from demi.domain.settings import AppSettings, InputSettings, MouseSettings
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
@@ -125,7 +126,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
         assert release_requests == []
-        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
             "F4 is reserved for mouse capture release"
         )
         assert dialog.mapping_model.capture_row == 0
@@ -183,17 +184,17 @@ def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
     assert dialog.isVisible()
     assert editor.draft == original
     assert dialog.mapping_model.capture_row is None
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == "Remap"
 
     dialog.begin_capture_row(0)
-    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 4))
+    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 3))
     QTest.mouseClick(dialog.table.viewport(), Qt.MouseButton.LeftButton, pos=action_rect.center())
     qt_application.processEvents()
 
     assert dialog.isVisible()
     assert editor.draft == original
     assert dialog.mapping_model.capture_row is None
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == "Remap"
 
 
 def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_and_round_trips(
@@ -205,6 +206,7 @@ def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_an
     dialog.show()
     qt_application.processEvents()
     dialog.table.selectRow(0)
+    dialog.table.setFocus()
 
     assert dialog.assign_escape_action in dialog.table.actions()
     assert dialog.assign_escape_action.text() == "Assign Escape"
@@ -247,7 +249,7 @@ def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
         "F4 is reserved for mouse capture release"
     )
     assert dialog.mapping_model.capture_row == 0
@@ -321,8 +323,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
-    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
+    assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
+    assert model.data(model.index(2, 4), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -418,19 +420,20 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
     dialog = MappingDialog(editor, on_save=save)
     dialog.show()
     qt_application.processEvents()
-    dialog.table.selectRow(0)
-    qt_application.processEvents()
+    model = dialog.mapping_model
+    inverted_index = model.index(0, 2)
 
-    assert dialog.inverted_checkbox.isEnabled()
-    assert not dialog.inverted_checkbox.isChecked()
-
-    dialog.inverted_checkbox.click()
+    assert not hasattr(dialog, "inverted_checkbox")
+    assert model.data(inverted_index, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Unchecked
+    assert model.setData(
+        inverted_index,
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    )
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].inverted is True
-    model = dialog.table.model()
-    assert model is not None
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "Yes"
+    assert model.data(inverted_index, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -457,15 +460,66 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
     assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
     assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
 
-    dialog.table.selectRow(32)
-    qt_application.processEvents()
-
-    assert not dialog.inverted_checkbox.isEnabled()
+    assert model.data(model.index(32, 2), Qt.ItemDataRole.CheckStateRole) is None
     assert dialog.set_source(32, "KEY:P") is True
     assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
 
     dialog.close()
     qt_application.processEvents()
+
+
+def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original_bindings = editor.draft.profiles[0].bindings
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.rowCount() == len(original_bindings)
+    assert not hasattr(dialog, "remove_binding_button")
+    assert not hasattr(dialog, "target_combo")
+    assert dialog.add_binding_button.menu() is dialog.add_binding_menu
+    assert [action.text() for action in dialog.add_binding_menu.actions()] == [
+        "Buttons",
+        "Left stick",
+        "Right stick",
+        "Diagnostics",
+    ]
+    assert {
+        action.data()
+        for group_menu in dialog.add_binding_group_menus.values()
+        for action in group_menu.actions()
+    } == set(BindingTarget)
+    right_stick_menu = dialog.add_binding_group_menus["Right stick"]
+    add_right_stick_up = next(
+        action
+        for action in right_stick_menu.actions()
+        if action.data() == BindingTarget.RIGHT_STICK_UP
+    )
+
+    add_right_stick_up.trigger()
+    qt_application.processEvents()
+
+    added_row = len(original_bindings)
+    assert dialog.mapping_model.rowCount() == added_row + 1
+    assert dialog.table.currentIndex().row() == added_row
+    assert editor.draft.profiles[0].bindings[added_row].target is BindingTarget.RIGHT_STICK_UP
+    assert editor.draft.profiles[0].bindings[added_row].source == "KEY:UNASSIGNED"
+
+    remove_index = dialog.mapping_model.index(added_row, 5)
+    dialog.table.scrollTo(remove_index)
+    qt_application.processEvents()
+    QTest.mouseClick(
+        dialog.table.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=dialog.table.visualRect(remove_index).center(),
+    )
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.rowCount() == len(original_bindings)
+    assert editor.draft.profiles[0].bindings == original_bindings
 
 
 def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
@@ -541,7 +595,7 @@ def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_keyboard_actions_reach
     assert dialog.mapping_model.capture_row is None
 
     dialog.tabs.setCurrentIndex(0)
-    action_index = dialog.mapping_model.index(0, 4)
+    action_index = dialog.mapping_model.index(0, 3)
     dialog.table.setCurrentIndex(action_index)
     _send_key(dialog.table, Qt.Key.Key_Return)
     assert dialog.mapping_model.capture_row == 0
@@ -567,18 +621,11 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     dialog = MappingDialog(editor, on_save=save)
     dialog.show()
     qt_application.processEvents()
-    dialog.table.selectRow(0)
-    dialog.inverted_checkbox.setFocus()
+    inverted_index = dialog.mapping_model.index(0, 2)
+    dialog.table.setCurrentIndex(inverted_index)
+    dialog.table.setFocus()
 
-    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Tab)
-    qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.restore_button
-
-    _send_key(dialog.restore_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
-    qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.inverted_checkbox
-
-    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Space)
+    _send_key(dialog.table, Qt.Key.Key_Space)
     qt_application.processEvents()
     assert editor.draft.profiles[0].bindings[0].inverted is True
 
@@ -614,7 +661,7 @@ def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_row_action_keyboard_re
     assert dialog.tabs.tabText(0) == "Bindings"
     assert dialog.tabs.tabText(1) == "Mouse gyro"
 
-    action_index = dialog.mapping_model.index(0, 4)
+    action_index = dialog.mapping_model.index(0, 3)
     dialog.table.setCurrentIndex(action_index)
     dialog.table.setFocus()
     _send_key(dialog.table, Qt.Key.Key_Space)
