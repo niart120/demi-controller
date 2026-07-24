@@ -12,8 +12,6 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     editor.update_binding(0, source="KEY:1", inverted=False)
     editor.update_connection(
         adapter_id="usb:0",
-        bond_slot="office",
-        timeout_seconds=45.0,
         reconnect_on_start=True,
         diagnostic_level=DiagnosticLevel.DEBUG,
     )
@@ -22,8 +20,6 @@ def test_editor_updates_binding_connection_and_color_as_a_new_draft() -> None:
     draft = editor.draft
     assert draft.profiles[0].bindings[0].source == "KEY:1"
     assert draft.connection.adapter_id == "usb:0"
-    assert draft.connection.bond_slot == "office"
-    assert draft.connection.timeout_seconds == 45.0
     assert draft.connection.reconnect_on_start is True
     assert draft.connection.diagnostic_level is DiagnosticLevel.DEBUG
     assert draft.controller_colors.body == "#ABCDEF"

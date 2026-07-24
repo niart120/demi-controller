@@ -410,6 +410,7 @@ def test_session_reconnects_once_only_when_the_saved_adapter_is_discovered() -> 
     assert len(reconnects) == 1
     assert reconnects[0].adapter_id == "usb:0"
     assert reconnects[0].bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert reconnects[0].timeout_seconds == 30.0
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.presentation.model.connection_state is ConnectionState.CONNECTING
     assert session.presentation.model.adapter_label == "Adapter"
@@ -583,7 +584,10 @@ def test_session_routes_toolbar_connection_and_capture_actions() -> None:
 
     session.connection_action()
 
-    assert isinstance(runtime.commands[-1], ConnectSaved)
+    connect = runtime.commands[-1]
+    assert isinstance(connect, ConnectSaved)
+    assert connect.bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert connect.timeout_seconds == 30.0
     session.connection_action()
     assert len([command for command in runtime.commands if isinstance(command, ConnectSaved)]) == 1
     session.handle_runtime_event(PairingProgress("ペアリング処理中"))
@@ -670,7 +674,10 @@ def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect()
     assert session.request_pairing() is True
     assert not any(isinstance(command, StartPairing) for command in runtime.commands)
     assert session.confirm_pairing() is True
-    assert isinstance(runtime.commands[-1], StartPairing)
+    pairing = runtime.commands[-1]
+    assert isinstance(pairing, StartPairing)
+    assert pairing.bond_path == Path("data") / "bonds" / "pro-controller" / "default.json"
+    assert pairing.timeout_seconds == 30.0
 
     session.handle_runtime_event(ConnectionChanged(ConnectionState.CONNECTED, adapter_id="usb:0"))
     assert session.open_settings(DialogKind.COLORS) is True

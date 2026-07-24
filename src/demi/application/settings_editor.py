@@ -127,8 +127,6 @@ class SettingsEditor:
         self,
         *,
         adapter_id: str | None = None,
-        bond_slot: str | None = None,
-        timeout_seconds: float | None = None,
         reconnect_on_start: bool | None = None,
         diagnostic_level: DiagnosticLevel | None = None,
     ) -> None:
@@ -137,10 +135,6 @@ class SettingsEditor:
         connection = ConnectionSettings(
             adapter_id=current.adapter_id if adapter_id is None else adapter_id,
             controller=current.controller,
-            bond_slot=current.bond_slot if bond_slot is None else bond_slot,
-            timeout_seconds=(
-                current.timeout_seconds if timeout_seconds is None else timeout_seconds
-            ),
             reconnect_on_start=(
                 current.reconnect_on_start if reconnect_on_start is None else reconnect_on_start
             ),

@@ -71,6 +71,8 @@ if TYPE_CHECKING:
     from demi.ui.event_bridge import QtRuntimeEventBridge
     from demi.ui.main_window import MainWindow
 
+_CONNECTION_TIMEOUT_SECONDS = 30.0
+
 
 class Clock(Protocol):
     """Monotonic clock consumed by input and controller boundaries."""
@@ -372,8 +374,8 @@ class ApplicationSession:
         self._runtime.post(
             ConnectSaved(
                 adapter_id=connection.adapter_id,
-                bond_path=self._paths.bond_file(connection.bond_slot),
-                timeout_seconds=connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )
@@ -452,8 +454,8 @@ class ApplicationSession:
         self._runtime.post(
             StartPairing(
                 adapter_id=self._settings.connection.adapter_id,
-                bond_path=self._paths.bond_file(self._settings.connection.bond_slot),
-                timeout_seconds=self._settings.connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )
@@ -497,8 +499,8 @@ class ApplicationSession:
         self._runtime.post(
             ConnectSaved(
                 adapter_id=connection.adapter_id,
-                bond_path=self._paths.bond_file(connection.bond_slot),
-                timeout_seconds=connection.timeout_seconds,
+                bond_path=self._paths.controller_profile_file,
+                timeout_seconds=_CONNECTION_TIMEOUT_SECONDS,
                 colors=self._settings.controller_colors,
             )
         )

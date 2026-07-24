@@ -1,15 +1,10 @@
 """OS-specific settings and bond paths."""
 
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import platformdirs
-
-from demi.domain.errors import DomainValueError
-
-_BOND_SLOT_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,21 +20,10 @@ class SettingsPaths:
         """Return the current settings TOML path."""
         return self.config_dir / "settings.toml"
 
-    def bond_file(self, slot: str) -> Path:
-        """Return a validated Pro Controller bond path for ``slot``.
-
-        Args:
-            slot: Lowercase bond slot name without path separators.
-
-        Returns:
-            The slot path under ``data_dir/bonds/pro-controller``.
-
-        Raises:
-            DomainValueError: ``slot`` does not match the safe slot pattern.
-        """
-        if not isinstance(slot, str) or _BOND_SLOT_PATTERN.fullmatch(slot) is None:
-            raise DomainValueError
-        return self.data_dir / "bonds" / "pro-controller" / f"{slot}.json"
+    @property
+    def controller_profile_file(self) -> Path:
+        """Return the one fixed Pro Controller connection-profile path."""
+        return self.data_dir / "bonds" / "pro-controller" / "default.json"
 
 
 def resolve_paths() -> SettingsPaths:

@@ -149,8 +149,6 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
         "connection": {
             "adapter_id": settings.connection.adapter_id,
             "controller": settings.connection.controller.value,
-            "bond_slot": settings.connection.bond_slot,
-            "timeout_seconds": settings.connection.timeout_seconds,
             "reconnect_on_start": settings.connection.reconnect_on_start,
             "diagnostic_level": settings.connection.diagnostic_level.value,
         },
@@ -247,12 +245,11 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             {
                 "adapter_id",
                 "controller",
-                "bond_slot",
-                "timeout_seconds",
                 "reconnect_on_start",
                 "diagnostic_level",
             }
         ),
+        frozenset({"bond_slot", "timeout_seconds"}),
     )
     controller = _require_table(raw["controller"])
     _check_keys(controller, frozenset({"colors"}))
@@ -296,8 +293,6 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             connection=ConnectionSettings(
                 adapter_id=_require_string(connection["adapter_id"]),
                 controller=_controller_type(connection["controller"]),
-                bond_slot=_require_string(connection["bond_slot"]),
-                timeout_seconds=_require_float(connection["timeout_seconds"]),
                 reconnect_on_start=_require_bool(connection["reconnect_on_start"]),
                 diagnostic_level=_diagnostic_level(connection["diagnostic_level"]),
             ),

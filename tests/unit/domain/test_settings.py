@@ -26,8 +26,8 @@ def test_default_settings_match_the_initial_configuration() -> None:
     assert settings.window == WindowSettings(width=960, height=640, maximized=False)
     assert settings.connection.adapter_id == ""
     assert settings.connection.controller is ControllerType.PRO_CONTROLLER
-    assert settings.connection.bond_slot == "default"
-    assert settings.connection.timeout_seconds == 30.0
+    assert not hasattr(settings.connection, "bond_slot")
+    assert not hasattr(settings.connection, "timeout_seconds")
     assert settings.connection.reconnect_on_start is False
     assert settings.connection.diagnostic_level is DiagnosticLevel.INFO
     assert settings.controller_colors == ControllerColorSettings(
@@ -70,8 +70,6 @@ def test_color_values_are_normalized_to_uppercase_hex() -> None:
     [
         lambda: WindowSettings(width=799),
         lambda: WindowSettings(height=4321),
-        lambda: ConnectionSettings(timeout_seconds=0.9),
-        lambda: ConnectionSettings(bond_slot="../escape"),
         lambda: ControllerColorSettings(body="#12345"),
         lambda: MouseSettings(horizontal_sensitivity=0.09),
         lambda: MouseSettings(invert_x=cast("bool", 1)),

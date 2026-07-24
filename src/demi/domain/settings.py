@@ -9,7 +9,6 @@ from .mapping import InputProfile, default_profile
 
 SCHEMA = "demi.settings/v1"
 _COLOR_PATTERN = re.compile(r"#[0-9A-Fa-f]{6}")
-_BOND_SLOT_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
 
 class ControllerType(StrEnum):
@@ -64,27 +63,19 @@ class WindowSettings:
 
 @dataclass(frozen=True, slots=True)
 class ConnectionSettings:
-    """Connection selection and timeout settings."""
+    """Application-wide connection selection and startup settings."""
 
     adapter_id: str = ""
     controller: ControllerType = ControllerType.PRO_CONTROLLER
-    bond_slot: str = "default"
-    timeout_seconds: float = 30.0
     reconnect_on_start: bool = False
     diagnostic_level: DiagnosticLevel = DiagnosticLevel.INFO
 
     def __post_init__(self) -> None:
-        """Validate connection values and the bond slot boundary."""
+        """Validate application-wide connection values."""
         if not isinstance(self.adapter_id, str) or len(self.adapter_id) > 256:
             raise DomainValueError
         if not isinstance(self.controller, ControllerType):
             raise DomainValueError
-        if (
-            not isinstance(self.bond_slot, str)
-            or _BOND_SLOT_PATTERN.fullmatch(self.bond_slot) is None
-        ):
-            raise DomainValueError
-        _require_float_range(self.timeout_seconds, 1.0, 120.0)
         if not isinstance(self.reconnect_on_start, bool):
             raise DomainValueError
         if not isinstance(self.diagnostic_level, DiagnosticLevel):
