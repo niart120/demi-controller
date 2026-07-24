@@ -39,9 +39,8 @@ from demi.domain.settings import AppSettings
 from demi.input.publisher import InputPublisher
 from demi.platform.windows_mouse_hook import WindowsMouseInputSuppressor
 from demi.ui.application import QtApplicationEventRouter
-from demi.ui.dialogs.colors import ControllerColorsDialog
-from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
-from demi.ui.dialogs.mapping import MappingDialog
+from demi.ui.dialogs.connection import PairingConfirmationDialog
+from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
 from demi.ui.event_bridge import QtRuntimeEventBridge
 from demi.ui.main_window import MainWindow
 
@@ -189,18 +188,17 @@ def test_f4_pointer_release_refreshes_the_bound_toolbar(
 
 
 @pytest.mark.parametrize(
-    ("action_name", "dialog_type", "dialog_kind"),
+    ("action_name", "expected_tab"),
     [
-        ("mapping_action", MappingDialog, DialogKind.MAPPING),
-        ("connection_settings_action", ConnectionDialog, DialogKind.CONNECTION),
-        ("colors_action", ControllerColorsDialog, DialogKind.COLORS),
+        ("mapping_action", SettingsTab.MAPPINGS),
+        ("connection_settings_action", SettingsTab.CONNECTION),
+        ("colors_action", SettingsTab.COLORS),
     ],
 )
 def test_router_binds_each_settings_action_to_a_session_owned_dialog(
     qt_application: QApplication,
     action_name: str,
-    dialog_type: type[MappingDialog | ConnectionDialog | ControllerColorsDialog],
-    dialog_kind: DialogKind,
+    expected_tab: SettingsTab,
 ) -> None:
     """Drive the normal GUI router path used by production composition."""
     settings = AppSettings.default()
@@ -225,10 +223,11 @@ def test_router_binds_each_settings_action_to_a_session_owned_dialog(
     qt_application.processEvents()
 
     dialog = window.active_settings_dialog
-    assert isinstance(dialog, dialog_type)
+    assert isinstance(dialog, SettingsDialog)
+    assert dialog.current_tab is expected_tab
     assert dialog.isVisible()
     assert dialog.parentWidget() is window
-    assert session.dialogs.model.kind is dialog_kind
+    assert session.dialogs.model.kind is DialogKind.SETTINGS
     assert session.settings_modal.editor is not None
 
     dialog.reject()
@@ -265,9 +264,9 @@ def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
     window.main_toolbar.mapping_action.trigger()
     qt_application.processEvents()
     save_dialog = window.active_settings_dialog
-    assert isinstance(save_dialog, MappingDialog)
-    save_dialog.invert_x_checkbox.setChecked(True)
-    save_dialog.invert_y_checkbox.setChecked(False)
+    assert isinstance(save_dialog, SettingsDialog)
+    save_dialog.mapping_page.invert_x_checkbox.setChecked(True)
+    save_dialog.mapping_page.invert_y_checkbox.setChecked(False)
     save_button = save_dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
     save_button.click()
@@ -281,9 +280,9 @@ def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
     window.main_toolbar.mapping_action.trigger()
     qt_application.processEvents()
     cancel_dialog = window.active_settings_dialog
-    assert isinstance(cancel_dialog, MappingDialog)
-    cancel_dialog.invert_x_checkbox.setChecked(False)
-    cancel_dialog.invert_y_checkbox.setChecked(True)
+    assert isinstance(cancel_dialog, SettingsDialog)
+    cancel_dialog.mapping_page.invert_x_checkbox.setChecked(False)
+    cancel_dialog.mapping_page.invert_y_checkbox.setChecked(True)
     cancel_button = cancel_dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel)
     assert cancel_button is not None
     cancel_button.click()
@@ -322,15 +321,16 @@ def test_router_routes_connection_dialog_actions_through_the_application_session
     window.main_toolbar.connection_settings_action.trigger()
     qt_application.processEvents()
     dialog = window.active_settings_dialog
-    assert isinstance(dialog, ConnectionDialog)
-    dialog.select_adapter(0)
+    assert isinstance(dialog, SettingsDialog)
+    connection_page = dialog.connection_page
+    connection_page.select_adapter(0)
 
-    dialog.request_rescan()
+    connection_page.request_rescan()
     assert runtime.commands == [DiscoverAdapters()]
     router.handle_runtime_event(AdaptersDiscovered(adapters))
-    assert dialog.rescan_button.isEnabled()
+    assert connection_page.rescan_button.isEnabled()
 
-    dialog.request_pairing()
+    connection_page.request_pairing()
     qt_application.processEvents()
     confirmation = window.active_settings_dialog
     assert isinstance(confirmation, PairingConfirmationDialog)
@@ -339,8 +339,9 @@ def test_router_routes_connection_dialog_actions_through_the_application_session
     confirmation.reject()
     qt_application.processEvents()
     restored_dialog = window.active_settings_dialog
-    assert isinstance(restored_dialog, ConnectionDialog)
-    assert session.dialogs.model.kind is DialogKind.CONNECTION
+    assert isinstance(restored_dialog, SettingsDialog)
+    assert restored_dialog.current_tab is SettingsTab.CONNECTION
+    assert session.dialogs.model.kind is DialogKind.SETTINGS
 
     restored_dialog.request_save()
     qt_application.processEvents()
@@ -349,6 +350,41 @@ def test_router_routes_connection_dialog_actions_through_the_application_session
     assert session.dialogs.model.kind is DialogKind.NONE
     assert repository.saved[-1].connection.adapter_id == "usb:0"
     assert not any(isinstance(command, ConnectSaved) for command in runtime.commands)
+
+
+def test_router_opens_one_settings_dialog_on_the_requested_toolbar_tab(
+    qt_application: QApplication,
+) -> None:
+    settings = AppSettings.default()
+    runtime = _Runtime()
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=SystemClock(), sink=runtime),
+        pointer_capture=_PointerCapture(),
+    )
+    session = ApplicationSession(
+        settings=settings,
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        runtime=runtime,
+        coordinator=coordinator,
+    )
+    window = MainWindow(WindowSpec(width=960, height=640, maximized=False))
+    router = QtApplicationEventRouter(window)
+    router.bind(session)
+
+    for action, expected_tab in (
+        (window.main_toolbar.mapping_action, SettingsTab.MAPPINGS),
+        (window.main_toolbar.connection_settings_action, SettingsTab.CONNECTION),
+        (window.main_toolbar.colors_action, SettingsTab.COLORS),
+    ):
+        action.trigger()
+        qt_application.processEvents()
+        dialog = window.active_settings_dialog
+        assert isinstance(dialog, SettingsDialog)
+        assert dialog.current_tab is expected_tab
+        dialog.reject()
+        qt_application.processEvents()
+        assert window.active_settings_dialog is None
 
 
 def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
@@ -379,8 +415,8 @@ def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
     window.main_toolbar.colors_action.trigger()
     qt_application.processEvents()
     cancelled = window.active_settings_dialog
-    assert isinstance(cancelled, ControllerColorsDialog)
-    assert cancelled.set_color("body", "#ABCDEF")
+    assert isinstance(cancelled, SettingsDialog)
+    assert cancelled.colors_page.set_color("body", "#ABCDEF")
     assert window.controller_preview.model is not None
     assert window.controller_preview.model.body_color == "#ABCDEF"
 
@@ -392,8 +428,8 @@ def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
     window.main_toolbar.colors_action.trigger()
     qt_application.processEvents()
     deferred = window.active_settings_dialog
-    assert isinstance(deferred, ControllerColorsDialog)
-    assert deferred.set_color("buttons", "#123456")
+    assert isinstance(deferred, SettingsDialog)
+    assert deferred.colors_page.set_color("buttons", "#123456")
     deferred.request_save()
     qt_application.processEvents()
     deferred_confirmation = deferred.reconnect_confirmation
@@ -410,8 +446,8 @@ def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(
     window.main_toolbar.colors_action.trigger()
     qt_application.processEvents()
     reconnecting = window.active_settings_dialog
-    assert isinstance(reconnecting, ControllerColorsDialog)
-    assert reconnecting.set_color("left_grip", "#654321")
+    assert isinstance(reconnecting, SettingsDialog)
+    assert reconnecting.colors_page.set_color("left_grip", "#654321")
     reconnecting.request_save()
     qt_application.processEvents()
     reconnect_confirmation = reconnecting.reconnect_confirmation
@@ -575,8 +611,9 @@ def test_router_opens_connection_settings_when_connection_is_not_configured(
     qt_application.processEvents()
 
     dialog = window.active_settings_dialog
-    assert isinstance(dialog, ConnectionDialog)
-    assert session.dialogs.model.kind is DialogKind.CONNECTION
+    assert isinstance(dialog, SettingsDialog)
+    assert dialog.current_tab is SettingsTab.CONNECTION
+    assert session.dialogs.model.kind is DialogKind.SETTINGS
 
     dialog.reject()
     qt_application.processEvents()

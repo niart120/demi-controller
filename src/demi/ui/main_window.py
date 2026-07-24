@@ -24,6 +24,7 @@ from demi.platform.windows_mouse_hook import WindowsMouseInputSuppressor
 from demi.platform.windows_raw_input import WindowsRawInputBackend
 from demi.ui.controller_preview import ControllerPreviewWidget
 from demi.ui.dialogs.connection import ConnectionDialog
+from demi.ui.dialogs.settings import SettingsDialog
 from demi.ui.status_bar import MainStatusBar, StatusBarState
 from demi.ui.toolbar import MainToolBar, ToolbarState
 
@@ -515,6 +516,9 @@ class MainWindow(QMainWindow):
         if isinstance(dialog, ConnectionDialog):
             dialog.set_adapters(snapshot.adapters)
             dialog.set_profile_exists(snapshot.controller_profile_exists)
+        elif isinstance(dialog, SettingsDialog):
+            dialog.connection_page.set_adapters(snapshot.adapters)
+            dialog.connection_page.set_profile_exists(snapshot.controller_profile_exists)
 
     def _on_input_evaluation_timeout(self) -> None:
         if not self._shutdown_started and self._input_coordinator is not None:

@@ -15,6 +15,7 @@ from demi.controller.events import RuntimeStopped
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog, PairingConfirmationDialog
 from demi.ui.dialogs.mapping import MappingDialog
+from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
 from demi.ui.localization import install_translators
 from demi.ui.main_window import MainWindow
 
@@ -148,9 +149,9 @@ class QtApplicationEventRouter:
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
         self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
-            mapping=self._create_mapping_dialog,
-            connection=self._create_connection_dialog,
-            colors=self._create_colors_dialog,
+            mapping=lambda parent: self._create_settings_dialog(SettingsTab.MAPPINGS, parent),
+            connection=lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent),
+            colors=lambda parent: self._create_settings_dialog(SettingsTab.COLORS, parent),
         )
         self.refresh()
 
@@ -204,10 +205,12 @@ class QtApplicationEventRouter:
         if session is not None:
             session.connection_action()
             if (
-                session.dialogs.model.kind is DialogKind.CONNECTION
+                session.dialogs.model.kind is DialogKind.SETTINGS
                 and self._window.active_settings_dialog is None
             ):
-                self._window.open_settings_dialog(self._create_connection_dialog)
+                self._window.open_settings_dialog(
+                    lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent)
+                )
             self.refresh()
 
     def _toggle_capture(self) -> None:
@@ -240,6 +243,52 @@ class QtApplicationEventRouter:
             on_dialog_opened=self._window.on_dialog_opened,
             on_save=self._save_settings,
             on_cancel=self._cancel_settings,
+            parent=parent,
+        )
+
+    def _create_settings_dialog(
+        self,
+        initial_tab: SettingsTab,
+        parent: QWidget,
+    ) -> SettingsDialog | None:
+        """Create the unified settings dialog on one requested tab."""
+        session = self._session
+        if session is None:
+            return None
+        editor = (
+            session.settings_modal.editor
+            if session.dialogs.model.kind is DialogKind.SETTINGS
+            else self._open_settings_editor(DialogKind.SETTINGS)
+        )
+        if editor is None:
+            return None
+        return self._settings_dialog(editor, initial_tab, parent)
+
+    def _settings_dialog(
+        self,
+        editor: SettingsEditor,
+        initial_tab: SettingsTab,
+        parent: QWidget,
+    ) -> SettingsDialog:
+        """Create one tabbed editor from an already-open session draft."""
+        session = self._session
+        connected = (
+            session is not None
+            and session.ui_snapshot.connection_state is ConnectionState.CONNECTED
+        )
+        return SettingsDialog(
+            editor,
+            initial_tab=initial_tab,
+            connected=connected,
+            on_rescan=self._rescan_adapters,
+            on_save=self._save_settings,
+            on_cancel=self._cancel_settings,
+            on_preview=self._window.set_controller_colors,
+            on_delete_profile=self._delete_controller_profile,
+            on_request_pairing=self._request_pairing,
+            on_defer_reconnect=self._defer_color_reconnect,
+            on_reconnect=self._request_color_reconnect,
+            on_dialog_opened=self._window.on_dialog_opened,
             parent=parent,
         )
 
@@ -362,7 +411,7 @@ class QtApplicationEventRouter:
             self.refresh()
             return
         self._window.replace_active_settings_dialog(
-            lambda parent: self._connection_dialog(editor, parent)
+            lambda parent: self._settings_dialog(editor, SettingsTab.CONNECTION, parent)
         )
         self.refresh()
 

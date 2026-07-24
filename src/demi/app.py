@@ -226,6 +226,7 @@ class ApplicationSession:
             settings.connection.adapter_id
         )
         self._startup_reconnect_discovery_complete = False
+        self._pairing_return_kind = DialogKind.SETTINGS
         if loaded is not None:
             self._presentation.set_recovery_notice(settings_recovery_notice(loaded))
         self._apply_live_settings(settings)
@@ -369,7 +370,7 @@ class ApplicationSession:
         connection = self._settings.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
             self._presentation.set_warning("Select a USB adapter to connect")
-            self.open_settings(DialogKind.CONNECTION)
+            self.open_settings(DialogKind.SETTINGS)
             return
         self._presentation.acknowledge_error()
         self._runtime.post(
@@ -418,16 +419,18 @@ class ApplicationSession:
 
     def request_pairing(self) -> bool:
         """Move an editable connection draft to its explicit confirmation step."""
-        if (
-            self._dialogs.model.kind is not DialogKind.CONNECTION
-            or self._settings_modal.editor is None
-        ):
+        kind = self._dialogs.model.kind
+        if kind not in {DialogKind.SETTINGS, DialogKind.CONNECTION}:
             return False
+        if self._settings_modal.editor is None:
+            return False
+        self._pairing_return_kind = kind
         return self._dialogs.replace(DialogKind.PAIRING_CONFIRMATION)
 
     def rescan_adapters(self) -> None:
         """Request fresh adapter discovery while a connection draft is open."""
         if self._dialogs.model.kind not in {
+            DialogKind.SETTINGS,
             DialogKind.CONNECTION,
             DialogKind.PAIRING_CONFIRMATION,
         }:
@@ -451,7 +454,7 @@ class ApplicationSession:
         """Return a pairing confirmation to its editable connection draft."""
         if self._dialogs.model.kind is not DialogKind.PAIRING_CONFIRMATION:
             return False
-        return self._dialogs.replace(DialogKind.CONNECTION)
+        return self._dialogs.replace(self._pairing_return_kind)
 
     def confirm_pairing(self) -> bool:
         """Persist a confirmed draft and post one explicit pairing command."""
@@ -461,7 +464,7 @@ class ApplicationSession:
         connection = editor.draft.connection
         if not connection.adapter_id or not self._presentation.has_adapter(connection.adapter_id):
             self._presentation.set_warning("Select a USB adapter to pair")
-            self._dialogs.replace(DialogKind.CONNECTION)
+            self._dialogs.replace(self._pairing_return_kind)
             return False
         if not self.save_settings():
             return False

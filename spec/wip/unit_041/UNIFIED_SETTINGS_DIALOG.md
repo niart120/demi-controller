@@ -87,8 +87,8 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| refactor-skipped | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | Settings menu階層はgreen。選択タブroutingは次の統合dialog cycleで確認 |
-| todo | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 色preview取消も確認 |
+| refactor-done | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | 3 factoryを統合dialogの初期tab指定へ変更 |
+| refactor-done | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 共通Save/Cancelと再接続確認を外側へ集約 |
 | refactor-skipped | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | `12 passed`。責務は既存editor内で完結しており追加整理なし |
 | refactor-skipped | Mappingsタブはtarget指定追加と選択行削除を標準controlから実行する | new | integration | `19 passed`。既存model/view境界へ行操作を追加し、別責務の抽出なし |
 | refactor-skipped | Connectionタブはprofile操作と全体設定を別groupで表示し、bond slotとtimeout controlを表示しない | new / regression | integration | `Controller profile`と`Global settings`へ分離し、旧controlを除去 |
@@ -98,6 +98,7 @@
 | refactor-skipped | connect、startup reconnect、pairingは固定profileパスと30秒timeoutを使う | regression | unit | 3 command経路を固定値へ統一。application境界の定数で完結 |
 | todo | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | catalog再生成を含む |
 | todo | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画 |
+| refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
 
 ## 7. 設計メモ
 
@@ -140,6 +141,8 @@
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `19 passed`。target指定追加、選択行削除、既存mapping操作 |
 | `uv run pytest tests/unit -q` | passed | `300 passed`。connection domain、codec旧設定互換、固定profile path、3 command経路を含む |
 | `uv run pytest tests/unit tests/integration/ui -q` | passed | `410 passed`。Connectionの区分、Save非接続、profile削除routingを含む |
+| `uv run pytest tests/unit tests/integration/ui -q` | passed | `414 passed`。統合3タブ、共有draft、初期tab、Esc取消を含む |
+| `uv run pytest tests/integration/ui/test_unified_settings_dialog.py tests/integration/ui/test_qt_runtime_events.py -q` | passed | `20 passed`。統合dialogのrefactor後回帰 |
 | TDD itemごとの対象pytest | not run | 実装前 |
 | `uv run pytest tests/unit` | not run | 実装前 |
 | `uv run pytest tests/integration` | not run | 実装前 |
