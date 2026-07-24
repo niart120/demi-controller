@@ -180,18 +180,27 @@ def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> N
     dpad_left = layout.controls["dpad_left"]
     dpad_right = layout.controls["dpad_right"]
     dpad_down = layout.controls["dpad_down"]
-    body_center_x = layout.body_bounds.left + layout.body_bounds.width / 2
-
-    assert layout.body_bounds.left <= layout.left_grip_bounds.left
-    assert layout.left_grip_bounds.right <= body_center_x
-    assert body_center_x <= layout.right_grip_bounds.left
-    assert layout.right_grip_bounds.right <= layout.body_bounds.right
     assert layout.left_grip_bounds.height > layout.left_grip_bounds.width
     assert layout.right_grip_bounds.height > layout.right_grip_bounds.width
     assert dpad_up.bottom > dpad_left.top
     assert dpad_up.bottom > dpad_right.top
     assert dpad_down.top < dpad_left.bottom
     assert dpad_down.top < dpad_right.bottom
+
+
+def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
+    layout = preview_layout(960, 600)
+
+    assert layout.left_grip_bounds.left < layout.body_bounds.left
+    assert layout.right_grip_bounds.right > layout.body_bounds.right
+    assert layout.left_grip_bounds.bottom <= layout.status_bounds.top
+    assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
+
+
+def test_controller_layout_places_the_left_stick_above_the_directional_pad() -> None:
+    layout = preview_layout(960, 600)
+
+    assert layout.controls["left_stick"].bottom <= layout.controls["dpad_up"].top
 
 
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(

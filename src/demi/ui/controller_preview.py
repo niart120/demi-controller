@@ -225,11 +225,15 @@ class ControllerPreviewWidget(QWidget):
         canvas_width = self.width()
         canvas_height = self.height()
         layout = preview_layout(canvas_width, canvas_height)
-        painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
+        silhouette = _controller_silhouette_path(layout)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(model.body_color))
-        painter.drawPath(_controller_silhouette_path(layout))
+        painter.drawPath(silhouette)
         self._draw_grip(painter, layout.left_grip_bounds, model.left_grip_color, left=True)
         self._draw_grip(painter, layout.right_grip_bounds, model.right_grip_color, left=False)
+        painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(silhouette)
         for control_id, bounds in layout.controls.items():
             if control_id in _STICK_CLICK_IDS or control_id.startswith("dpad_"):
                 continue
@@ -457,6 +461,8 @@ def _qrect(bounds: PreviewRect) -> QRectF:
 
 def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
+    left_grip = _qrect(layout.left_grip_bounds)
+    right_grip = _qrect(layout.right_grip_bounds)
     path = QPainterPath()
     path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
     path.lineTo(bounds.right() - bounds.width() * 0.14, bounds.top())
@@ -468,41 +474,39 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
         bounds.right(),
         bounds.top() + bounds.height() * 0.25,
     )
-    path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.49)
+    path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
     path.cubicTo(
-        bounds.right(),
-        bounds.top() + bounds.height() * 0.72,
+        right_grip.right(),
+        right_grip.top() + right_grip.height() * 0.18,
+        right_grip.right(),
+        right_grip.top() + right_grip.height() * 0.72,
+        right_grip.right() - right_grip.width() * 0.18,
+        right_grip.bottom(),
+    )
+    path.cubicTo(
+        right_grip.left() + right_grip.width() * 0.42,
+        right_grip.bottom(),
         bounds.right() - bounds.width() * 0.09,
         bounds.bottom(),
-        bounds.right() - bounds.width() * 0.26,
-        bounds.bottom(),
-    )
-    path.cubicTo(
-        bounds.right() - bounds.width() * 0.38,
-        bounds.bottom(),
-        bounds.right() - bounds.width() * 0.43,
-        bounds.bottom() - bounds.height() * 0.05,
         bounds.center().x() + bounds.width() * 0.06,
-        bounds.bottom() - bounds.height() * 0.05,
-    )
-    path.lineTo(
-        bounds.center().x() - bounds.width() * 0.06, bounds.bottom() - bounds.height() * 0.05
-    )
-    path.cubicTo(
-        bounds.left() + bounds.width() * 0.43,
-        bounds.bottom() - bounds.height() * 0.05,
-        bounds.left() + bounds.width() * 0.38,
-        bounds.bottom(),
-        bounds.left() + bounds.width() * 0.26,
         bounds.bottom(),
     )
+    path.lineTo(bounds.center().x() - bounds.width() * 0.06, bounds.bottom())
     path.cubicTo(
         bounds.left() + bounds.width() * 0.09,
         bounds.bottom(),
+        left_grip.right() - left_grip.width() * 0.42,
+        left_grip.bottom(),
+        left_grip.left() + left_grip.width() * 0.18,
+        left_grip.bottom(),
+    )
+    path.cubicTo(
+        left_grip.left(),
+        left_grip.top() + left_grip.height() * 0.72,
+        left_grip.left(),
+        left_grip.top() + left_grip.height() * 0.18,
         bounds.left(),
-        bounds.top() + bounds.height() * 0.72,
-        bounds.left(),
-        bounds.top() + bounds.height() * 0.49,
+        bounds.top() + bounds.height() * 0.60,
     )
     path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.25)
     path.cubicTo(
@@ -521,57 +525,57 @@ def _grip_path(bounds: PreviewRect, *, left: bool) -> QPainterPath:
     rect = _qrect(bounds)
     path = QPainterPath()
     if left:
-        path.moveTo(rect.left() + rect.width() * 0.22, rect.top())
-        path.lineTo(rect.right() - rect.width() * 0.14, rect.top())
+        path.moveTo(rect.right(), rect.top())
+        path.lineTo(rect.left() + rect.width() * 0.18, rect.top() + rect.height() * 0.12)
         path.cubicTo(
-            rect.right(),
-            rect.top() + rect.height() * 0.12,
-            rect.right(),
-            rect.top() + rect.height() * 0.54,
-            rect.right() - rect.width() * 0.15,
-            rect.top() + rect.height() * 0.80,
+            rect.left() + rect.width() * 0.02,
+            rect.top() + rect.height() * 0.30,
+            rect.left(),
+            rect.top() + rect.height() * 0.55,
+            rect.left() + rect.width() * 0.12,
+            rect.top() + rect.height() * 0.75,
         )
         path.cubicTo(
-            rect.right() - rect.width() * 0.29,
+            rect.left() + rect.width() * 0.24,
             rect.bottom(),
-            rect.left() + rect.width() * 0.36,
+            rect.left() + rect.width() * 0.52,
             rect.bottom(),
-            rect.left() + rect.width() * 0.17,
-            rect.top() + rect.height() * 0.78,
+            rect.left() + rect.width() * 0.70,
+            rect.top() + rect.height() * 0.84,
         )
         path.cubicTo(
-            rect.left(),
-            rect.top() + rect.height() * 0.53,
-            rect.left(),
-            rect.top() + rect.height() * 0.14,
-            rect.left() + rect.width() * 0.22,
+            rect.left() + rect.width() * 0.91,
+            rect.top() + rect.height() * 0.68,
+            rect.right(),
+            rect.top() + rect.height() * 0.35,
+            rect.right(),
             rect.top(),
         )
     else:
-        path.moveTo(rect.right() - rect.width() * 0.22, rect.top())
-        path.lineTo(rect.left() + rect.width() * 0.14, rect.top())
+        path.moveTo(rect.left(), rect.top())
+        path.lineTo(rect.right() - rect.width() * 0.18, rect.top() + rect.height() * 0.12)
         path.cubicTo(
-            rect.left(),
-            rect.top() + rect.height() * 0.12,
-            rect.left(),
-            rect.top() + rect.height() * 0.54,
-            rect.left() + rect.width() * 0.15,
-            rect.top() + rect.height() * 0.80,
+            rect.right() - rect.width() * 0.02,
+            rect.top() + rect.height() * 0.30,
+            rect.right(),
+            rect.top() + rect.height() * 0.55,
+            rect.right() - rect.width() * 0.12,
+            rect.top() + rect.height() * 0.75,
         )
         path.cubicTo(
-            rect.left() + rect.width() * 0.29,
+            rect.right() - rect.width() * 0.24,
             rect.bottom(),
-            rect.right() - rect.width() * 0.36,
+            rect.right() - rect.width() * 0.52,
             rect.bottom(),
-            rect.right() - rect.width() * 0.17,
-            rect.top() + rect.height() * 0.78,
+            rect.right() - rect.width() * 0.70,
+            rect.top() + rect.height() * 0.84,
         )
         path.cubicTo(
-            rect.right(),
-            rect.top() + rect.height() * 0.53,
-            rect.right(),
-            rect.top() + rect.height() * 0.14,
-            rect.right() - rect.width() * 0.22,
+            rect.right() - rect.width() * 0.91,
+            rect.top() + rect.height() * 0.68,
+            rect.left(),
+            rect.top() + rect.height() * 0.35,
+            rect.left(),
             rect.top(),
         )
     path.closeSubpath()
