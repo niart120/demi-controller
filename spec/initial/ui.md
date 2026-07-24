@@ -184,7 +184,7 @@ model/view controlを使い、binding rowやscroll領域を独自座標で描画
 - Remove列はQt標準のゴミ箱アイコンを中央表示し、tooltipで操作名を示す。同じ行だけを削除し、表外に選択行用の削除buttonを置かない。
 - `Esc` は取消。Esc自体を割り当てる場合は「Escを割り当てる」補助操作を使う。
 - 競合がある場合はsource、変更先、既存targetを列挙し、置換または取消を選ばせる。取消時はdraftを変更しない。
-- `F4` はマウス捕捉解除用である理由を対象行へ表示し、待受を継続する。`F12` は通常の入力として扱う。
+- `F5` はマウス入力切替用の予約キーであり、割り当て待受では候補にしない。`F4` と `F12` は通常の入力として扱う。
 - Bindings以外のtabへ移動した場合は待受を中止し、非表示の待受状態を残さない。
 - `Add binding` は `Buttons`、`Left stick`、`Right stick`、`Diagnostics` の分類menuを開く。targetを選ぶと未割り当て行を末尾へ追加する。
 - 複数の `KEY:UNASSIGNED` は入力競合として扱わない。
@@ -192,7 +192,7 @@ model/view controlを使い、binding rowやscroll領域を独自座標で描画
 
 ### 5.4 IMU 診断target
 
-`GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`ACCEL:ZERO` は通常のbinding行として一覧へ表示する。利用者は通常の行操作で同じtargetの追加・削除とsource変更ができる。角速度の変更と0G以外の加速度入力は扱わない。
+`GYRO:X_POSITIVE`、`GYRO:X_NEGATIVE`、`GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`IMU:NEUTRAL` は通常のbinding行として一覧へ表示する。利用者は通常の行操作で同じtargetの追加・削除とsource変更ができる。`IMU:NEUTRAL` は当該フレームをジャイロ `(0, 0, 0)`、加速度 `(0, 0, 1)` にする。
 
 ## 6. Mouse tab
 
@@ -298,7 +298,7 @@ Adapter: usb:0 | Connected | Input: Captured | 8 ms | warning
 | Tab / Shift+Tab | フォーカス移動 |
 | Enter / Space | ボタン実行 |
 | Esc | ダイアログ取消 |
-| F4 | マウス捕捉解除 |
+| F5 | マウス入力切替 |
 | F12 | 通常の割り当て入力 |
 | Ctrl+Q | 終了 |
 | Ctrl+C | マウス捕捉切替 |

@@ -34,8 +34,7 @@ def test_main_window_refreshes_toolbar_and_status_bar_from_application_snapshot(
 
     assert window.main_toolbar.connection_action.text() == "Disconnect"
     assert window.main_toolbar.connection_action.isEnabled()
-    assert window.main_toolbar.capture_action.text() == "Stop mouse"
-    assert window.main_toolbar.capture_action.isChecked()
+    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: ON (F5)"
     assert window.status_bar.adapter_label.text() == "Adapter: Bluetooth adapter"
     assert window.status_bar.connection_label.text() == "Connection: Connected"
     assert window.status_bar.capture_label.text() == "Mouse capture: On"
@@ -49,10 +48,8 @@ def test_main_window_prioritizes_primary_actions_connection_status_and_preview(
     window.show()
     qt_application.processEvents()
 
-    assert window.main_toolbar.actions()[:2] == [
-        window.main_toolbar.connection_action,
-        window.main_toolbar.capture_action,
-    ]
+    assert window.main_toolbar.actions()[0] is window.main_toolbar.connection_action
+    assert window.main_toolbar.actions()[1] is window.main_toolbar.mouse_input_status_action
     assert not window.main_toolbar.isMovable()
     assert not window.main_toolbar.isFloatable()
     assert (

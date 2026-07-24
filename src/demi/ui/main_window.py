@@ -122,7 +122,6 @@ class MainWindow(QMainWindow):
         self.addAction(self._quit_action)
         self._mouse_input_toggle_action = QAction(self)
         self._mouse_input_toggle_action.setShortcut(QKeySequence("F5"))
-        self._mouse_input_toggle_action.triggered.connect(self._toggle_input_capture)
         self.addAction(self._mouse_input_toggle_action)
         if spec.maximized:
             self.showMaximized()

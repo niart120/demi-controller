@@ -67,7 +67,7 @@ _BINDING_TARGET_GROUPS = (
     ),
     (
         "Diagnostics",
-        tuple(target for target in BindingTarget if target.value.startswith(("GYRO:", "ACCEL:"))),
+        tuple(target for target in BindingTarget if target.value.startswith(("GYRO:", "IMU:"))),
     ),
 )
 
@@ -399,7 +399,6 @@ class MappingDialog(QDialog):
         editor: SettingsEditor,
         *,
         on_dialog_opened: CaptureTransition | None = None,
-        on_release_capture: CaptureTransition | None = None,
         on_save: SettingsAction | None = None,
         on_cancel: SettingsAction | None = None,
         parent: QWidget | None = None,
@@ -410,7 +409,6 @@ class MappingDialog(QDialog):
             editor: Application-owned immutable settings draft editor.
             on_dialog_opened: Neutralizes controller capture before the dialog
                 accepts any input.
-            on_release_capture: Handles the fixed F4 capture-release action.
             on_save: Saves the application-owned draft and reports success.
             on_cancel: Discards the application-owned draft and reports success.
             parent: Optional Qt parent for dialog ownership.
@@ -419,7 +417,6 @@ class MappingDialog(QDialog):
         self.setWindowTitle(self.tr("Key mappings"))
         self._mapping_model = MappingTableModel(editor, self)
         self._on_dialog_opened = on_dialog_opened
-        self._on_release_capture = on_release_capture
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._capture_row: int | None = None

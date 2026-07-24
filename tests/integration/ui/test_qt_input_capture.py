@@ -266,7 +266,7 @@ def test_capture_suppresses_external_mouse_delivery_and_preserves_button_mapping
     assert suppressor.handle_message(WM_LBUTTONUP) is True
     assert publisher.state.is_source_active("MOUSE:LEFT") is False
 
-    window._mouse_input_toggle_action.trigger()
+    window._toggle_input_capture()
 
     assert coordinator.app_state is AppState.IDLE
     assert suppressor.active is False

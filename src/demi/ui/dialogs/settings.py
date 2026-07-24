@@ -55,7 +55,6 @@ class SettingsDialog(QDialog):
         on_defer_reconnect: Action,
         on_reconnect: Action,
         on_dialog_opened: Action | None = None,
-        on_release_capture: Action | None = None,
         parent: QWidget | None = None,
     ) -> None:
         """Create one modal that owns common Save and Cancel actions.
@@ -73,7 +72,6 @@ class SettingsDialog(QDialog):
             on_defer_reconnect: Keeps saved colors for a later connection.
             on_reconnect: Reconnects to apply saved colors.
             on_dialog_opened: Neutralizes active input capture.
-            on_release_capture: Executes the fixed capture-release action.
             parent: Optional Qt parent.
         """
         super().__init__(parent)
@@ -93,7 +91,6 @@ class SettingsDialog(QDialog):
         self.mapping_page = MappingDialog(
             editor,
             on_dialog_opened=on_dialog_opened,
-            on_release_capture=on_release_capture,
             on_cancel=self._cancel_from_page,
             parent=self,
         )

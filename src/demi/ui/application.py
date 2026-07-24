@@ -147,6 +147,9 @@ class QtApplicationEventRouter:
             session.settings.local_actions.connection
         )
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
+        self._window._mouse_input_toggle_action.triggered.connect(
+            lambda _checked=False: self._toggle_capture()
+        )
         self._window.bind_settings_dialog_factories(
             connection=lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent),
             bindings=lambda parent: self._create_settings_dialog(SettingsTab.BINDINGS, parent),
@@ -211,6 +214,13 @@ class QtApplicationEventRouter:
                 self._window.open_settings_dialog(
                     lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent)
                 )
+            self.refresh()
+
+    def _toggle_capture(self) -> None:
+        """Toggle input capture through the session and refresh the window."""
+        session = self._session
+        if session is not None:
+            session.toggle_capture()
             self.refresh()
 
     def _open_settings_editor(self, kind: DialogKind) -> SettingsEditor | None:
