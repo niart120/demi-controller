@@ -77,7 +77,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | refactor-skipped | Minus, Plus, Home, and Capture are equal circles smaller than ABXY | regression | unit | 直径80%以下、追加整理は不要 |
 | refactor-skipped | Misc controls form a symmetric shallow V | regression | unit | 上外側にMinus/Plus、下内側にHome/Capture |
 | refactor-skipped | The directional pad sits inward from the left stick and balances the right stick | regression | unit | 描画幅36%の位置、追加整理は不要 |
-| green | Default, mixed-input, and minimum states visually read as one compact controller body | visual | integration | 3状態で確認 |
+| refactor-skipped | Default, mixed-input, and minimum states visually read as one compact controller body | visual | integration | 3状態で確認、構造整理は対象外 |
 
 ## 7. 設計メモ
 
@@ -122,7 +122,18 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | `uv run pytest tests/unit/ui/test_controller_preview.py::test_directional_pad_sits_inward_and_balances_the_right_stick -q -p no:cacheprovider --basetemp tmp/pytest-unit048-dpad-red` | red | D-pad中心が左スティック中心より9.6px外側にあるため1 failed |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-dpad-green-attempt1` | pass | 52 passed、D-padを描画幅36%へ移動 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-dpad-attempt1` | pass | 通常幅と最小幅で左スティック右下と下段の左右バランスを確認 |
-| standard gate | not run | 完了前に実行する |
+| `uv sync --dev` | pass | 77 packages resolved、74 packages checked |
+| `uv lock --check` | pass | lock整合 |
+| `uv run ruff format --check .` | pass | 148 files already formatted |
+| `uv run ruff check .` | pass | lint errorなし |
+| `uv run ty check --no-progress` | pass | 型エラーなし |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit048-final-unit-gate` | pass | 329 passed |
+| `$env:PYTHONUTF8='1'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit048-final-integration-gate` | fail | 隔離環境のPyPI通信拒否によりpackage build 3件が失敗、その他129件は成功 |
+| `$env:PYTHONUTF8='1'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit048-final-integration-gate-network` | pass | 依存取得を許可して132 passed |
+| `uv build` | pass | sdistとwheelを生成 |
+| docs-quality-review residue scan | pass | 仮テキスト、会話依存語、未検証表現の残存なし |
+| `git diff --check` | pass | whitespace errorなし |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-final` | pass | 既定、複合入力、最小表示で最終状態を確認 |
 
 ## 10. 先送り事項
 
