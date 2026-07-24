@@ -71,5 +71,8 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Verify package contents
+        run: uv run python packaging/verify_distribution.py
+
       - name: Check whitespace
         run: git diff --check
