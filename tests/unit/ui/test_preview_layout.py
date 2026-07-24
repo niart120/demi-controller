@@ -99,7 +99,7 @@ def test_preview_layout_keeps_major_regions_inside_content_without_overlap(
 
 
 def test_preview_layout_reserves_readable_height_for_imu_at_minimum_window_size() -> None:
-    layout = preview_layout(800, 480)
+    layout = preview_layout(800, 475)
 
     assert layout.gyro_bounds.height >= 48.0
     assert layout.accel_bounds.height >= 48.0

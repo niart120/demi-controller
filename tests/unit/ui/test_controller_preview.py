@@ -387,7 +387,7 @@ def test_gyro_indicator_uses_signed_linear_tracks_instead_of_button_like_rings()
 
 
 def test_minimum_imu_layout_keeps_plots_below_a_readable_heading_band() -> None:
-    layout = preview_layout(800, 480)
+    layout = preview_layout(800, 475)
     gyro_bounds = preview_module._qrect(layout.gyro_bounds)
     accel_bounds = preview_module._qrect(layout.accel_bounds)
     display = accel_display(AccelG(0.0, 0.0, 1.0))
