@@ -236,6 +236,26 @@ def test_directional_pad_uses_one_connected_cross_path() -> None:
         assert path.contains(bounds.center())
 
 
+def test_face_controls_and_shoulders_keep_balanced_relative_proportions() -> None:
+    layout = preview_layout(960, 600)
+    controls = layout.controls
+    stick_diameter = controls["left_stick"].width
+    face_button_diameter = controls["a"].width
+    dpad_bounds = preview_module._directional_pad_path(layout).boundingRect()
+
+    assert dpad_bounds.width() <= stick_diameter * 1.2
+    assert dpad_bounds.height() <= stick_diameter * 1.2
+    for control_id in ("zl", "l", "r", "zr"):
+        assert controls[control_id].width <= face_button_diameter * 2.25
+
+    x_center = controls["x"].left + controls["x"].width / 2
+    y_center = controls["y"].left + controls["y"].width / 2
+    a_center = controls["a"].left + controls["a"].width / 2
+    b_center = controls["b"].left + controls["b"].width / 2
+    assert a_center - x_center == pytest.approx(x_center - y_center)
+    assert b_center == pytest.approx(x_center)
+
+
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(
     qt_application: object,
 ) -> None:
