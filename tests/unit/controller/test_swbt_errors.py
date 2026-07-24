@@ -10,6 +10,7 @@ from swbt import (
     InputState,
     InvalidInputError,
     InvalidKeyStoreError,
+    InvalidProfileError,
     TransportOpenError,
 )
 
@@ -108,9 +109,47 @@ def test_saved_bond_error_is_classified_as_bond_not_found() -> None:
     assert raised.value.category is ControllerErrorCategory.BOND_NOT_FOUND
 
 
+def test_invalid_swbt_profile_is_classified_as_saved_bond_error() -> None:
+    gamepad = FailingGamepad(open_error=InvalidProfileError())
+    adapter = SwbtControllerAdapter(gamepad_factory=lambda **_kwargs: gamepad)
+
+    with pytest.raises(ControllerAdapterError) as raised:
+        asyncio.run(
+            adapter.connect_saved(
+                "usb:0",
+                Path("legacy-or-invalid.json"),
+                30.0,
+                ControllerColorSettings(),
+            )
+        )
+
+    assert raised.value.category is ControllerErrorCategory.BOND_NOT_FOUND
+
+
+def test_existing_profile_path_is_not_reported_as_pairing_timeout() -> None:
+    async def reject_existing_profile(**_kwargs: object) -> FailingGamepad:
+        raise FileExistsError
+
+    adapter = SwbtControllerAdapter(profile_creator=reject_existing_profile)
+
+    with pytest.raises(ControllerAdapterError) as raised:
+        asyncio.run(
+            adapter.start_pairing(
+                "usb:0",
+                Path("existing-profile.json"),
+                30.0,
+                ControllerColorSettings(),
+            )
+        )
+
+    assert raised.value.category is ControllerErrorCategory.PAIRING_PROFILE_EXISTS
+
+
 def test_pairing_timeout_and_transport_open_errors_are_classified() -> None:
-    pairing_gamepad = FailingGamepad(connect_error=ConnectionTimeoutError())
-    pairing_adapter = SwbtControllerAdapter(gamepad_factory=lambda **_kwargs: pairing_gamepad)
+    async def fail_profile_creation(**_kwargs: object) -> FailingGamepad:
+        raise ConnectionTimeoutError
+
+    pairing_adapter = SwbtControllerAdapter(profile_creator=fail_profile_creation)
     with pytest.raises(ControllerAdapterError) as pairing_raised:
         asyncio.run(
             pairing_adapter.start_pairing(

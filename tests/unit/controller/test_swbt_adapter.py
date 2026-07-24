@@ -188,7 +188,8 @@ def test_adapter_info_and_project_colors_cross_the_public_boundary() -> None:
         ),
     )
     assert constructor_kwargs["adapter"] == "usb:0"
-    assert constructor_kwargs["key_store_path"] == "bond.json"
+    assert constructor_kwargs["profile_path"] == "bond.json"
+    assert "key_store_path" not in constructor_kwargs
     swbt_colors = constructor_kwargs["controller_colors"]
     assert isinstance(swbt_colors, ControllerColors)
     assert swbt_colors.body == 0xABCDEF
@@ -220,3 +221,64 @@ def test_direct_gamepad_constructor_omits_report_period() -> None:
     )
 
     assert "report_period_us" not in constructor_kwargs
+
+
+def test_new_pairing_uses_profile_creator_without_reopening_the_paired_gamepad() -> None:
+    creator_kwargs: dict[str, object] = {}
+
+    class PairedGamepad(RecordingGamepad):
+        async def open(self) -> None:
+            raise AssertionError
+
+        async def connect(
+            self,
+            *,
+            timeout: float | None = None,  # noqa: ASYNC109
+            allow_pairing: bool = False,
+        ) -> None:
+            del timeout, allow_pairing
+            raise AssertionError
+
+    gamepad = PairedGamepad()
+
+    async def profile_creator(**kwargs: object) -> RecordingGamepad:
+        creator_kwargs.update(kwargs)
+        return gamepad
+
+    def unexpected_constructor(**kwargs: object) -> RecordingGamepad:
+        del kwargs
+        raise AssertionError
+
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=unexpected_constructor,
+        profile_creator=profile_creator,
+        adapter_lister=lambda: (),
+    )
+    colors = ControllerColorSettings(
+        body="#ABCDEF",
+        buttons="#102030",
+        left_grip="#405060",
+        right_grip="#708090",
+    )
+
+    asyncio.run(
+        adapter.start_pairing(
+            "usb:0",
+            Path("new-profile.json"),
+            12.5,
+            colors,
+        )
+    )
+
+    assert creator_kwargs == {
+        "adapter": "usb:0",
+        "profile_path": "new-profile.json",
+        "local_address": None,
+        "pair_timeout": 12.5,
+        "controller_colors": ControllerColors(
+            body=0xABCDEF,
+            buttons=0x102030,
+            left_grip=0x405060,
+            right_grip=0x708090,
+        ),
+    }

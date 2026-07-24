@@ -354,12 +354,15 @@ ControllerRuntime.post()
 SwbtAdapter
   │
   ├── list_adapters()
-  ├── DirectProController(...)
-  ├── connect()/reconnect()
+  ├── DirectProController(profile_path=...)
+  ├── DirectProController.create_profile(...)
+  ├── reconnect()/connect(allow_pairing=True)
   ├── send(InputState)
   ├── send(rest InputState)
   └── close()
 ```
+
+`send()`はBumbleの送信キュー受理まで待つ。HCIの送信完了や対象機器への反映は待たない。
 
 `swbt` の例外は `ControllerFault` へ変換する。UIは例外クラス名に依存しない。
 

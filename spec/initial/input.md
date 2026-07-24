@@ -360,7 +360,11 @@ gyro_rate = GyroRate(0.0, 0.0, 0.0)
 accel_g = AccelG(0.0, 0.0, 1.0)
 ```
 
-接続直後、捕捉解除、フォーカス喪失、停止監視、切断前には、このIMUを含む完全な `InputState` を `send()` し、完了を待つ。現行swbt-pythonの `IMUFrame.neutral()` / `InputState.neutral()` は加速度も0にするため、定常的な静止状態の生成には使わない。rest送信成功後は `close(neutral=False)`、送信失敗時だけ `close(neutral=True)` を使う。
+接続直後、捕捉解除、フォーカス喪失、停止監視、切断前には、このIMUを含む完全な
+`InputState`を`send()`し、Bumbleの送信キュー受理を待つ。HCIの送信完了や対象機器への
+反映は待たない。現行swbt-pythonの`IMUFrame.neutral()` / `InputState.neutral()`は
+加速度も0にするため、定常的な静止状態の生成には使わない。rest送信成功後は
+`close(neutral=False)`、送信失敗時だけ`close(neutral=True)`を使う。
 
 | 項目 | 規則 |
 |---|---|

@@ -76,7 +76,9 @@ accel: (0, 0, +1) G
 virtual pitch: 0 rad
 ```
 
-主スレッドは `ControllerFrame` としてこの状態を生成し、接続ワーカーは完全な `InputState` へ変換して `send()` の完了を待つ。rest送信成功後は `close(neutral=False)`、送信失敗時だけ `close(neutral=True)` を最終フォールバックにする。
+主スレッドは `ControllerFrame` としてこの状態を生成し、接続ワーカーは完全な `InputState` へ
+変換して `send()` がBumbleの送信キューへ受理されるまで待つ。rest送信成功後は
+`close(neutral=False)`、送信失敗時だけ `close(neutral=True)` を最終フォールバックにする。
 
 ## 4. マウス捕捉開始
 
@@ -135,9 +137,9 @@ virtual pitch: 0 rad
 UI Connect
   -> validate adapter and slot
   -> state CONNECTING
-  -> worker constructs DirectProController
+  -> worker constructs DirectProController(profile_path=...)
   -> reconnect without pairing
-  -> send physical rest state and await completion
+  -> send physical rest state and await enqueue acceptance
   -> state CONNECTED
 ```
 
@@ -160,12 +162,19 @@ open connection dialog
   -> confirmation
   -> verify adapter
   -> state CONNECTING
-  -> connect(allow_pairing=True)
-  -> send physical rest state and await completion
+  -> if the slot is unused:
+       DirectProController.create_profile(local_address=None)
+       receive the paired controller without reopening it
+  -> else:
+       DirectProController(profile_path=...)
+       connect(allow_pairing=True)
+  -> send physical rest state and await enqueue acceptance
   -> state CONNECTED
 ```
 
-取消やタイムアウト時に空または部分的なボンドが残る可能性は、swbt-pythonの契約と実機試験で確認する。Project_Demiは既存ボンドを上書きする前にバックアップ名を確保する。
+取消やタイムアウト時も、swbtプロファイルは再試行用に残る。`create_profile()`は既存パスを
+上書きしない。swbt 0.4のkey-store JSONは互換でないため、利用者は未使用スロットを選ぶか、
+旧ファイルを明示削除してから再ペアリングする。
 
 ## 7. 切断
 

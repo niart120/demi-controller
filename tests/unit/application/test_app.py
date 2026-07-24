@@ -50,6 +50,13 @@ if TYPE_CHECKING:
     from demi.controller.adapter import ControllerAdapterFactory
 
 
+def test_existing_pairing_profile_has_a_specific_safe_message() -> None:
+    assert (
+        app_module._safe_error_message(ControllerErrorCategory.PAIRING_PROFILE_EXISTS)
+        == "Pairing profile slot already exists"
+    )
+
+
 @dataclass
 class FakeClock:
     """Deterministic monotonic clock."""

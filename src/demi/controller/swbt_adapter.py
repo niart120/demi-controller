@@ -1,7 +1,7 @@
 """swbt-python public API adapter for the controller runtime."""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import NoReturn, Protocol
 
@@ -18,6 +18,7 @@ from swbt import (
     InputState,
     InvalidInputError,
     InvalidKeyStoreError,
+    InvalidProfileError,
     Stick,
     SwbtError,
     TransportOpenError,
@@ -57,6 +58,7 @@ class SwbtGamepad(Protocol):
 
 
 type GamepadFactory = Callable[..., SwbtGamepad]
+type ProfileCreator = Callable[..., Awaitable[SwbtGamepad]]
 type AdapterLister = Callable[[], tuple[AdapterInfo, ...]]
 
 
@@ -89,15 +91,18 @@ class SwbtControllerAdapter(ControllerAdapter):
         self,
         *,
         gamepad_factory: GamepadFactory = DirectProController,
+        profile_creator: ProfileCreator = DirectProController.create_profile,
         adapter_lister: AdapterLister = list_adapters,
     ) -> None:
         """Initialize an adapter with injectable public-API boundaries.
 
         Args:
             gamepad_factory: Public swbt gamepad constructor.
+            profile_creator: Public swbt initial profile creation method.
             adapter_lister: Public swbt adapter discovery function.
         """
         self._gamepad_factory = gamepad_factory
+        self._profile_creator = profile_creator
         self._adapter_lister = adapter_lister
         self._gamepad: SwbtGamepad | None = None
         self._adapter_id: str | None = None
@@ -139,12 +144,30 @@ class SwbtControllerAdapter(ControllerAdapter):
         timeout_seconds: float,
         colors: ControllerColorSettings,
     ) -> None:
-        """Open a controller and allow explicit pairing."""
+        """Create a controller profile through explicit pairing."""
         try:
-            await self._connect_controller(adapter_id, bond_path, colors)
+            if _path_exists(bond_path):
+                await self._connect_controller(adapter_id, bond_path, colors)
+                self._timeout_seconds = timeout_seconds
+                await self._require_gamepad().connect(
+                    timeout=timeout_seconds,
+                    allow_pairing=True,
+                )
+                return
+            if self._gamepad is not None:
+                await self.disconnect()
+            gamepad = await self._profile_creator(
+                adapter=adapter_id,
+                profile_path=str(bond_path),
+                local_address=None,
+                pair_timeout=timeout_seconds,
+                controller_colors=to_swbt_colors(colors),
+            )
+            self._gamepad = gamepad
+            self._adapter_id = adapter_id
+            self._bond_path = bond_path
+            self._colors = colors
             self._timeout_seconds = timeout_seconds
-            gamepad = self._require_gamepad()
-            await gamepad.connect(timeout=timeout_seconds, allow_pairing=True)
         except Exception as error:  # noqa: BLE001
             await self._discard_failed_gamepad()
             _raise_adapter_failure(error, ControllerErrorCategory.PAIRING_TIMEOUT)
@@ -195,7 +218,7 @@ class SwbtControllerAdapter(ControllerAdapter):
             await self.disconnect()
         self._gamepad = self._gamepad_factory(
             adapter=adapter_id,
-            key_store_path=str(bond_path),
+            profile_path=str(bond_path),
             controller_colors=to_swbt_colors(colors),
         )
         self._adapter_id = adapter_id
@@ -305,6 +328,10 @@ def _hex_color(value: str) -> int:
     return int(value.removeprefix("#"), 16)
 
 
+def _path_exists(path: Path) -> bool:
+    return path.exists()
+
+
 def _raise_adapter_failure(
     error: Exception,
     fallback: ControllerErrorCategory,
@@ -312,7 +339,9 @@ def _raise_adapter_failure(
     """Raise a safe adapter failure classified from a swbt exception."""
     if isinstance(error, (AdapterDiscoveryError, TransportOpenError)):
         category = ControllerErrorCategory.ADAPTER_OPEN_FAILED
-    elif isinstance(error, InvalidKeyStoreError):
+    elif isinstance(error, FileExistsError):
+        category = ControllerErrorCategory.PAIRING_PROFILE_EXISTS
+    elif isinstance(error, (InvalidKeyStoreError, InvalidProfileError)):
         category = ControllerErrorCategory.BOND_NOT_FOUND
     elif isinstance(error, InvalidInputError):
         category = ControllerErrorCategory.INVALID_INPUT
