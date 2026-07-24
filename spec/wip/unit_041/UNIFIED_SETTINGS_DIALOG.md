@@ -15,6 +15,9 @@
 | user request | キーバインディング行を追加・削除できるようにする | conversation |
 | user request | 接続設定の保存時に自動接続しない | conversation |
 | user request | 接続プロファイル削除、ボンドスロット除去、プロファイル設定と全体設定の区別、接続タイムアウトの非公開化 | conversation |
+| user review | 削除操作と反転トグルをbinding行へ置き、行との対応を明確にする | conversation |
+| user review | `Bindings` / `Mouse gyro` の入れ子をなくし、`Mouse` をSettings直下へ置く | conversation |
+| user review | binding追加UIを利用者の選択負荷と画面占有の観点から再検討する | conversation |
 | initial design | Qt標準部品、単一モーダル、draftの保存・取消契約 | `spec/initial/ui.md` |
 | initial design | 設定 schema と旧設定読み込み | `spec/initial/configuration.md` |
 
@@ -23,9 +26,10 @@
 | actor / boundary | 入力または状態 | 期待する観測結果 | 制約 |
 |---|---|---|---|
 | 利用者 | ツールバーの `Settings` から項目を選ぶ | 1つの設定ダイアログが選択したタブを表示する | 設定ダイアログは同時に1つだけ |
-| 利用者 | 設定ダイアログ内でタブを切り替える | 同じdraftの編集を維持したまま3設定面を移動できる | 非表示のキー入力待受を残さない |
+| 利用者 | 設定ダイアログ内でタブを切り替える | 同じdraftの編集を維持したまま4設定面を移動できる | 非表示のキー入力待受を残さない |
 | 利用者 | 割り当て対象を選んで行を追加する | 未割り当て入力を持つ新しいbinding行が追加される | targetを選ばず暗黙追加しない |
-| 利用者 | binding行を選んで削除する | 選択した行だけがdraftから削除される | 選択がない場合は削除不可 |
+| 利用者 | binding行の削除操作を実行する | 操作した行だけがdraftから削除される | 選択行と別の場所に削除buttonを置かない |
+| 利用者 | binding行の反転トグルを操作する | その行が反転可能な場合だけ値を変更できる | 反転不可のtargetにはトグルを表示しない |
 | 利用者 | 接続設定で `Save` を選ぶ | 設定が保存され、接続commandは発行されない | 接続はメイン画面の接続操作で明示する |
 | 利用者 | 保存済み接続プロファイルを削除する | 確認後に固定プロファイルファイルが削除され、未保存表示になる | 設定ファイルと入力profileは削除しない |
 | 設定読込 | 旧schema v1に `bond_slot` / `timeout_seconds` がある | 旧値を利用者設定として採用せず、他の設定を読み込める | schema識別子はv1を維持する |
@@ -34,9 +38,10 @@
 ## 2. 対象範囲
 
 - ツールバーの `Settings` 階層と3つの子action。
-- `Mappings`、`Connection`、`Colors` の3タブを持つ単一設定ダイアログ。
+- `Bindings`、`Mouse`、`Connection`、`Colors` の4タブを持つ単一設定ダイアログ。
 - 1つの設定draftをタブ間で共有する保存・取消処理。
-- binding行のtarget指定追加と選択行削除。
+- binding行内の反転トグルと削除操作。
+- binding targetを分類して選択する追加操作。
 - Connectionタブの `Controller profile` と `Global settings` の視覚的な分離。
 - 設定保存と接続command発行の分離。
 - 固定Pro Controller接続プロファイルの存在表示、確認付き削除。
@@ -72,10 +77,12 @@
 | 振る舞い | 入力・状態 | 期待結果 | 備考 |
 |---|---|---|---|
 | 設定階層 | toolbarが操作可能 | `Settings` の子に `Mappings`、`Connection`、`Colors` が順に表示される | 3 actionは独立したトップレベルに置かない |
-| 初期タブ | 各子actionを実行 | 同じ種類の設定ダイアログが開き、選択したタブが前面になる | 既に開いている場合は2つ目を開かない |
+| 初期タブ | 各子actionを実行 | 同じ種類の設定ダイアログが開き、`Mappings`は`Bindings`、他は対応するタブが前面になる | 既に開いている場合は2つ目を開かない |
 | draft共有 | 複数タブで値を変更して保存 | 全変更を1回の保存で永続化する | 取消時は全変更を破棄し、色previewも保存値へ戻す |
-| binding追加 | targetを選択して追加 | `KEY:UNASSIGNED`、amount `1.0`、非反転の行を末尾へ追加する | targetは全 `BindingTarget` から選べる |
-| binding削除 | 行を選択して削除 | 対象行だけを削除し、残りの順序を維持する | 不正indexではdraftを変更しない |
+| binding追加 | 分類された一覧からtargetを選択 | `KEY:UNASSIGNED`、amount `1.0`、非反転の行を末尾へ追加する | 常設のtarget選択欄で表の横幅を消費しない |
+| binding削除 | 行内の削除操作を実行 | 対象行だけを削除し、残りの順序を維持する | 不正indexではdraftを変更しない |
+| binding反転 | 行内の反転トグルを操作 | button targetだけが更新され、stickと診断targetは変更不可 | 表外の選択行用checkboxを置かない |
+| タブ平坦化 | 設定ダイアログを開く | `Bindings`、`Mouse`、`Connection`、`Colors` が同じ階層に並ぶ | `Mappings`内の入れ子タブを表示しない |
 | 未割り当て競合 | 未割り当て行が複数ある | `KEY:UNASSIGNED` 同士を競合として扱わない | 実入力sourceの競合判定は維持する |
 | Connection区分 | Connectionタブを表示 | 接続プロファイル操作と全体設定を別groupで表示する | adapter、起動時再接続、診断レベルは全体設定 |
 | 保存 | 有効なConnection draftで `Save` | repositoryへ保存してダイアログを閉じ、`ConnectSaved` を発行しない | adapter未検出でも保存済み選択値は保存可能 |
@@ -99,11 +106,16 @@
 | refactor-skipped | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | `153 finished`、localizationとcatalogの`3 passed` |
 | refactor-skipped | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画3状態で切れ、重なり、操作欠落なし |
 | refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
+| refactor-done | Inverted列は反転可能な行だけ標準チェック状態を表示し、その場でdraftを更新する | regression | unit / integration | 表外checkboxと選択行同期を除去。Spaceと標準delegateの更新経路を使用 |
+| todo | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonを除去 |
+| todo | Settingsは`Bindings`、`Mouse`、`Connection`、`Colors`を入れ子なしで表示する | regression | integration | `Mappings` actionは`Bindings`を初期表示 |
+| todo | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換する候補を画像確認 |
 
 ## 7. 設計メモ
 
 - `Settings` はツールバー上の `QToolButton` と `QMenu` で階層を表す。子actionは既存の利用者向け名称を `Connection` に揃える。
-- 単一の設定ダイアログが `QTabWidget` と共通の `QDialogButtonBox` を所有する。各設定面はダイアログを閉じず、共有editorだけを更新する。
+- 単一の設定ダイアログが4タブの `QTabWidget` と共通の `QDialogButtonBox` を所有する。`Mappings`用の入れ子タブは作らず、`Bindings`と`Mouse`を同じ階層に置く。各設定面はダイアログを閉じず、共有editorだけを更新する。
+- 反転と削除は対象行の値・操作なので表内に置く。追加は行がまだ存在しないため表外に置くが、target分類を開いたときだけ選択肢を表示する。
 - 接続プロファイルは `SettingsPaths` が返す固定ファイル1個とする。入力mappingの `InputProfile` とは別概念であり、Connectionタブでは `Controller profile` と明記する。
 - 接続タイムアウトはcontroller command境界で30秒を指定する内部定数とし、`ConnectionSettings` とTOMLから外す。
 - schema識別子は `demi.settings/v1` のままとする。decoderは旧2keyを任意keyとして受理するが値を解釈しない。
@@ -158,6 +170,7 @@
 | `git diff --check` | passed | 空白エラーなし |
 | `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | `[TODO]`、`TBD`、`xxx`なし |
 | `rg`による廃止UI文言と部品名の残存検索 | passed | 旧schema互換とcontroller command内部値を除き残存なし |
+| `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `20 passed`。行内Invertedトグルと既存mapping操作 |
 
 ## 10. 先送り事項
 
