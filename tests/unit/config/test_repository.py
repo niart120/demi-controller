@@ -60,11 +60,12 @@ def test_load_migrates_missing_default_diagnostics_without_rewriting_settings_fi
     assert result.status is SettingsLoadStatus.MIGRATED
     assert result.settings.profiles[0].bindings[:28] == legacy_bindings
     assert [binding.target for binding in result.settings.profiles[0].bindings[28:]] == [
-        BindingTarget.GYRO_Y_NEGATIVE,
+        BindingTarget.GYRO_X_POSITIVE,
+        BindingTarget.GYRO_X_NEGATIVE,
         BindingTarget.GYRO_Y_POSITIVE,
         BindingTarget.GYRO_Z_POSITIVE,
         BindingTarget.GYRO_Z_NEGATIVE,
-        BindingTarget.ACCEL_ZERO,
+        BindingTarget.IMU_NEUTRAL,
     ]
     assert paths.settings_file.read_text(encoding="utf-8") == saved_text
 

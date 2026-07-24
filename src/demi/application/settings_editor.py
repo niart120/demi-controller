@@ -282,7 +282,6 @@ class SettingsEditor:
             *self._draft.local_actions.toggle_capture,
             *self._draft.local_actions.quit,
             *self._draft.local_actions.connection,
-            *self._draft.local_actions.release_capture,
         )
         local_action_set = set(local_actions)
         for index, binding in enumerate(profile.bindings):
