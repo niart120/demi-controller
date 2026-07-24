@@ -162,13 +162,13 @@ model/view controlを使い、binding rowやscroll領域を独自座標で描画
 │ キー割り当て                     [×]         │
 ├──────────────────────────────────────────────┤
 │ [割り当てを追加 ▾]          [標準に戻す]    │
-│ 対象      入力    反転  競合   操作    削除   │
-│ A         F       [ ]          [変更] [削除] │
-│ B         V       [ ]          [変更] [削除] │
+│ 対象      入力    反転  操作    競合    削除   │
+│ A         F       [ ]  [変更]           [🗑]  │
+│ B         V       [ ]  [変更]           [🗑]  │
 │ ...                                          │
-│ 左スティック上 W        [変更] [削除]        │
-│ 診断ジャイロY- I        [変更] [削除]        │
-│ 診断加速度0G O          [変更] [削除]        │
+│ 左スティック上 W        [変更]          [🗑]  │
+│ 診断ジャイロY- I        [変更]          [🗑]  │
+│ 診断加速度0G O          [変更]          [🗑]  │
 │ ...                                          │
 └──────────────────────────────────────────────┘
 ```
@@ -181,7 +181,7 @@ model/view controlを使い、binding rowやscroll領域を独自座標で描画
 - 対象行の入力列へ入力待ち状態、操作列へ「取消」を表示する。表外の取得buttonと固定対象labelは設けない。
 - 次のキーまたはマウスボタンを候補表示する。
 - Inverted列はボタン割り当ての行だけチェック可能にする。スティック方向と診断targetの行にはチェックを表示しない。
-- Remove列の操作は同じ行だけを削除する。表外に選択行用の削除buttonを置かない。
+- Remove列はQt標準のゴミ箱アイコンを中央表示し、tooltipで操作名を示す。同じ行だけを削除し、表外に選択行用の削除buttonを置かない。
 - `Esc` は取消。Esc自体を割り当てる場合は「Escを割り当てる」補助操作を使う。
 - 競合がある場合はsource、変更先、既存targetを列挙し、置換または取消を選ばせる。取消時はdraftを変更しない。
 - `F4` はマウス捕捉解除用である理由を対象行へ表示し、待受を継続する。`F12` は通常の入力として扱う。
@@ -209,20 +209,20 @@ model/view controlを使い、binding rowやscroll領域を独自座標で描画
 
 ## 7. Connection tab
 
-`QGroupBox`、`QComboBox`、`QCheckBox` を使う。接続プロファイル操作とアプリケーション全体の設定を別groupで表示する。adapter 0件ではpairingを無効にし、Saveと再検索を有効に保つ。
+`QGroupBox`、`QComboBox`、`QCheckBox` を使う。アプリケーション全体の設定を上、接続プロファイル操作を下の別groupで表示する。adapter 0件ではpairingを無効にし、Saveと再検索を有効に保つ。
 
 項目:
 
 ```text
-Controller profile
-  Controller type: Pro Controller
-  Status: Saved / Not saved
-  [Pair new controller] [Delete profile]
-
 Global settings
   USB adapter: [usb:0 ... ▾] [Rescan]
   Reconnect on startup: [ ]
   Diagnostic log level: INFO
+
+Controller profile
+  Controller type: Pro Controller
+  Status: Saved / Not saved
+  [Pair new controller] [Delete profile]
 ```
 
 Saveは設定だけを保存し、接続を開始しない。接続はメイン画面の接続actionで明示する。接続プロファイルのパスと30秒timeoutはUIへ表示しない。`Pair new controller` と `Delete profile` は確認画面を挟む。

@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
@@ -78,16 +79,30 @@ class MappingActionDelegate(QStyledItemDelegate):
         self,
         *,
         on_activated: RowAction,
+        center_decoration: bool = False,
         parent: QObject | None = None,
     ) -> None:
         """Create a delegate that reports the activated model row.
 
         Args:
             on_activated: Command receiving the activated binding row.
+            center_decoration: Whether to center an icon-only cell decoration.
             parent: Optional Qt owner.
         """
         super().__init__(parent)
         self._on_activated = on_activated
+        self._center_decoration = center_decoration
+
+    @override
+    def initStyleOption(
+        self,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
+        """Center an icon-only action when requested."""
+        super().initStyleOption(option, index)
+        if self._center_decoration:
+            option.decorationAlignment = Qt.AlignmentFlag.AlignCenter
 
     @override
     def editorEvent(
@@ -171,6 +186,13 @@ class MappingTableModel(QAbstractTableModel):
                 return Qt.CheckState.Checked if binding.inverted else Qt.CheckState.Unchecked
             if role == Qt.ItemDataRole.DisplayRole:
                 return None
+        if index.column() == 5:
+            if role == Qt.ItemDataRole.DecorationRole:
+                return QApplication.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon)
+            if role == Qt.ItemDataRole.ToolTipRole:
+                return self.tr("Remove")
+            if role == Qt.ItemDataRole.DisplayRole:
+                return None
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         input_text = (
@@ -185,7 +207,7 @@ class MappingTableModel(QAbstractTableModel):
             None,
             action_text,
             self._row_status.get(index.row()) or self._conflict_text(index.row()),
-            self.tr("Remove"),
+            None,
         )
         return values[index.column()]
 
@@ -422,6 +444,7 @@ class MappingDialog(QDialog):
         )
         self._remove_binding_delegate = MappingActionDelegate(
             on_activated=self._remove_binding_row,
+            center_decoration=True,
             parent=self.table,
         )
         self.table.setItemDelegateForColumn(3, self._mapping_action_delegate)

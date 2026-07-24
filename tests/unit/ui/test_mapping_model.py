@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 
 from demi.application.settings_editor import SettingsEditor
 from demi.domain.settings import AppSettings
@@ -14,8 +15,7 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.rowCount() == 33
     assert model.columnCount() == 6
     assert [
-        model.headerData(column, Qt.Orientation.Horizontal)
-        for column in range(model.columnCount())
+        model.headerData(column, Qt.Orientation.Horizontal) for column in range(model.columnCount())
     ] == ["Target", "Input", "Inverted", "Action", "Conflict", "Remove"]
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DisplayRole) == "BUTTON:A"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "F"
@@ -29,8 +29,6 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "I"
     assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
     assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
-    assert model.data(model.index(0, 5), Qt.ItemDataRole.DisplayRole) == "Remove"
-
     model.update_source(0, "KEY:1")
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:1"
@@ -39,6 +37,20 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     model.update_source(32, "KEY:P")
 
     assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
+
+
+def test_mapping_model_exposes_remove_as_an_icon_with_a_text_tooltip(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    model = MappingTableModel(SettingsEditor(AppSettings.default()))
+    remove_index = model.index(0, 5)
+
+    assert model.data(remove_index, Qt.ItemDataRole.DisplayRole) is None
+    assert model.data(remove_index, Qt.ItemDataRole.ToolTipRole) == "Remove"
+    icon = model.data(remove_index, Qt.ItemDataRole.DecorationRole)
+    assert isinstance(icon, QIcon)
+    assert not icon.isNull()
 
     model.restore_default_profile()
 
