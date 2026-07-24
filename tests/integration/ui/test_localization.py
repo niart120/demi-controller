@@ -33,7 +33,7 @@ def test_default_user_interface_uses_english_source_text(
         on_reconnect=lambda: None,
     )
     assert window.main_toolbar.connection_action.text() == "Connect"
-    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: OFF (F5)"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
     assert window.main_toolbar.settings_button.text() == "Settings"
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
         "Connection",

@@ -97,6 +97,7 @@ class ControllerPreviewModel:
     accel_display: SensorDisplay
     capture_active: bool
     pointer_capture_active: bool
+    mouse_input_active: bool
     control_ids: frozenset[str]
 
 
@@ -130,6 +131,7 @@ def controller_preview_model(
         accel_display=accel_display(frame.accel_g),
         capture_active=frame.capture_active,
         pointer_capture_active=frame.pointer_capture_active,
+        mouse_input_active=frame.pointer_capture_active,
         control_ids=CONTROL_IDS,
     )
 
@@ -315,16 +317,17 @@ class ControllerPreviewWidget(QWidget):
         bounds: PreviewRect,
     ) -> None:
         translate = QCoreApplication.translate
-        keyboard = translate("ControllerPreviewWidget", "Keyboard input")
-        mouse = translate("ControllerPreviewWidget", "Mouse capture")
         on = translate("ControllerPreviewWidget", "On")
         off = translate("ControllerPreviewWidget", "Off")
+        mouse_input = translate("ControllerPreviewWidget", "Mouse input")
+        mouse_color = "#176B3A" if model.mouse_input_active else "#7A1F1F"
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
+        painter.setBrush(QColor(mouse_color))
+        painter.drawRoundedRect(_qrect(bounds), 5.0, 5.0)
         painter.drawText(
             _qrect(bounds),
             Qt.AlignmentFlag.AlignCenter,
-            f"{keyboard}: {on if model.capture_active else off}  ·  "
-            f"{mouse}: {on if model.pointer_capture_active else off}",
+            f"{mouse_input}: {on if model.mouse_input_active else off} (F5)",
         )
 
     def _draw_sensors(

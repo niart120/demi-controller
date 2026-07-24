@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMenu, QToolBar, QToolButton, QWidget
+from PySide6.QtWidgets import QMenu, QToolBar, QToolButton, QWidget
 
 from demi.application.state import AppState, ConnectionState
 
@@ -40,9 +40,6 @@ class MainToolBar(QToolBar):
         self.setMovable(False)
         self.setFloatable(False)
         self.connection_action = QAction(self.tr("Connect"), self)
-        self.mouse_input_status = QLabel(self)
-        self.mouse_input_status.setObjectName("mouse-input-status")
-        self.mouse_input_status.setMinimumWidth(132)
         self.connection_settings_action = QAction(self.tr("Connection"), self)
         self.bindings_action = QAction(self.tr("Bindings"), self)
         self.mouse_action = QAction(self.tr("Mouse"), self)
@@ -64,7 +61,6 @@ class MainToolBar(QToolBar):
         for action in (self.connection_action,):
             action.setEnabled(False)
             self.addAction(action)
-        self.mouse_input_status_action = self.addWidget(self.mouse_input_status)
         for action in self.settings_menu.actions():
             action.setEnabled(False)
         self.settings_action = self.addWidget(self.settings_button)
@@ -79,7 +75,6 @@ class MainToolBar(QToolBar):
         connection_state = state.connection_state
         application_state = state.application_state
         is_connected = connection_state is ConnectionState.CONNECTED
-        is_captured = application_state is AppState.CAPTURED
         interaction_available = not state.dialog_open and application_state not in {
             AppState.SHUTTING_DOWN,
             AppState.STOPPED,
@@ -93,18 +88,6 @@ class MainToolBar(QToolBar):
             self.tr("Disconnect") if is_connected else self.tr("Connect")
         )
         self.connection_action.setEnabled(connection_available)
-        mouse_state = (
-            self.tr("Mouse input: ON (F5)") if is_captured else self.tr("Mouse input: OFF (F5)")
-        )
-        mouse_color = "#176B3A" if is_captured else "#7A1F1F"
-        self.mouse_input_status.setText(mouse_state)
-        self.mouse_input_status.setStyleSheet(
-            f"background: {mouse_color}; color: white; font-weight: bold; "
-            "padding: 4px 8px; border-radius: 3px;"
-        )
-        self.mouse_input_status.setAccessibleName(mouse_state)
-        self.mouse_input_status.setEnabled(interaction_available)
-        self.mouse_input_status_action.setEnabled(interaction_available)
         for action in (
             self.connection_settings_action,
             self.bindings_action,

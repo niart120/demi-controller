@@ -110,6 +110,7 @@ def test_preview_model_and_widget_reflect_one_complete_frame_and_four_colors(
     assert model.accel_display == accel_display(frame.accel_g)
     assert model.capture_active is True
     assert model.pointer_capture_active is True
+    assert model.mouse_input_active is True
 
     widget = ControllerPreviewWidget(colors=colors)
     widget.resize(640, 360)
@@ -161,6 +162,7 @@ def test_preview_keeps_keyboard_operation_independent_from_pointer_capture() -> 
 
     assert model.capture_active is True
     assert model.pointer_capture_active is False
+    assert model.mouse_input_active is False
 
 
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(

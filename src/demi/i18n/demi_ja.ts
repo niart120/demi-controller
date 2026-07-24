@@ -203,9 +203,9 @@
         <translation>キーボード入力</translation>
     </message>
     <message>
-        <location filename="../ui/controller_preview.py" line="319"/>
-        <source>Mouse capture</source>
-        <translation>マウス捕捉</translation>
+        <location filename="../ui/controller_preview.py" line="322"/>
+        <source>Mouse input</source>
+        <translation>マウス入力</translation>
     </message>
     <message>
         <location filename="../ui/controller_preview.py" line="320"/>

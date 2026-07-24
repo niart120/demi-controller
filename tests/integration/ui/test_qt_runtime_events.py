@@ -173,7 +173,7 @@ def test_f5_pointer_toggle_refreshes_the_bound_toolbar(
 
     window._mouse_input_toggle_action.trigger()
     assert coordinator.app_state is AppState.CAPTURED
-    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: ON (F5)"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
     QCoreApplication.sendEvent(
         window,
@@ -183,7 +183,7 @@ def test_f5_pointer_toggle_refreshes_the_bound_toolbar(
 
     window._mouse_input_toggle_action.trigger()
     assert coordinator.app_state is AppState.IDLE
-    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: OFF (F5)"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
 
 @pytest.mark.parametrize(
@@ -495,12 +495,12 @@ def test_router_binds_connection_and_capture_toolbar_actions_to_the_session(
     window._mouse_input_toggle_action.trigger()
     assert coordinator.is_captured
     assert runtime.frames[-1].capture_active
-    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: ON (F5)"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
     window._mouse_input_toggle_action.trigger()
     assert not coordinator.is_captured
     assert runtime.frames[-1].capture_active
-    assert window.main_toolbar.mouse_input_status.text() == "Mouse input: OFF (F5)"
+    assert not hasattr(window.main_toolbar, "mouse_input_status")
 
     window.main_toolbar.connection_action.trigger()
     assert isinstance(runtime.commands[-1], ConnectSaved)
@@ -761,7 +761,6 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     assert session.ui_snapshot.connection_state is ConnectionState.STOPPED
     assert runtime.frames[-1].capture_active is False
     assert not window.main_toolbar.connection_action.isEnabled()
-    assert not window.main_toolbar.mouse_input_status_action.isEnabled()
     assert not window.main_toolbar.bindings_action.isEnabled()
     assert not window.main_toolbar.mouse_action.isEnabled()
     assert not window.main_toolbar.connection_settings_action.isEnabled()
