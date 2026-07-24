@@ -105,6 +105,20 @@ def test_preview_layout_reserves_readable_height_for_imu_at_minimum_window_size(
     assert layout.accel_bounds.height >= 90.0
 
 
+@pytest.mark.parametrize("size", [(960, 600), (800, 475)])
+def test_controller_status_and_imu_share_one_horizontal_column(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
+
+    assert layout.body_bounds.left == pytest.approx(layout.status_bounds.left)
+    assert layout.status_bounds.left == pytest.approx(layout.gyro_bounds.left)
+    assert layout.body_bounds.right == pytest.approx(layout.status_bounds.right)
+    assert layout.status_bounds.right == pytest.approx(layout.accel_bounds.right)
+    assert layout.gyro_bounds.width == pytest.approx(layout.accel_bounds.width)
+    assert layout.gyro_bounds.right < layout.accel_bounds.left
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

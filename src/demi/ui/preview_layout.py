@@ -132,11 +132,11 @@ def preview_layout(width: int, height: int) -> PreviewLayout:
     return PreviewLayout(
         content_bounds=content_bounds,
         body_bounds=_scaled_rect(content_bounds, 0.18, 0.00, 0.64, 0.65),
-        left_grip_bounds=_scaled_rect(content_bounds, 0.17, 0.30, 0.16, 0.39),
-        right_grip_bounds=_scaled_rect(content_bounds, 0.67, 0.30, 0.16, 0.39),
+        left_grip_bounds=_scaled_rect(content_bounds, 0.18, 0.30, 0.16, 0.39),
+        right_grip_bounds=_scaled_rect(content_bounds, 0.66, 0.30, 0.16, 0.39),
         status_bounds=_scaled_rect(content_bounds, 0.18, 0.71, 0.64, 0.045),
-        gyro_bounds=_scaled_rect(content_bounds, 0.06, 0.78, 0.40, 0.20),
-        accel_bounds=_scaled_rect(content_bounds, 0.54, 0.78, 0.40, 0.20),
+        gyro_bounds=_scaled_rect(content_bounds, 0.18, 0.78, 0.30, 0.20),
+        accel_bounds=_scaled_rect(content_bounds, 0.52, 0.78, 0.30, 0.20),
         controls=controls,
     )
 

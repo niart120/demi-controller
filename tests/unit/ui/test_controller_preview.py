@@ -214,11 +214,11 @@ def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> N
     assert dpad_down.top < dpad_right.bottom
 
 
-def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
+def test_controller_layout_keeps_rounded_grips_within_the_faceplate_width() -> None:
     layout = preview_layout(960, 600)
 
-    assert layout.left_grip_bounds.left < layout.body_bounds.left
-    assert layout.right_grip_bounds.right > layout.body_bounds.right
+    assert layout.left_grip_bounds.left == pytest.approx(layout.body_bounds.left)
+    assert layout.right_grip_bounds.right == pytest.approx(layout.body_bounds.right)
     assert layout.left_grip_bounds.bottom <= layout.status_bounds.top
     assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
 

@@ -54,10 +54,10 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | Grip regions stay within the body horizontal bounds | regression | unit | 左右対称 |
-| todo | Body, mouse status, and combined IMU regions share both horizontal edges | regression | unit | 中央カラム |
-| todo | Gyro and acceleration regions have equal widths and a center gap | regression | unit | 高さは変更しない |
-| todo | Default, mixed-input, and minimum states retain readable plots in one aligned column | visual | integration | `inspect-gui-states` |
+| refactor-skipped | Grip regions stay within the body horizontal bounds | regression | unit | 本体左右端と一致、追加整理は不要 |
+| refactor-skipped | Body, mouse status, and combined IMU regions share both horizontal edges | regression | unit | 描画幅18%〜82%、追加整理は不要 |
+| refactor-skipped | Gyro and acceleration regions have equal widths and a center gap | regression | unit | 各30%、中央4%、追加整理は不要 |
+| refactor-skipped | Default, mixed-input, and minimum states retain readable plots in one aligned column | visual | integration | 3状態で確認、構造整理は対象外 |
 
 ## 7. 設計メモ
 
@@ -79,8 +79,11 @@
 | command | result | notes |
 |---|---|---|
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_049-baseline` | pass | グリップが本体より外側へ張り出し、IMU全体がMouse inputより左右へ広がる基準状態を確認 |
-| targeted pytest | not run | TDD項目ごとに記録する |
-| `inspect-gui-states` capture | not run | 基準画像と修正後を別出力先へ撮影する |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_controller_layout_keeps_rounded_grips_within_the_faceplate_width -q -p no:cacheprovider --basetemp tmp/pytest-unit049-grips-red` | red | 左グリップが本体左端より9.6px外側にあるため1 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit049-grips-green-attempt2` | pass | 52 passed、左右グリップ外端を本体端へ整列 |
+| `uv run pytest tests/unit/ui/test_preview_layout.py::test_controller_status_and_imu_share_one_horizontal_column -q -p no:cacheprovider --basetemp tmp/pytest-unit049-column-red` | red | IMU左端がMouse input左端より115.2px外側にあるため2 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit049-column-green` | pass | 54 passed、共通左右端とIMU等幅分割を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_049-column-attempt1` | pass | 既定、複合入力、最小表示で内向きグリップと中央カラムを確認 |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項
@@ -90,6 +93,6 @@
 ## 11. チェックリスト
 
 - [x] 対象範囲と対象外を確認した
-- [ ] TDD Test Listを更新した
-- [ ] 検証結果または未実行理由を記録した
+- [x] TDD Test Listを更新した
+- [x] 検証結果または未実行理由を記録した
 - [x] package / release / public APIは変更対象外であることを確認した
