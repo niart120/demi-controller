@@ -85,7 +85,7 @@
 | `src/demi/ui/controller_preview.py` | modify | 上部外形、状態文言、加速度投影 |
 | `tests/unit/ui/test_preview_layout.py` | modify | 最小領域と配置 |
 | `tests/unit/ui/test_controller_preview.py` | modify | 外形比率、ABXY、文言、軸投影 |
-| `tests/integration/package/test_translation_catalog.py` | modify | 必要な場合のみ翻訳実行時検査 |
+| `tests/integration/package/test_translation_catalog.py` | inspect | 既存の日本語catalog検査を確認、変更不要 |
 | `spec/initial/ui.md` | modify | 修正後のUI契約 |
 
 ## 9. 検証
@@ -105,7 +105,17 @@
 | `uv run pytest tests/unit/ui/test_preview_layout.py::test_preview_layout_reserves_readable_height_for_imu_at_minimum_window_size tests/unit/ui/test_controller_preview.py::test_acceleration_indicator_composes_three_axes_into_one_vector -q -p no:cacheprovider --basetemp tmp/pytest-unit047-imu-red` | red | IMU高さ48.45px、+Xが上向きのため2 failed |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-imu-green` | pass | 48 passed、最小表示95pxと右Joy-Con軸投影を確認 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-imu-green` | pass | 通常幅と最小幅でIMU拡大、+X右上、+Y右下、+Z下を確認 |
-| standard gate | not run | 完了前に実行する |
+| `uv sync --dev` | pass | 77 packages resolved、74 packages checked |
+| `uv lock --check` | pass | lock整合 |
+| `uv run ruff format --check .` | pass | 148 files already formatted |
+| `uv run ruff check .` | pass | lint errorなし |
+| `uv run ty check --no-progress` | pass | 型エラーなし |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit047-unit-gate` | pass | 325 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit047-integration-gate` | fail | 隔離環境のPyPI通信拒否と日本語エラーのcp932復号でpackage build 3件が失敗 |
+| `$env:PYTHONUTF8='1'; uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit047-integration-gate-network` | pass | 132 passed、依存取得を許可して再実行 |
+| `uv build` | pass | sdistとwheelを生成 |
+| `git diff --check` | pass | whitespace errorなし |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-final` | pass | 既定、複合入力、最小表示で最終状態を確認 |
 
 ## 10. 先送り事項
 
