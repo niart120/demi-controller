@@ -19,6 +19,7 @@ from demi.application.settings_modal import SettingsModalController
 from demi.application.state import AppState
 from demi.config.errors import SettingsPersistenceError
 from demi.domain.controller import ControllerFrame
+from demi.domain.mapping import BindingTarget
 from demi.domain.settings import AppSettings, InputSettings, MouseSettings
 from demi.input.publisher import InputPublisher
 from demi.input.qt_adapter import QtInputAdapter
@@ -466,6 +467,42 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
 
     dialog.close()
     qt_application.processEvents()
+
+
+def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original_bindings = editor.draft.profiles[0].bindings
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.rowCount() == len(original_bindings)
+    selection_model = dialog.table.selectionModel()
+    assert selection_model is not None
+    selection_model.clearCurrentIndex()
+    qt_application.processEvents()
+    assert not dialog.remove_binding_button.isEnabled()
+    target_index = dialog.target_combo.findData(BindingTarget.RIGHT_STICK_UP)
+    assert target_index >= 0
+    dialog.target_combo.setCurrentIndex(target_index)
+
+    dialog.add_binding_button.click()
+    qt_application.processEvents()
+
+    added_row = len(original_bindings)
+    assert dialog.mapping_model.rowCount() == added_row + 1
+    assert dialog.table.currentIndex().row() == added_row
+    assert dialog.remove_binding_button.isEnabled()
+    assert editor.draft.profiles[0].bindings[added_row].target is BindingTarget.RIGHT_STICK_UP
+    assert editor.draft.profiles[0].bindings[added_row].source == "KEY:UNASSIGNED"
+
+    dialog.remove_binding_button.click()
+    qt_application.processEvents()
+
+    assert dialog.mapping_model.rowCount() == len(original_bindings)
+    assert editor.draft.profiles[0].bindings == original_bindings
 
 
 def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(

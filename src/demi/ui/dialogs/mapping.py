@@ -19,11 +19,13 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QMessageBox,
@@ -42,7 +44,7 @@ from demi.application.settings_editor import (
     SettingsEditor,
 )
 from demi.domain.errors import DomainValueError
-from demi.domain.mapping import Binding, is_button_target
+from demi.domain.mapping import Binding, BindingTarget, is_button_target
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 
 _ROOT_INDEX = QModelIndex()
@@ -265,6 +267,25 @@ class MappingTableModel(QAbstractTableModel):
         self._row_status.clear()
         self._reset_from_editor()
 
+    def add_binding(self, target: BindingTarget) -> None:
+        """Append one unassigned row for a selected binding target."""
+        if not isinstance(target, BindingTarget):
+            raise DomainValueError
+        row = self.rowCount()
+        self.beginInsertRows(_ROOT_INDEX, row, row)
+        self._editor.add_binding(target)
+        self.endInsertRows()
+
+    def remove_binding(self, row: int) -> None:
+        """Remove one existing binding row."""
+        if not 0 <= row < self.rowCount():
+            raise DomainValueError
+        self.beginRemoveRows(_ROOT_INDEX, row, row)
+        self._editor.remove_binding(row)
+        self._capture_row = None
+        self._row_status.clear()
+        self.endRemoveRows()
+
     def conflict_summary(self) -> str:
         """Return all current conflicts as visible, line-separated text."""
         return "\n".join(self._format_conflict(conflict) for conflict in self._editor.conflicts())
@@ -357,6 +378,12 @@ class MappingDialog(QDialog):
         table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
         self.inverted_checkbox.setEnabled(False)
+        self.target_combo = QComboBox(self)
+        for target in BindingTarget:
+            self.target_combo.addItem(target.value, target)
+        self.add_binding_button = QPushButton(self.tr("Add binding"), self)
+        self.remove_binding_button = QPushButton(self.tr("Remove binding"), self)
+        self.remove_binding_button.setEnabled(False)
         mouse_settings = editor.draft.input.mouse
         self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
@@ -399,6 +426,12 @@ class MappingDialog(QDialog):
         bindings_layout = QVBoxLayout(bindings_page)
         bindings_layout.addWidget(self.table)
         bindings_layout.addWidget(self.inverted_checkbox)
+        binding_actions = QHBoxLayout()
+        binding_actions.addWidget(QLabel(self.tr("Target"), bindings_page))
+        binding_actions.addWidget(self.target_combo, 1)
+        binding_actions.addWidget(self.add_binding_button)
+        binding_actions.addWidget(self.remove_binding_button)
+        bindings_layout.addLayout(binding_actions)
         bindings_layout.addWidget(self.restore_button)
         mouse_page = QWidget(self)
         mouse_layout = QVBoxLayout(mouse_page)
@@ -433,12 +466,15 @@ class MappingDialog(QDialog):
 
         self.assign_escape_action.triggered.connect(self.assign_escape)
         self.tabs.currentChanged.connect(self._handle_tab_changed)
+        self.add_binding_button.clicked.connect(self.add_binding)
+        self.remove_binding_button.clicked.connect(self.remove_selected_binding)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
         selection_model = self.table.selectionModel()
         if selection_model is not None:
             selection_model.currentRowChanged.connect(self._sync_inverted_checkbox)
+            selection_model.currentRowChanged.connect(self._sync_binding_row_actions)
         self.inverted_checkbox.toggled.connect(self.set_inverted)
         self.mouse_gyro_enabled_checkbox.toggled.connect(
             lambda enabled: editor.update_mouse(gyro_enabled=enabled)
@@ -508,6 +544,35 @@ class MappingDialog(QDialog):
         self._mapping_model.restore_default_profile()
         self._capture_row = None
         self._mapping_model.cancel_capture()
+
+    def add_binding(self) -> None:
+        """Append and select an unassigned row for the chosen target."""
+        self.cancel_capture()
+        target = self.target_combo.currentData()
+        try:
+            selected_target = target if isinstance(target, BindingTarget) else BindingTarget(target)
+            self._mapping_model.add_binding(selected_target)
+        except (DomainValueError, ValueError):
+            return
+        self.table.selectRow(self._mapping_model.rowCount() - 1)
+
+    def remove_selected_binding(self) -> None:
+        """Remove the selected binding row while preserving surrounding order."""
+        selected = self.table.currentIndex()
+        if not selected.isValid():
+            return
+        self.cancel_capture()
+        row = selected.row()
+        try:
+            self._mapping_model.remove_binding(row)
+        except DomainValueError:
+            return
+        remaining = self._mapping_model.rowCount()
+        if remaining:
+            self.table.selectRow(min(row, remaining - 1))
+        else:
+            self.remove_binding_button.setEnabled(False)
+            self.inverted_checkbox.setEnabled(False)
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -703,6 +768,9 @@ class MappingDialog(QDialog):
             self.inverted_checkbox.setChecked(self._mapping_model.inverted_at(current.row()))
         finally:
             self._updating_inverted = False
+
+    def _sync_binding_row_actions(self, current: QModelIndex, _previous: QModelIndex) -> None:
+        self.remove_binding_button.setEnabled(current.isValid())
 
     def _handle_conflict_confirmation(self, button: QAbstractButton) -> None:
         confirmation = self._conflict_confirmation
