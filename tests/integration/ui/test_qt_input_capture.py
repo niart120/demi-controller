@@ -120,7 +120,7 @@ def test_keyboard_input_reaches_evaluated_frame_without_pointer_capture(
     coordinator.begin_shutdown()
 
 
-def test_f4_releases_pointer_while_focus_dialog_and_shutdown_neutralize_all_input(
+def test_f5_toggles_pointer_while_focus_dialog_and_shutdown_neutralize_all_input(
     qt_application: object,
 ) -> None:
     assert qt_application is not None
@@ -132,7 +132,7 @@ def test_f4_releases_pointer_while_focus_dialog_and_shutdown_neutralize_all_inpu
     adapter = QtInputAdapter(
         state=publisher.state,
         is_captured=lambda: coordinator.is_captured,
-        on_stop_capture=coordinator.stop_capture,
+        on_toggle_capture=coordinator.toggle_capture,
         on_focus_lost=coordinator.on_focus_lost,
         on_focus_gained=coordinator.on_focus_gained,
         on_dialog_opened=coordinator.open_configuration,
@@ -143,7 +143,7 @@ def test_f4_releases_pointer_while_focus_dialog_and_shutdown_neutralize_all_inpu
     publisher.state.press_key("F")
     publisher.state.add_mouse_motion(4.0, -2.0)
 
-    adapter.eventFilter(target, _key_event(Qt.Key.Key_F4))
+    adapter.eventFilter(target, _key_event(Qt.Key.Key_F5))
 
     assert coordinator.app_state is AppState.IDLE
     assert sink.frames[-1].capture_active is True
@@ -266,7 +266,7 @@ def test_capture_suppresses_external_mouse_delivery_and_preserves_button_mapping
     assert suppressor.handle_message(WM_LBUTTONUP) is True
     assert publisher.state.is_source_active("MOUSE:LEFT") is False
 
-    QCoreApplication.sendEvent(window, _key_event(Qt.Key.Key_F4))
+    window._mouse_input_toggle_action.trigger()
 
     assert coordinator.app_state is AppState.IDLE
     assert suppressor.active is False

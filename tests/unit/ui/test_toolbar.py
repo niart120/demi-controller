@@ -22,9 +22,9 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
 
     assert toolbar.connection_action.text() == "Connect"
     assert toolbar.connection_action.isEnabled() is True
-    assert toolbar.capture_action.text() == "Start mouse"
-    assert toolbar.capture_action.isChecked() is False
-    assert toolbar.capture_action.isEnabled() is True
+    assert not hasattr(toolbar, "capture_action")
+    assert toolbar.mouse_input_status.text() == "Mouse input: OFF (F5)"
+    assert "#7A1F1F" in toolbar.mouse_input_status.styleSheet()
     assert isinstance(toolbar.settings_button, QToolButton)
     assert toolbar.settings_button.text() == "Settings"
     assert isinstance(toolbar.settings_menu, QMenu)
@@ -62,9 +62,8 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
 
     assert toolbar.connection_action.text() == "Disconnect"
     assert toolbar.connection_action.isEnabled() is True
-    assert toolbar.capture_action.text() == "Stop mouse"
-    assert toolbar.capture_action.isChecked() is True
-    assert toolbar.capture_action.isEnabled() is True
+    assert toolbar.mouse_input_status.text() == "Mouse input: ON (F5)"
+    assert "#176B3A" in toolbar.mouse_input_status.styleSheet()
     assert toolbar.bindings_action.isEnabled() is True
 
     toolbar.refresh(
@@ -76,7 +75,6 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
     )
 
     assert toolbar.connection_action.isEnabled() is False
-    assert toolbar.capture_action.isEnabled() is False
     assert toolbar.connection_settings_action.isEnabled() is False
     assert toolbar.bindings_action.isEnabled() is False
     assert toolbar.mouse_action.isEnabled() is False

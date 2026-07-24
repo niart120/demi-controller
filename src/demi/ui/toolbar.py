@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QMenu, QToolBar, QToolButton, QWidget
+from PySide6.QtWidgets import QLabel, QMenu, QToolBar, QToolButton, QWidget
 
 from demi.application.state import AppState, ConnectionState
 
@@ -40,8 +40,9 @@ class MainToolBar(QToolBar):
         self.setMovable(False)
         self.setFloatable(False)
         self.connection_action = QAction(self.tr("Connect"), self)
-        self.capture_action = QAction(self.tr("Start mouse"), self)
-        self.capture_action.setCheckable(True)
+        self.mouse_input_status = QLabel(self)
+        self.mouse_input_status.setObjectName("mouse-input-status")
+        self.mouse_input_status.setMinimumWidth(132)
         self.connection_settings_action = QAction(self.tr("Connection"), self)
         self.bindings_action = QAction(self.tr("Bindings"), self)
         self.mouse_action = QAction(self.tr("Mouse"), self)
@@ -60,9 +61,10 @@ class MainToolBar(QToolBar):
         self.settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.settings_button.setMenu(self.settings_menu)
         self.settings_button.setEnabled(False)
-        for action in (self.connection_action, self.capture_action):
+        for action in (self.connection_action,):
             action.setEnabled(False)
             self.addAction(action)
+        self.mouse_input_status_action = self.addWidget(self.mouse_input_status)
         for action in self.settings_menu.actions():
             action.setEnabled(False)
         self.settings_action = self.addWidget(self.settings_button)
@@ -86,20 +88,25 @@ class MainToolBar(QToolBar):
             connection_state in {ConnectionState.READY, ConnectionState.CONNECTED}
             or (connection_state is ConnectionState.ERROR and state.connection_retryable)
         )
-        capture_available = interaction_available and application_state in {
-            AppState.IDLE,
-            AppState.CAPTURED,
-        }
 
         self.connection_action.setText(
             self.tr("Disconnect") if is_connected else self.tr("Connect")
         )
         self.connection_action.setEnabled(connection_available)
-        self.capture_action.setText(
-            self.tr("Stop mouse") if is_captured else self.tr("Start mouse")
+        mouse_state = (
+            self.tr("Mouse input: ON (F5)")
+            if is_captured
+            else self.tr("Mouse input: OFF (F5)")
         )
-        self.capture_action.setChecked(is_captured)
-        self.capture_action.setEnabled(capture_available)
+        mouse_color = "#176B3A" if is_captured else "#7A1F1F"
+        self.mouse_input_status.setText(mouse_state)
+        self.mouse_input_status.setStyleSheet(
+            f"background: {mouse_color}; color: white; font-weight: bold; "
+            "padding: 4px 8px; border-radius: 3px;"
+        )
+        self.mouse_input_status.setAccessibleName(mouse_state)
+        self.mouse_input_status.setEnabled(interaction_available)
+        self.mouse_input_status_action.setEnabled(interaction_available)
         for action in (
             self.connection_settings_action,
             self.bindings_action,
@@ -127,11 +134,3 @@ class MainToolBar(QToolBar):
         """
         self.connection_action.setShortcuts([QKeySequence(shortcut) for shortcut in shortcuts])
 
-    def bind_capture_action(self, callback: Callable[[], object]) -> None:
-        """Route enabled capture action requests to the application layer.
-
-        Args:
-            callback: Semantic capture-toggle request owned by the application
-                layer.
-        """
-        self.capture_action.triggered.connect(lambda _checked=False: callback())

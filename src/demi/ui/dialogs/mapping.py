@@ -135,7 +135,7 @@ class MappingActionDelegate(QStyledItemDelegate):
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("Target", "Input", "Inverted", "Action", "Conflict", "Remove")
+    _HEADERS = ("Target", "Input", "Inverted", "Action", "Conflict", "")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -827,14 +827,12 @@ class MappingDialog(QDialog):
                 self.cancel_capture()
                 event.accept()
                 return True
-            if event.key() == Qt.Key.Key_F4 and "KEY:F4" in RESERVED_BINDING_SOURCES:
+            if event.key() == Qt.Key.Key_F5 and "KEY:F5" in RESERVED_BINDING_SOURCES:
                 if self._capture_row is not None:
                     self._mapping_model.set_row_status(
                         self._capture_row,
-                        self.tr("F4 is reserved for mouse capture release"),
+                        self.tr("F5 is reserved for mouse input toggle"),
                     )
-                else:
-                    _invoke(self._on_release_capture)
                 event.accept()
                 return True
             return self._capture_source(key_source_for_event(event))

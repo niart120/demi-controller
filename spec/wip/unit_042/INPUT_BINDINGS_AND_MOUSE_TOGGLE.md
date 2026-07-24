@@ -58,9 +58,9 @@
 |---|---|---|---|---|
 | refactor-skipped | Default profile exposes X-positive=U, X-negative=O, and IMU-neutral=P without ACCEL:ZERO | regression | unit | mapping | red: enum absent; green: 2026-07-24 |
 | refactor-skipped | Held IMU-neutral produces physical neutral IMU and overrides active diagnostic rotation | new | unit | input | green: 2026-07-24 |
-| todo | Bindings table has a blank remove header and colors swatches keep their size hint at wider dialog widths | regression | integration | ui |
-| todo | F5 toggles pointer capture, F4 has no capture side effect, and no Start mouse action exists | regression | integration | ui |
-| todo | Main window visibly distinguishes enabled and disabled mouse input | new | integration | ui | visual review follows |
+| refactor-skipped | Bindings table has a blank remove header and colors swatches keep their size hint at wider dialog widths | regression | integration | ui | green: 2026-07-24 |
+| refactor-skipped | F5 toggles pointer capture, F4 has no capture side effect, and no Start mouse action exists | regression | integration | ui | green: 2026-07-24 |
+| refactor-skipped | Main window visibly distinguishes enabled and disabled mouse input | new | integration | ui | widget assertion green; visual review follows |
 
 ## 7. 設計メモ
 
@@ -87,6 +87,7 @@
 |---|---|---|
 | `uv run pytest tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | pass | 40 passed |
 | `uv run ruff check src/demi/domain/mapping.py src/demi/input/mapper.py src/demi/input/publisher.py tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py` | pass | targeted static check |
+| `uv run pytest tests/unit/ui/test_toolbar.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_qt_input_capture.py -q -p no:cacheprovider` | pass | 13 passed |
 | GUI state capture | not run | 実装後にWindows描画で確認 |
 | standard gate | not run | 完了前に実行 |
 
