@@ -3,7 +3,7 @@
 from math import hypot, isfinite
 from typing import Literal
 
-from demi.domain.controller import LogicalButton, StickVector
+from demi.domain.controller import GyroRate, LogicalButton, StickVector
 from demi.domain.errors import DomainValueError
 from demi.domain.mapping import (
     BindingTarget,
@@ -64,13 +64,13 @@ def synthesize_diagnostic_rotation_intent(
     )
 
 
-def is_accel_zero_active(
+def synthesize_diagnostic_gyro_rate(
     profile: InputProfile,
     state: PhysicalInputState,
     *,
     capture_active: bool = True,
-) -> bool:
-    """Return whether an active binding requests a zero-G diagnostic frame.
+) -> GyroRate:
+    """Return direct local-axis diagnostic gyro output.
 
     Args:
         profile: Profile whose diagnostic bindings are evaluated.
@@ -78,10 +78,32 @@ def is_accel_zero_active(
         capture_active: Disable the diagnostic input when false.
 
     Returns:
-        Whether the final frame acceleration should be overridden with zero.
+        Direct local-axis gyro rate for the current evaluation.
     """
+    if not capture_active:
+        return GyroRate(0.0, 0.0, 0.0)
+    active_targets = {
+        binding.target for binding in profile.bindings if state.is_source_active(binding.source)
+    }
+    x_direction = float(BindingTarget.GYRO_X_POSITIVE in active_targets) - float(
+        BindingTarget.GYRO_X_NEGATIVE in active_targets
+    )
+    return GyroRate(
+        x_direction * DIAGNOSTIC_GYRO_RADIANS_PER_SECOND,
+        0.0,
+        0.0,
+    )
+
+
+def is_imu_neutral_active(
+    profile: InputProfile,
+    state: PhysicalInputState,
+    *,
+    capture_active: bool = True,
+) -> bool:
+    """Return whether the current evaluation requests physical neutral IMU."""
     return capture_active and any(
-        binding.target is BindingTarget.ACCEL_ZERO and state.is_source_active(binding.source)
+        binding.target is BindingTarget.IMU_NEUTRAL and state.is_source_active(binding.source)
         for binding in profile.bindings
     )
 

@@ -26,7 +26,7 @@
 
 - Remove列の見出しを空文字列にする。
 - Colorsの色ボタンをフォームの余剰幅へ伸ばさない。
-- `GYRO:X_POSITIVE => KEY:U`、`GYRO:Y_NEGATIVE => KEY:O`、`IMU:NEUTRAL => KEY:P` を既定プロファイルへ追加する。
+- `GYRO:X_POSITIVE => KEY:U`、`GYRO:X_NEGATIVE => KEY:O`、`IMU:NEUTRAL => KEY:P` を既定プロファイルへ追加する。
 - `ACCEL:ZERO` targetとゼロG上書きを削除し、`IMU:NEUTRAL` がgyro `(0, 0, 0)` とaccel `(0, 0, 1)` を出力する。
 - Start mouseツールバーactionとF4解除を削除し、F5で捕捉を切り替える。
 - メイン画面でマウス入力の有効・無効を高コントラストな専用状態表示で示す。
@@ -47,7 +47,7 @@
 
 | 振る舞い | 入力・状態 | 期待結果 | 備考 |
 |---|---|---|---|
-| IMU既定割当 | Default profile | X正=U、Y負=O、ニュートラル=P | ACCEL:ZEROなし |
+| IMU既定割当 | Default profile | X正=U、X負=O、ニュートラル=P | ACCEL:ZEROなし |
 | IMUニュートラル | Pを保持して捕捉中 | gyroが全軸0、accelがZ=1 | 他の診断入力より優先する |
 | F5切替 | 設定ダイアログなし | 捕捉状態を反転する | 割り当て候補ではない |
 | マウス状態表示 | IDLE/CAPTURED | 色と文言で有効状態を区別できる | ツールバーの開始ボタンを用いない |
@@ -56,8 +56,8 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | Default profile exposes X-positive=U, Y-negative=O, and IMU-neutral=P without ACCEL:ZERO | regression | unit | mapping |
-| todo | Held IMU-neutral produces physical neutral IMU and overrides active diagnostic rotation | new | unit | input |
+| refactor-skipped | Default profile exposes X-positive=U, X-negative=O, and IMU-neutral=P without ACCEL:ZERO | regression | unit | mapping | red: enum absent; green: 2026-07-24 |
+| refactor-skipped | Held IMU-neutral produces physical neutral IMU and overrides active diagnostic rotation | new | unit | input | green: 2026-07-24 |
 | todo | Bindings table has a blank remove header and colors swatches keep their size hint at wider dialog widths | regression | integration | ui |
 | todo | F5 toggles pointer capture, F4 has no capture side effect, and no Start mouse action exists | regression | integration | ui |
 | todo | Main window visibly distinguishes enabled and disabled mouse input | new | integration | ui | visual review follows |
@@ -85,7 +85,8 @@
 
 | command | result | notes |
 |---|---|---|
-| TDD targeted pytest | not run | 実装前 |
+| `uv run pytest tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | pass | 40 passed |
+| `uv run ruff check src/demi/domain/mapping.py src/demi/input/mapper.py src/demi/input/publisher.py tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py` | pass | targeted static check |
 | GUI state capture | not run | 実装後にWindows描画で確認 |
 | standard gate | not run | 完了前に実行 |
 
