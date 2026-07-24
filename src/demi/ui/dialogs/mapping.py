@@ -149,6 +149,15 @@ class MappingTableModel(QAbstractTableModel):
             Qt.ItemDataRole.AccessibleDescriptionRole,
         }:
             return binding.source
+        if index.column() == 2:
+            if role == Qt.ItemDataRole.CheckStateRole and is_button_target(binding.target):
+                return (
+                    Qt.CheckState.Checked
+                    if binding.inverted
+                    else Qt.CheckState.Unchecked
+                )
+            if role == Qt.ItemDataRole.DisplayRole:
+                return None
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         input_text = (
@@ -160,11 +169,43 @@ class MappingTableModel(QAbstractTableModel):
         values = (
             binding.target.value,
             input_text,
-            self.tr("Yes") if binding.inverted else self.tr("No"),
+            None,
             self._row_status.get(index.row()) or self._conflict_text(index.row()),
             action_text,
         )
         return values[index.column()]
+
+    @override
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
+        """Return checkbox editing support only for invertible binding rows."""
+        flags = super().flags(index)
+        if (
+            index.isValid()
+            and index.column() == 2
+            and self.is_invertible_at(index.row())
+        ):
+            return flags | Qt.ItemFlag.ItemIsUserCheckable
+        return flags
+
+    @override
+    def setData(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.EditRole,
+    ) -> bool:
+        """Update an invertible row from the standard table checkbox."""
+        if (
+            not index.isValid()
+            or index.column() != 2
+            or role != Qt.ItemDataRole.CheckStateRole
+            or not self.is_invertible_at(index.row())
+        ):
+            return False
+        checked = value == Qt.CheckState.Checked
+        self._editor.update_binding(index.row(), inverted=checked)
+        self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
+        return True
 
     @property
     def capture_row(self) -> int | None:
@@ -350,7 +391,6 @@ class MappingDialog(QDialog):
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._capture_row: int | None = None
-        self._updating_inverted = False
         self._cancel_requested = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
@@ -376,8 +416,6 @@ class MappingDialog(QDialog):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.inverted_checkbox = QCheckBox(self.tr("Inverted"), self)
-        self.inverted_checkbox.setEnabled(False)
         self.target_combo = QComboBox(self)
         for target in BindingTarget:
             self.target_combo.addItem(target.value, target)
@@ -425,7 +463,6 @@ class MappingDialog(QDialog):
         bindings_page = QWidget(self)
         bindings_layout = QVBoxLayout(bindings_page)
         bindings_layout.addWidget(self.table)
-        bindings_layout.addWidget(self.inverted_checkbox)
         binding_actions = QHBoxLayout()
         binding_actions.addWidget(QLabel(self.tr("Target"), bindings_page))
         binding_actions.addWidget(self.target_combo, 1)
@@ -448,8 +485,7 @@ class MappingDialog(QDialog):
         self.setMinimumSize(760, 520)
         self.resize(840, 640)
 
-        QWidget.setTabOrder(self.table, self.inverted_checkbox)
-        QWidget.setTabOrder(self.inverted_checkbox, self.restore_button)
+        QWidget.setTabOrder(self.table, self.restore_button)
         QWidget.setTabOrder(self.restore_button, self.mouse_gyro_enabled_checkbox)
         QWidget.setTabOrder(
             self.mouse_gyro_enabled_checkbox,
@@ -473,9 +509,7 @@ class MappingDialog(QDialog):
         self.button_box.rejected.connect(self.request_reject)
         selection_model = self.table.selectionModel()
         if selection_model is not None:
-            selection_model.currentRowChanged.connect(self._sync_inverted_checkbox)
             selection_model.currentRowChanged.connect(self._sync_binding_row_actions)
-        self.inverted_checkbox.toggled.connect(self.set_inverted)
         self.mouse_gyro_enabled_checkbox.toggled.connect(
             lambda enabled: editor.update_mouse(gyro_enabled=enabled)
         )
@@ -572,7 +606,6 @@ class MappingDialog(QDialog):
             self.table.selectRow(min(row, remaining - 1))
         else:
             self.remove_binding_button.setEnabled(False)
-            self.inverted_checkbox.setEnabled(False)
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -646,25 +679,6 @@ class MappingDialog(QDialog):
         self._binding_replacement_confirmation = None
         self._pending_binding_replacement = None
 
-    def set_inverted(self, inverted: bool) -> None:
-        """Update the selected binding inversion through the draft editor.
-
-        Args:
-            inverted: New state requested by the standard check box.
-        """
-        if self._updating_inverted:
-            return
-        selected = self.table.currentIndex()
-        if not selected.isValid():
-            self.inverted_checkbox.setEnabled(False)
-            return
-        try:
-            self._mapping_model.update_inverted(selected.row(), inverted)
-        except DomainValueError:
-            self.inverted_checkbox.setEnabled(False)
-            return
-        self.table.selectRow(selected.row())
-
     def request_accept(self) -> None:
         """Accept immediately or ask for explicit confirmation of conflicts."""
         conflict_summary = self._mapping_model.conflict_summary()
@@ -727,6 +741,27 @@ class MappingDialog(QDialog):
                 self._activate_row_action(current.row())
                 event.accept()
                 return True
+            if (
+                watched is self.table
+                and current.column() == 2
+                and event.key() == Qt.Key.Key_Space
+            ):
+                state = self._mapping_model.data(
+                    current,
+                    Qt.ItemDataRole.CheckStateRole,
+                )
+                if state is not None:
+                    self._mapping_model.setData(
+                        current,
+                        (
+                            Qt.CheckState.Unchecked
+                            if state == Qt.CheckState.Checked
+                            else Qt.CheckState.Checked
+                        ),
+                        Qt.ItemDataRole.CheckStateRole,
+                    )
+                    event.accept()
+                    return True
             if event.key() == Qt.Key.Key_Escape and self._capture_row is not None:
                 self.cancel_capture()
                 event.accept()
@@ -757,17 +792,6 @@ class MappingDialog(QDialog):
         if self.set_source(row, source):
             self._capture_row = None
         return True
-
-    def _sync_inverted_checkbox(self, current: QModelIndex, _previous: QModelIndex) -> None:
-        if not current.isValid():
-            self.inverted_checkbox.setEnabled(False)
-            return
-        self._updating_inverted = True
-        try:
-            self.inverted_checkbox.setEnabled(self._mapping_model.is_invertible_at(current.row()))
-            self.inverted_checkbox.setChecked(self._mapping_model.inverted_at(current.row()))
-        finally:
-            self._updating_inverted = False
 
     def _sync_binding_row_actions(self, current: QModelIndex, _previous: QModelIndex) -> None:
         self.remove_binding_button.setEnabled(current.isValid())

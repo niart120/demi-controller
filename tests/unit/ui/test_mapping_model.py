@@ -18,7 +18,7 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.data(model.index(0, 1), Qt.ItemDataRole.UserRole) == "KEY:F"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.ToolTipRole) == "KEY:F"
     assert model.data(model.index(4, 1), Qt.ItemDataRole.DisplayRole) == "Middle mouse"
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "No"
+    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) is None
     assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
     assert model.data(model.index(1, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
     assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:Y_NEGATIVE"
@@ -75,3 +75,32 @@ def test_mapping_model_clears_transient_status_when_capture_moves_or_stops(
     model.cancel_capture()
 
     assert model.data(model.index(1, 3), Qt.ItemDataRole.DisplayRole) == ""
+
+
+def test_mapping_model_toggles_inverted_in_the_table_only_for_button_targets(
+    qt_application: object,
+) -> None:
+    assert qt_application is not None
+    editor = SettingsEditor(AppSettings.default())
+    model = MappingTableModel(editor)
+    button_inverted = model.index(0, 2)
+    diagnostic_inverted = model.index(28, 2)
+
+    assert model.data(button_inverted, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Unchecked
+    assert model.flags(button_inverted) & Qt.ItemFlag.ItemIsUserCheckable
+    assert model.data(diagnostic_inverted, Qt.ItemDataRole.CheckStateRole) is None
+    assert not model.flags(diagnostic_inverted) & Qt.ItemFlag.ItemIsUserCheckable
+
+    assert model.setData(
+        button_inverted,
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    )
+
+    assert editor.draft.profiles[0].bindings[0].inverted is True
+    assert model.data(button_inverted, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
+    assert not model.setData(
+        diagnostic_inverted,
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    )

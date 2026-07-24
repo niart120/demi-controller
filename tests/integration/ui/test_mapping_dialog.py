@@ -419,19 +419,20 @@ def test_mapping_dialog_exposes_and_saves_an_inverted_binding(
     dialog = MappingDialog(editor, on_save=save)
     dialog.show()
     qt_application.processEvents()
-    dialog.table.selectRow(0)
-    qt_application.processEvents()
+    model = dialog.mapping_model
+    inverted_index = model.index(0, 2)
 
-    assert dialog.inverted_checkbox.isEnabled()
-    assert not dialog.inverted_checkbox.isChecked()
-
-    dialog.inverted_checkbox.click()
+    assert not hasattr(dialog, "inverted_checkbox")
+    assert model.data(inverted_index, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Unchecked
+    assert model.setData(
+        inverted_index,
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    )
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].inverted is True
-    model = dialog.table.model()
-    assert model is not None
-    assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) == "Yes"
+    assert model.data(inverted_index, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -458,10 +459,7 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
     assert model.data(model.index(32, 0), Qt.ItemDataRole.DisplayRole) == "ACCEL:ZERO"
     assert model.data(model.index(32, 1), Qt.ItemDataRole.DisplayRole) == "O"
 
-    dialog.table.selectRow(32)
-    qt_application.processEvents()
-
-    assert not dialog.inverted_checkbox.isEnabled()
+    assert model.data(model.index(32, 2), Qt.ItemDataRole.CheckStateRole) is None
     assert dialog.set_source(32, "KEY:P") is True
     assert editor.draft.profiles[0].bindings[32].source == "KEY:P"
 
@@ -604,18 +602,11 @@ def test_mapping_dialog_uses_standard_keyboard_navigation_and_dialog_actions(
     dialog = MappingDialog(editor, on_save=save)
     dialog.show()
     qt_application.processEvents()
-    dialog.table.selectRow(0)
-    dialog.inverted_checkbox.setFocus()
+    inverted_index = dialog.mapping_model.index(0, 2)
+    dialog.table.setCurrentIndex(inverted_index)
+    dialog.table.setFocus()
 
-    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Tab)
-    qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.restore_button
-
-    _send_key(dialog.restore_button, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
-    qt_application.processEvents()
-    assert qt_application.focusWidget() is dialog.inverted_checkbox
-
-    _send_key(dialog.inverted_checkbox, Qt.Key.Key_Space)
+    _send_key(dialog.table, Qt.Key.Key_Space)
     qt_application.processEvents()
     assert editor.draft.profiles[0].bindings[0].inverted is True
 
