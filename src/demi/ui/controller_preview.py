@@ -545,17 +545,74 @@ def _directional_pad_path(layout: PreviewLayout) -> QPainterPath:
 def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
     path = QPainterPath()
-    path.moveTo(bounds.left() + bounds.width() * 0.02, bounds.top())
-    path.lineTo(bounds.right() - bounds.width() * 0.02, bounds.top())
+    path.moveTo(
+        bounds.left() + bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.04,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.12,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.20,
+        bounds.top(),
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.24,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.27,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.left() + bounds.width() * 0.30,
+        bounds.top() + bounds.height() * 0.015,
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.38,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.left() + bounds.width() * 0.43,
+        bounds.top() + bounds.height() * 0.055,
+        bounds.center().x(),
+        bounds.top() + bounds.height() * 0.055,
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.43,
+        bounds.top() + bounds.height() * 0.055,
+        bounds.right() - bounds.width() * 0.38,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.right() - bounds.width() * 0.30,
+        bounds.top() + bounds.height() * 0.015,
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.27,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.right() - bounds.width() * 0.24,
+        bounds.top(),
+        bounds.right() - bounds.width() * 0.20,
+        bounds.top(),
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.12,
+        bounds.top(),
+        bounds.right() - bounds.width() * 0.04,
+        bounds.top(),
+        bounds.right() - bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
+    )
     path.cubicTo(
         bounds.right() - bounds.width() * 0.005,
-        bounds.top(),
-        bounds.right(),
-        bounds.top() + bounds.height() * 0.01,
-        bounds.right(),
-        bounds.top() + bounds.height() * 0.03,
+        bounds.top() + bounds.height() * 0.10,
+        bounds.right() - bounds.width() * 0.02,
+        bounds.top() + bounds.height() * 0.20,
+        bounds.right() - bounds.width() * 0.025,
+        bounds.top() + bounds.height() * 0.30,
     )
-    path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.03,
+        bounds.top() + bounds.height() * 0.42,
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.52,
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.60,
+    )
     path.cubicTo(
         bounds.right(),
         bounds.top() + bounds.height() * 0.84,
@@ -573,14 +630,21 @@ def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
         bounds.left(),
         bounds.top() + bounds.height() * 0.60,
     )
-    path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.03)
     path.cubicTo(
         bounds.left(),
-        bounds.top() + bounds.height() * 0.01,
-        bounds.left() + bounds.width() * 0.005,
-        bounds.top(),
+        bounds.top() + bounds.height() * 0.52,
+        bounds.left() + bounds.width() * 0.03,
+        bounds.top() + bounds.height() * 0.42,
+        bounds.left() + bounds.width() * 0.025,
+        bounds.top() + bounds.height() * 0.30,
+    )
+    path.cubicTo(
         bounds.left() + bounds.width() * 0.02,
-        bounds.top(),
+        bounds.top() + bounds.height() * 0.20,
+        bounds.left() + bounds.width() * 0.005,
+        bounds.top() + bounds.height() * 0.10,
+        bounds.left() + bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
     )
     path.closeSubpath()
     return path

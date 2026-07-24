@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from math import hypot
 
 import pytest
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 import demi.ui.controller_preview as preview_module
@@ -237,6 +237,30 @@ def test_all_controls_stay_inside_a_two_to_one_silhouette_with_enclosed_shoulder
 
     assert silhouette_bounds.top() <= layout.content_bounds.top + 1.0
     assert 1.9 <= silhouette_bounds.width() / silhouette_bounds.height() <= 2.1
+
+
+@pytest.mark.parametrize("size", [(960, 600), (800, 475)])
+def test_shoulder_row_sits_inside_a_shallow_curved_upper_shell(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
+    faceplate = preview_module._controller_faceplate_path(layout)
+    body = preview_module._qrect(layout.body_bounds)
+    shoulders = [layout.controls[control_id] for control_id in ("zl", "l", "r", "zr")]
+
+    assert len({shoulder.top for shoulder in shoulders}) == 1
+    assert len({shoulder.height for shoulder in shoulders}) == 1
+    for shoulder in shoulders:
+        assert faceplate.contains(preview_module._qrect(shoulder))
+
+    assert not faceplate.contains(QPointF(body.center().x(), body.top() + body.height() * 0.03))
+    assert faceplate.contains(QPointF(body.center().x(), body.top() + body.height() * 0.10))
+
+    upper_side_y = body.top() + body.height() * 0.30
+    assert not faceplate.contains(QPointF(body.left() + body.width() * 0.01, upper_side_y))
+    assert faceplate.contains(QPointF(body.left() + body.width() * 0.08, upper_side_y))
+    assert not faceplate.contains(QPointF(body.right() - body.width() * 0.01, upper_side_y))
+    assert faceplate.contains(QPointF(body.right() - body.width() * 0.08, upper_side_y))
 
 
 def test_controller_silhouette_contains_both_complete_grip_regions() -> None:

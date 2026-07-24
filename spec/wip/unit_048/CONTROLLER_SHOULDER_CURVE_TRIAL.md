@@ -54,11 +54,11 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | All four shoulder buttons share one row and remain enclosed at normal and minimum sizes | regression | unit | L/Rを含む |
-| todo | The upper outline uses a shallow center dip instead of a full-width flat edge | regression | unit | 深さ10%以内 |
-| todo | The upper side outline curves inward instead of continuing as a vertical slab edge | regression | unit | 左右対称 |
-| todo | The complete silhouette remains near 2:1 and all controls remain enclosed | regression | unit | unit_047契約 |
-| todo | Default, mixed-input, and minimum states visually read as one controller body | visual | integration | `inspect-gui-states` |
+| refactor-skipped | All four shoulder buttons share one row and remain enclosed at normal and minimum sizes | regression | unit | L/Rを含む、追加整理は不要 |
+| refactor-done | The upper outline uses a shallow center dip instead of a full-width flat edge | regression | unit | 深さ5.5%へ調整 |
+| refactor-done | The upper side outline curves inward instead of continuing as a vertical slab edge | regression | unit | 試作1の6〜7%から2.5〜3%へ縮小 |
+| refactor-skipped | The complete silhouette remains near 2:1 and all controls remain enclosed | regression | unit | unit_047契約を維持、追加整理は不要 |
+| green | Default, mixed-input, and minimum states visually read as one controller body | visual | integration | 試作2を提示案として採用、ユーザ確認待ち |
 
 ## 7. 設計メモ
 
@@ -81,17 +81,25 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | command | result | notes |
 |---|---|---|
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-baseline` | pass | 上面と上側面が長い直線になり、板状に見える基準状態を確認 |
-| targeted pytest | not run | TDD項目ごとに記録する |
-| `inspect-gui-states` capture | not run | 基準画像と試作ごとに別出力先へ撮影する |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_shoulder_row_sits_inside_a_shallow_curved_upper_shell -q -p no:cacheprovider --basetemp tmp/pytest-unit048-outline-red` | red | 中央上端と上側面が直線のため2 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-outline-green-attempt1` | red | 新曲線は成立したが上端位置の既存契約で2 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-outline-green-attempt2` | pass | 50 passed |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-curve-attempt1` | fail | 中央の谷と側面の絞りが深く、砂時計形に見えるため不採用 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-outline-green-attempt3` | pass | 50 passed、浅くした曲線でも契約を維持 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-curve-attempt2` | pass | 既定、複合入力、最小表示で緩い上面と側面の連続性を確認 |
+| `uv run ruff format --check src/demi/ui/controller_preview.py src/demi/ui/preview_layout.py tests/unit/ui/test_controller_preview.py` | pass | 3 files already formatted |
+| `uv run ruff check src/demi/ui/controller_preview.py src/demi/ui/preview_layout.py tests/unit/ui/test_controller_preview.py` | pass | lint errorなし |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-trial-gate-formatted` | pass | 50 passed |
+| `git diff --check` | pass | whitespace errorなし |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項
 
-- none
+- 試作2のユーザ確認後、採用する場合は `spec/initial/ui.md` へ曲線契約を反映してunit_048を完了する。
 
 ## 11. チェックリスト
 
 - [x] 対象範囲と対象外を確認した
-- [ ] TDD Test Listを更新した
-- [ ] 検証結果または未実行理由を記録した
+- [x] TDD Test Listを更新した
+- [x] 検証結果または未実行理由を記録した
 - [x] package / release / public APIは変更対象外であることを確認した
