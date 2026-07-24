@@ -48,10 +48,13 @@ def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
 
     dialog.connection_page.adapter_combo.setCurrentIndex(0)
     dialog.connection_page.reconnect_on_start_checkbox.setChecked(True)
-    dialog.mapping_page.target_combo.setCurrentIndex(
-        dialog.mapping_page.target_combo.findData(BindingTarget.BUTTON_A)
+    button_menu = dialog.mapping_page.add_binding_group_menus["Buttons"]
+    add_button_a = next(
+        action
+        for action in button_menu.actions()
+        if action.data() == BindingTarget.BUTTON_A
     )
-    dialog.mapping_page.add_binding_button.click()
+    add_button_a.trigger()
     assert dialog.colors_page.set_color("body", "#ABCDEF")
 
     dialog.tabs.setCurrentIndex(SettingsTab.BINDINGS)

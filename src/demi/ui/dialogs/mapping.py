@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -28,12 +27,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -52,6 +53,26 @@ _ROOT_INDEX = QModelIndex()
 type CaptureTransition = Callable[[], object]
 type SettingsAction = Callable[[], bool]
 type RowAction = Callable[[int], object]
+
+_BINDING_TARGET_GROUPS = (
+    ("Buttons", tuple(target for target in BindingTarget if target.value.startswith("BUTTON:"))),
+    (
+        "Left stick",
+        tuple(target for target in BindingTarget if target.value.startswith("LEFT_STICK:")),
+    ),
+    (
+        "Right stick",
+        tuple(target for target in BindingTarget if target.value.startswith("RIGHT_STICK:")),
+    ),
+    (
+        "Diagnostics",
+        tuple(
+            target
+            for target in BindingTarget
+            if target.value.startswith(("GYRO:", "ACCEL:"))
+        ),
+    ),
+)
 
 
 class MappingActionDelegate(QStyledItemDelegate):
@@ -423,10 +444,30 @@ class MappingDialog(QDialog):
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        self.target_combo = QComboBox(self)
-        for target in BindingTarget:
-            self.target_combo.addItem(target.value, target)
-        self.add_binding_button = QPushButton(self.tr("Add binding"), self)
+        self.add_binding_menu = QMenu(self)
+        self.add_binding_group_menus: dict[str, QMenu] = {}
+        translated_group_labels = {
+            "Buttons": self.tr("Buttons"),
+            "Left stick": self.tr("Left stick"),
+            "Right stick": self.tr("Right stick"),
+            "Diagnostics": self.tr("Diagnostics"),
+        }
+        for group_label, targets in _BINDING_TARGET_GROUPS:
+            group_menu = QMenu(translated_group_labels[group_label], self.add_binding_menu)
+            self.add_binding_menu.addMenu(group_menu)
+            self.add_binding_group_menus[group_label] = group_menu
+            for target in targets:
+                action = group_menu.addAction(target.value)
+                action.setData(target)
+                action.triggered.connect(
+                    lambda _checked=False, selected_target=target: self.add_binding(
+                        selected_target
+                    )
+                )
+        self.add_binding_button = QToolButton(self)
+        self.add_binding_button.setText(self.tr("Add binding"))
+        self.add_binding_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.add_binding_button.setMenu(self.add_binding_menu)
         mouse_settings = editor.draft.input.mouse
         self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
@@ -467,13 +508,12 @@ class MappingDialog(QDialog):
 
         self.bindings_page = QWidget(self)
         bindings_layout = QVBoxLayout(self.bindings_page)
-        bindings_layout.addWidget(self.table)
         binding_actions = QHBoxLayout()
-        binding_actions.addWidget(QLabel(self.tr("Target"), self.bindings_page))
-        binding_actions.addWidget(self.target_combo, 1)
         binding_actions.addWidget(self.add_binding_button)
+        binding_actions.addStretch()
+        binding_actions.addWidget(self.restore_button)
         bindings_layout.addLayout(binding_actions)
-        bindings_layout.addWidget(self.restore_button)
+        bindings_layout.addWidget(self.table)
         self.mouse_page = QWidget(self)
         mouse_layout = QVBoxLayout(self.mouse_page)
         mouse_layout.addWidget(self.mouse_gyro_group)
@@ -489,6 +529,7 @@ class MappingDialog(QDialog):
         self.setMinimumSize(760, 520)
         self.resize(840, 640)
 
+        QWidget.setTabOrder(self.add_binding_button, self.table)
         QWidget.setTabOrder(self.table, self.restore_button)
         QWidget.setTabOrder(self.restore_button, self.mouse_gyro_enabled_checkbox)
         QWidget.setTabOrder(
@@ -506,7 +547,6 @@ class MappingDialog(QDialog):
 
         self.assign_escape_action.triggered.connect(self.assign_escape)
         self.tabs.currentChanged.connect(self._handle_tab_changed)
-        self.add_binding_button.clicked.connect(self.add_binding)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
@@ -598,14 +638,12 @@ class MappingDialog(QDialog):
         self._capture_row = None
         self._mapping_model.cancel_capture()
 
-    def add_binding(self) -> None:
+    def add_binding(self, target: BindingTarget) -> None:
         """Append and select an unassigned row for the chosen target."""
         self.cancel_capture()
-        target = self.target_combo.currentData()
         try:
-            selected_target = target if isinstance(target, BindingTarget) else BindingTarget(target)
-            self._mapping_model.add_binding(selected_target)
-        except (DomainValueError, ValueError):
+            self._mapping_model.add_binding(target)
+        except DomainValueError:
             return
         self.table.selectRow(self._mapping_model.rowCount() - 1)
 

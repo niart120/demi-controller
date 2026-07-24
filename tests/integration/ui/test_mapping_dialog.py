@@ -206,6 +206,7 @@ def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_an
     dialog.show()
     qt_application.processEvents()
     dialog.table.selectRow(0)
+    dialog.table.setFocus()
 
     assert dialog.assign_escape_action in dialog.table.actions()
     assert dialog.assign_escape_action.text() == "Assign Escape"
@@ -478,11 +479,24 @@ def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row
 
     assert dialog.mapping_model.rowCount() == len(original_bindings)
     assert not hasattr(dialog, "remove_binding_button")
-    target_index = dialog.target_combo.findData(BindingTarget.RIGHT_STICK_UP)
-    assert target_index >= 0
-    dialog.target_combo.setCurrentIndex(target_index)
+    assert not hasattr(dialog, "target_combo")
+    assert dialog.add_binding_button.menu() is dialog.add_binding_menu
+    assert [
+        action.text() for action in dialog.add_binding_menu.actions()
+    ] == ["Buttons", "Left stick", "Right stick", "Diagnostics"]
+    assert {
+        action.data()
+        for group_menu in dialog.add_binding_group_menus.values()
+        for action in group_menu.actions()
+    } == set(BindingTarget)
+    right_stick_menu = dialog.add_binding_group_menus["Right stick"]
+    add_right_stick_up = next(
+        action
+        for action in right_stick_menu.actions()
+        if action.data() == BindingTarget.RIGHT_STICK_UP
+    )
 
-    dialog.add_binding_button.click()
+    add_right_stick_up.trigger()
     qt_application.processEvents()
 
     added_row = len(original_bindings)
