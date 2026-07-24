@@ -198,16 +198,20 @@ def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
     assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
 
 
-def test_face_controls_stay_inside_the_faceplate_and_shoulders_touch_its_top_edge() -> None:
-    layout = preview_layout(960, 600)
+@pytest.mark.parametrize("size", [(960, 600), (800, 475)])
+def test_all_controls_stay_inside_a_two_to_one_silhouette_with_enclosed_shoulders(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
     faceplate = preview_module._controller_faceplate_path(layout)
-    face_control_ids = CONTROL_IDS.difference({"zl", "l", "r", "zr"})
+    silhouette = preview_module._controller_silhouette_path(layout)
+    silhouette_bounds = silhouette.boundingRect()
 
-    for control_id in face_control_ids:
+    for control_id in CONTROL_IDS:
         assert faceplate.contains(preview_module._qrect(layout.controls[control_id])), control_id
 
-    for control_id in ("zl", "l", "r", "zr"):
-        assert layout.controls[control_id].bottom == pytest.approx(layout.body_bounds.top)
+    assert silhouette_bounds.top() <= layout.content_bounds.top + 1.0
+    assert 1.9 <= silhouette_bounds.width() / silhouette_bounds.height() <= 2.1
 
 
 def test_controller_silhouette_contains_both_complete_grip_regions() -> None:
@@ -255,6 +259,9 @@ def test_face_controls_and_shoulders_keep_balanced_relative_proportions() -> Non
     b_center = controls["b"].left + controls["b"].width / 2
     assert a_center - x_center == pytest.approx(x_center - y_center)
     assert b_center == pytest.approx(x_center)
+    horizontal_spacing = a_center - x_center
+    vertical_spacing = controls["y"].top - controls["x"].top
+    assert horizontal_spacing == pytest.approx(vertical_spacing)
 
 
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(

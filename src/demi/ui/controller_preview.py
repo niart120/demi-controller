@@ -539,15 +539,15 @@ def _directional_pad_path(layout: PreviewLayout) -> QPainterPath:
 def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
     path = QPainterPath()
-    path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
-    path.lineTo(bounds.right() - bounds.width() * 0.14, bounds.top())
+    path.moveTo(bounds.left() + bounds.width() * 0.02, bounds.top())
+    path.lineTo(bounds.right() - bounds.width() * 0.02, bounds.top())
     path.cubicTo(
-        bounds.right() - bounds.width() * 0.04,
+        bounds.right() - bounds.width() * 0.005,
         bounds.top(),
         bounds.right(),
-        bounds.top() + bounds.height() * 0.10,
+        bounds.top() + bounds.height() * 0.01,
         bounds.right(),
-        bounds.top() + bounds.height() * 0.25,
+        bounds.top() + bounds.height() * 0.03,
     )
     path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
     path.cubicTo(
@@ -567,13 +567,13 @@ def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
         bounds.left(),
         bounds.top() + bounds.height() * 0.60,
     )
-    path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.25)
+    path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.03)
     path.cubicTo(
         bounds.left(),
-        bounds.top() + bounds.height() * 0.10,
-        bounds.left() + bounds.width() * 0.04,
+        bounds.top() + bounds.height() * 0.01,
+        bounds.left() + bounds.width() * 0.005,
         bounds.top(),
-        bounds.left() + bounds.width() * 0.14,
+        bounds.left() + bounds.width() * 0.02,
         bounds.top(),
     )
     path.closeSubpath()
