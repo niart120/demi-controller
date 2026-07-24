@@ -227,13 +227,14 @@ class ControllerPreviewWidget(QWidget):
         layout = preview_layout(canvas_width, canvas_height)
         silhouette = _controller_silhouette_path(layout)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(model.body_color))
-        painter.drawPath(silhouette)
         self._draw_grip(painter, layout.left_grip_bounds, model.left_grip_color, left=True)
         self._draw_grip(painter, layout.right_grip_bounds, model.right_grip_color, left=False)
+        painter.setBrush(QColor(model.body_color))
+        painter.drawPath(_controller_faceplate_path(layout))
         painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(silhouette)
+        painter.drawPath(_controller_faceplate_path(layout))
         for control_id, bounds in layout.controls.items():
             if control_id in _STICK_CLICK_IDS or control_id.startswith("dpad_"):
                 continue
@@ -460,6 +461,14 @@ def _qrect(bounds: PreviewRect) -> QRectF:
 
 
 def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
+    return (
+        _controller_faceplate_path(layout)
+        .united(_grip_path(layout.left_grip_bounds, left=True))
+        .united(_grip_path(layout.right_grip_bounds, left=False))
+    )
+
+
+def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
     path = QPainterPath()
     path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
@@ -500,66 +509,80 @@ def _controller_silhouette_path(layout: PreviewLayout) -> QPainterPath:
         bounds.top(),
     )
     path.closeSubpath()
-    return path.united(_grip_path(layout.left_grip_bounds, left=True)).united(
-        _grip_path(layout.right_grip_bounds, left=False)
-    )
+    return path
 
 
 def _grip_path(bounds: PreviewRect, *, left: bool) -> QPainterPath:
     rect = _qrect(bounds)
     path = QPainterPath()
     if left:
-        path.moveTo(rect.right(), rect.top())
-        path.lineTo(rect.left() + rect.width() * 0.18, rect.top() + rect.height() * 0.12)
+        path.moveTo(rect.left() + rect.width() * 0.43, rect.top())
+        path.lineTo(rect.right(), rect.top() + rect.height() * 0.58)
+        path.cubicTo(
+            rect.left() + rect.width() * 0.92,
+            rect.top() + rect.height() * 0.58,
+            rect.left() + rect.width() * 0.82,
+            rect.top() + rect.height() * 0.78,
+            rect.left() + rect.width() * 0.70,
+            rect.top() + rect.height() * 0.90,
+        )
+        path.cubicTo(
+            rect.left() + rect.width() * 0.57,
+            rect.bottom(),
+            rect.left() + rect.width() * 0.30,
+            rect.bottom(),
+            rect.left() + rect.width() * 0.18,
+            rect.top() + rect.height() * 0.91,
+        )
         path.cubicTo(
             rect.left() + rect.width() * 0.02,
-            rect.top() + rect.height() * 0.30,
+            rect.top() + rect.height() * 0.78,
             rect.left(),
-            rect.top() + rect.height() * 0.55,
+            rect.top() + rect.height() * 0.48,
             rect.left() + rect.width() * 0.12,
-            rect.top() + rect.height() * 0.75,
+            rect.top() + rect.height() * 0.24,
         )
         path.cubicTo(
-            rect.left() + rect.width() * 0.24,
-            rect.bottom(),
-            rect.left() + rect.width() * 0.52,
-            rect.bottom(),
-            rect.left() + rect.width() * 0.70,
-            rect.top() + rect.height() * 0.84,
-        )
-        path.cubicTo(
-            rect.left() + rect.width() * 0.91,
-            rect.top() + rect.height() * 0.68,
-            rect.right(),
-            rect.top() + rect.height() * 0.35,
-            rect.right(),
+            rect.left() + rect.width() * 0.20,
+            rect.top() + rect.height() * 0.08,
+            rect.left() + rect.width() * 0.30,
+            rect.top(),
+            rect.left() + rect.width() * 0.43,
             rect.top(),
         )
     else:
-        path.moveTo(rect.left(), rect.top())
-        path.lineTo(rect.right() - rect.width() * 0.18, rect.top() + rect.height() * 0.12)
+        path.moveTo(rect.right() - rect.width() * 0.43, rect.top())
+        path.lineTo(rect.left(), rect.top() + rect.height() * 0.58)
+        path.cubicTo(
+            rect.right() - rect.width() * 0.92,
+            rect.top() + rect.height() * 0.58,
+            rect.right() - rect.width() * 0.82,
+            rect.top() + rect.height() * 0.78,
+            rect.right() - rect.width() * 0.70,
+            rect.top() + rect.height() * 0.90,
+        )
+        path.cubicTo(
+            rect.right() - rect.width() * 0.57,
+            rect.bottom(),
+            rect.right() - rect.width() * 0.30,
+            rect.bottom(),
+            rect.right() - rect.width() * 0.18,
+            rect.top() + rect.height() * 0.91,
+        )
         path.cubicTo(
             rect.right() - rect.width() * 0.02,
-            rect.top() + rect.height() * 0.30,
+            rect.top() + rect.height() * 0.78,
             rect.right(),
-            rect.top() + rect.height() * 0.55,
+            rect.top() + rect.height() * 0.48,
             rect.right() - rect.width() * 0.12,
-            rect.top() + rect.height() * 0.75,
+            rect.top() + rect.height() * 0.24,
         )
         path.cubicTo(
-            rect.right() - rect.width() * 0.24,
-            rect.bottom(),
-            rect.right() - rect.width() * 0.52,
-            rect.bottom(),
-            rect.right() - rect.width() * 0.70,
-            rect.top() + rect.height() * 0.84,
-        )
-        path.cubicTo(
-            rect.right() - rect.width() * 0.91,
-            rect.top() + rect.height() * 0.68,
-            rect.left(),
-            rect.top() + rect.height() * 0.35,
-            rect.left(),
+            rect.right() - rect.width() * 0.20,
+            rect.top() + rect.height() * 0.08,
+            rect.right() - rect.width() * 0.30,
+            rect.top(),
+            rect.right() - rect.width() * 0.43,
             rect.top(),
         )
     path.closeSubpath()

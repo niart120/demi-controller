@@ -50,14 +50,16 @@
 |---|---|---|---|---|
 | refactor-skipped | Grips extend outside the faceplate and finish above the mouse-input status | regression | unit | ui: red 2026-07-25, green 2026-07-25 |
 | refactor-skipped | The left stick is above the directional pad in the controller layout | regression | unit | ui: red 2026-07-25, green 2026-07-25 |
-| refactor-skipped | The controller silhouette contains each complete colored grip region without crossing it | regression | unit | self-review finding 1: red and green 2026-07-25 |
+| refactor-skipped | The complete controller silhouette contains both colored grip regions | regression | unit | geometry guard: red and green 2026-07-25 |
+| green | Rendered grips visually match the reference's broad sloped shoulders, front-panel seam, and vertical handles | acceptance | manual | red: `unit_045-grip-union`, `unit_045-grip-visual-3`; green: `unit_045-grip-layer`,目視確認 2026-07-25 |
 | deferred | IMU indicators remain readable at 800x520 | regression | integration | self-review finding 2; next cycle |
 | deferred | Directional-pad directions render as one connected cross | regression | unit | self-review finding 3; later cycle |
 
 ## 7. 設計メモ
 
 - 参照画像は形状関係を確認するために使い、画像データは製品へ含めない。
-- 外周は1本のQPainterPath、左右グリップはその外周と整合する別のQPainterPathで描く。
+- 全体外周は1本のQPainterPathで描き、本体前面の輪郭線は色付きグリップ上部を横切る斜めの継ぎ目として残す。
+- 描画順はグリップ、本体前面、外周線と継ぎ目、操作部とし、本体前面がグリップ上部を覆う。
 
 ## 8. 対象ファイル
 
@@ -79,7 +81,9 @@
 | `uv build` | pass | sdistとwheelを生成 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-lower-grips` | pass | Windows Qt描画で外周、グリップ位置、ON/OFF、押下を確認 |
 | `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-green-2` | pass | 15 passed。外周外に残るグリップ面積がないことを確認 |
-| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-union` | pass | グリップ内部の外周線が消え、左右グリップが本体外周へ連続することを確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-union` | fail | グリップが細い接点から吊られた涙滴形であり、本体前面とグリップの継ぎ目も消えているため不合格 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-visual-3` | fail | 肩と縦長比率は改善したが、グリップを本体前面より後に塗ったため色面が操作部側へ入り込んでいる |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-layer` | pass | 実機画像と目視比較し、グリップが背面、本体前面が手前となり、外側の肩、継ぎ目、縦長の把持部が読めることを確認 |
 | `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 外周修正後のstatic gate |
 | `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-full` | pass | 308 passed |
 | `uv run pytest tests/integration` / `uv build` | not run | 残る2件の修正後、unit_045再完了時に実行する |
