@@ -998,7 +998,7 @@ def test_qt_startup_without_saved_settings_or_adapters_keeps_window_interactive(
         def observe_and_close() -> None:
             observed.append(
                 (
-                    window.main_toolbar.mapping_action.isEnabled(),
+                    window.main_toolbar.bindings_action.isEnabled(),
                     window.main_toolbar.connection_settings_action.isEnabled(),
                     window.status_bar.notice_label.text(),
                 )

@@ -113,7 +113,7 @@
 | refactor-done | Inverted列は反転可能な行だけ標準チェック状態を表示し、その場でdraftを更新する | regression | unit / integration | 表外checkboxと選択行同期を除去。Spaceと標準delegateの更新経路を使用 |
 | refactor-done | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonと選択行同期を除去。Remapと同じdelegate方式を再利用 |
 | refactor-done | Settingsは`Connection`、`Bindings`、`Mouse`、`Colors`を入れ子なしで表示する | regression | integration | 既存mapping pagesを外側tabへ移し、入力待受の所有期間を共有dialogへ統合 |
-| todo | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | `Mappings`表記を除去 |
+| refactor-done | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | 4 factoryへ分離し、`mapping_action`と`Mappings`表記を除去 |
 | todo | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換する候補を画像確認 |
 
 ## 7. 設計メモ
@@ -178,6 +178,7 @@
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `20 passed`。行内Invertedトグルと既存mapping操作 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | passed | `22 passed`。行内Removeとdelegate回帰 |
 | `uv run pytest tests/integration/ui/test_unified_settings_dialog.py -q` | passed | `3 passed`。4タブの平坦化、順序、共有draft |
+| `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_unified_settings_dialog.py tests/integration/ui/test_main_window_dialogs.py tests/integration/ui/test_main_window_snapshot.py tests/integration/ui/test_qt_runtime_events.py -q` | passed | `27 passed`。4 action、同名tab routing、modal排他 |
 
 ## 10. 先送り事項
 

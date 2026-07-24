@@ -190,8 +190,9 @@ def test_f4_pointer_release_refreshes_the_bound_toolbar(
 @pytest.mark.parametrize(
     ("action_name", "expected_tab"),
     [
-        ("mapping_action", SettingsTab.MAPPINGS),
         ("connection_settings_action", SettingsTab.CONNECTION),
+        ("bindings_action", SettingsTab.BINDINGS),
+        ("mouse_action", SettingsTab.MOUSE),
         ("colors_action", SettingsTab.COLORS),
     ],
 )
@@ -261,7 +262,7 @@ def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
     router = QtApplicationEventRouter(window)
     router.bind(session)
 
-    window.main_toolbar.mapping_action.trigger()
+    window.main_toolbar.mouse_action.trigger()
     qt_application.processEvents()
     save_dialog = window.active_settings_dialog
     assert isinstance(save_dialog, SettingsDialog)
@@ -277,7 +278,7 @@ def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
     assert session.settings.input.mouse.invert_x is True
     assert session.settings.input.mouse.invert_y is False
 
-    window.main_toolbar.mapping_action.trigger()
+    window.main_toolbar.mouse_action.trigger()
     qt_application.processEvents()
     cancel_dialog = window.active_settings_dialog
     assert isinstance(cancel_dialog, SettingsDialog)
@@ -373,8 +374,9 @@ def test_router_opens_one_settings_dialog_on_the_requested_toolbar_tab(
     router.bind(session)
 
     for action, expected_tab in (
-        (window.main_toolbar.mapping_action, SettingsTab.MAPPINGS),
         (window.main_toolbar.connection_settings_action, SettingsTab.CONNECTION),
+        (window.main_toolbar.bindings_action, SettingsTab.BINDINGS),
+        (window.main_toolbar.mouse_action, SettingsTab.MOUSE),
         (window.main_toolbar.colors_action, SettingsTab.COLORS),
     ):
         action.trigger()
@@ -761,7 +763,8 @@ def test_worker_fault_is_queued_to_widgets_and_runtime_stop_disables_interaction
     assert runtime.frames[-1].capture_active is False
     assert not window.main_toolbar.connection_action.isEnabled()
     assert not window.main_toolbar.capture_action.isEnabled()
-    assert not window.main_toolbar.mapping_action.isEnabled()
+    assert not window.main_toolbar.bindings_action.isEnabled()
+    assert not window.main_toolbar.mouse_action.isEnabled()
     assert not window.main_toolbar.connection_settings_action.isEnabled()
     assert not window.main_toolbar.colors_action.isEnabled()
     assert window.status_bar.connection_label.text() == "Connection: Stopped"
@@ -799,11 +802,12 @@ def test_shutdown_drops_queued_events_timer_timeouts_and_dialog_callbacks(
         return dialog
 
     window.bind_settings_dialog_factories(
-        mapping=create_dialog,
         connection=lambda _parent: None,
+        bindings=create_dialog,
+        mouse=lambda _parent: None,
         colors=lambda _parent: None,
     )
-    window.main_toolbar.mapping_action.trigger()
+    window.main_toolbar.bindings_action.trigger()
     qt_application.processEvents()
     dialog = dialogs[0]
     snapshot_before_shutdown = session.ui_snapshot

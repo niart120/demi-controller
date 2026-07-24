@@ -42,14 +42,16 @@ class MainToolBar(QToolBar):
         self.connection_action = QAction(self.tr("Connect"), self)
         self.capture_action = QAction(self.tr("Start mouse"), self)
         self.capture_action.setCheckable(True)
-        self.mapping_action = QAction(self.tr("Mappings"), self)
         self.connection_settings_action = QAction(self.tr("Connection"), self)
+        self.bindings_action = QAction(self.tr("Bindings"), self)
+        self.mouse_action = QAction(self.tr("Mouse"), self)
         self.colors_action = QAction(self.tr("Colors"), self)
         self.settings_menu = QMenu(self)
         self.settings_menu.addActions(
             (
-                self.mapping_action,
                 self.connection_settings_action,
+                self.bindings_action,
+                self.mouse_action,
                 self.colors_action,
             )
         )
@@ -99,8 +101,9 @@ class MainToolBar(QToolBar):
         self.capture_action.setChecked(is_captured)
         self.capture_action.setEnabled(capture_available)
         for action in (
-            self.mapping_action,
             self.connection_settings_action,
+            self.bindings_action,
+            self.mouse_action,
             self.colors_action,
         ):
             action.setEnabled(interaction_available)

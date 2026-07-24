@@ -143,8 +143,9 @@ def test_main_window_refreshes_connection_candidates_without_auto_selecting(
         return ConnectionDialog(editor, on_rescan=lambda: None, parent=parent)
 
     window.bind_settings_dialog_factories(
-        mapping=lambda _parent: None,
         connection=create_connection_dialog,
+        bindings=lambda _parent: None,
+        mouse=lambda _parent: None,
         colors=lambda _parent: None,
     )
     window.refresh(

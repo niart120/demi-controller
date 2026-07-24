@@ -149,8 +149,9 @@ class QtApplicationEventRouter:
         self._window.main_toolbar.bind_connection_action(self._run_connection_action)
         self._window.main_toolbar.bind_capture_action(self._toggle_capture)
         self._window.bind_settings_dialog_factories(
-            mapping=lambda parent: self._create_settings_dialog(SettingsTab.MAPPINGS, parent),
             connection=lambda parent: self._create_settings_dialog(SettingsTab.CONNECTION, parent),
+            bindings=lambda parent: self._create_settings_dialog(SettingsTab.BINDINGS, parent),
+            mouse=lambda parent: self._create_settings_dialog(SettingsTab.MOUSE, parent),
             colors=lambda parent: self._create_settings_dialog(SettingsTab.COLORS, parent),
         )
         self.refresh()
