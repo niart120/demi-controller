@@ -14,7 +14,7 @@ def test_mapping_delegate_routes_mouse_and_keyboard_activation_to_the_same_row(
     model = MappingTableModel(SettingsEditor(AppSettings.default()))
     activated_rows: list[int] = []
     delegate = MappingActionDelegate(on_activated=activated_rows.append)
-    index = model.index(3, 4)
+    index = model.index(3, 3)
     option = QStyleOptionViewItem()
     option.rect = QRect(0, 0, 120, 32)
 
@@ -47,10 +47,10 @@ def test_mapping_dialog_uses_shared_delegates_without_per_row_widgets(
     assert qt_application is not None
     dialog = MappingDialog(SettingsEditor(AppSettings.default()))
 
-    assert isinstance(dialog.table.itemDelegateForColumn(4), MappingActionDelegate)
+    assert isinstance(dialog.table.itemDelegateForColumn(3), MappingActionDelegate)
     assert isinstance(dialog.table.itemDelegateForColumn(5), MappingActionDelegate)
     assert all(
         dialog.table.indexWidget(dialog.mapping_model.index(row, column)) is None
         for row in range(33)
-        for column in (4, 5)
+        for column in (3, 5)
     )

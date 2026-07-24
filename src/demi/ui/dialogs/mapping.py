@@ -120,7 +120,7 @@ class MappingActionDelegate(QStyledItemDelegate):
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("Target", "Input", "Inverted", "Conflict", "Action", "Remove")
+    _HEADERS = ("Target", "Input", "Inverted", "Action", "Conflict", "Remove")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -183,8 +183,8 @@ class MappingTableModel(QAbstractTableModel):
             binding.target.value,
             input_text,
             None,
-            self._row_status.get(index.row()) or self._conflict_text(index.row()),
             action_text,
+            self._row_status.get(index.row()) or self._conflict_text(index.row()),
             self.tr("Remove"),
         )
         return values[index.column()]
@@ -424,13 +424,13 @@ class MappingDialog(QDialog):
             on_activated=self._remove_binding_row,
             parent=self.table,
         )
-        self.table.setItemDelegateForColumn(4, self._mapping_action_delegate)
+        self.table.setItemDelegateForColumn(3, self._mapping_action_delegate)
         self.table.setItemDelegateForColumn(5, self._remove_binding_delegate)
         table_header = self.table.horizontalHeader()
         for column in range(3):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         table_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.add_binding_menu = QMenu(self)
         self.add_binding_group_menus: dict[str, QMenu] = {}
@@ -769,7 +769,7 @@ class MappingDialog(QDialog):
             current = self.table.currentIndex()
             if (
                 watched is self.table
-                and current.column() == 4
+                and current.column() == 3
                 and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
             ):
                 self._activate_row_action(current.row())

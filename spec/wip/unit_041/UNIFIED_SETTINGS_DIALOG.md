@@ -121,7 +121,7 @@
 | refactor-done | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | 4 factoryへ分離し、`mapping_action`と`Mappings`表記を除去 |
 | refactor-done | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換。全31 targetの重複・欠落なし |
 | refactor-skipped | Connectionタブは`Global settings`を`Controller profile`より上に表示する | regression | integration | `6 passed`。groupの追加順だけで完結しており追加整理なし |
-| todo | Bindings表は`Action`を`Inverted`と`Conflict`の間に表示する | regression | unit / integration | delegateとkeyboard操作も移動後の列へ追従させる |
+| refactor-skipped | Bindings表は`Action`を`Inverted`と`Conflict`の間に表示する | regression | unit / integration | `22 passed`。delegate、keyboard操作、Conflict表示を移動後の列へ追従。固定6列のため追加整理なし |
 | todo | binding削除セルはQt標準のゴミ箱アイコンを中央表示し、説明用ツールチップを持つ | regression | unit / integration | 削除対象行と操作方法は維持する |
 
 ## 7. 設計メモ
@@ -194,6 +194,7 @@
 | `.venv\Scripts\pyside6-lrelease.exe src\demi\i18n\demi_ja.ts -qm src\demi\i18n\demi_ja.qm` | passed | `155 finished`、`0 unfinished` |
 | `uv run pytest tests/integration/ui/test_localization.py tests/integration/package/test_translation_catalog.py -q` | passed | `3 passed`。4 action、4 tab、分類menu、行内Remove |
 | `uv run pytest tests/integration/ui/test_connection_dialog.py -q` | passed | `6 passed`。`Global settings`、`Controller profile`の表示順と既存保存操作 |
+| `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `22 passed`。Action列移動、delegate、keyboard操作、Conflict表示 |
 
 ## 10. 先送り事項
 

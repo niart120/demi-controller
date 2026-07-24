@@ -126,7 +126,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f4(
 
         assert editor.draft.profiles[0].bindings[0].source == "KEY:U"
         assert release_requests == []
-        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+        assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
             "F4 is reserved for mouse capture release"
         )
         assert dialog.mapping_model.capture_row == 0
@@ -184,17 +184,17 @@ def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
     assert dialog.isVisible()
     assert editor.draft == original
     assert dialog.mapping_model.capture_row is None
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == "Remap"
 
     dialog.begin_capture_row(0)
-    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 4))
+    action_rect = dialog.table.visualRect(dialog.mapping_model.index(0, 3))
     QTest.mouseClick(dialog.table.viewport(), Qt.MouseButton.LeftButton, pos=action_rect.center())
     qt_application.processEvents()
 
     assert dialog.isVisible()
     assert editor.draft == original
     assert dialog.mapping_model.capture_row is None
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == "Remap"
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == "Remap"
 
 
 def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_and_round_trips(
@@ -249,7 +249,7 @@ def test_mapping_dialog_rejects_f4_with_reason_but_saves_and_reloads_f12(
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
-    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == (
+    assert dialog.mapping_model.data(dialog.mapping_model.index(0, 4)) == (
         "F4 is reserved for mouse capture release"
     )
     assert dialog.mapping_model.capture_row == 0
@@ -323,8 +323,8 @@ def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.data(model.index(0, 3), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
-    assert model.data(model.index(2, 3), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
+    assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
+    assert model.data(model.index(2, 4), Qt.ItemDataRole.DisplayRole) == "Local action: CTRL+C"
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -595,7 +595,7 @@ def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_keyboard_actions_reach
     assert dialog.mapping_model.capture_row is None
 
     dialog.tabs.setCurrentIndex(0)
-    action_index = dialog.mapping_model.index(0, 4)
+    action_index = dialog.mapping_model.index(0, 3)
     dialog.table.setCurrentIndex(action_index)
     _send_key(dialog.table, Qt.Key.Key_Return)
     assert dialog.mapping_model.capture_row == 0
@@ -661,7 +661,7 @@ def test_mapping_dialog_tabs_cancel_hidden_remap_and_keep_row_action_keyboard_re
     assert dialog.tabs.tabText(0) == "Bindings"
     assert dialog.tabs.tabText(1) == "Mouse gyro"
 
-    action_index = dialog.mapping_model.index(0, 4)
+    action_index = dialog.mapping_model.index(0, 3)
     dialog.table.setCurrentIndex(action_index)
     dialog.table.setFocus()
     _send_key(dialog.table, Qt.Key.Key_Space)
