@@ -14,6 +14,7 @@ def test_preview_layout_keeps_all_controls_in_bounds_without_unintended_overlap(
         frozenset({"left_stick", "left_stick_click"}),
         frozenset({"right_stick", "right_stick_click"}),
     }
+    directional_pad_ids = frozenset({"dpad_up", "dpad_right", "dpad_down", "dpad_left"})
 
     assert layout.controls
     for bounds in layout.controls.values():
@@ -25,7 +26,8 @@ def test_preview_layout_keeps_all_controls_in_bounds_without_unintended_overlap(
     for (first_id, first), (second_id, second) in itertools.combinations(
         layout.controls.items(), 2
     ):
-        if frozenset({first_id, second_id}) in allowed_intersections:
+        control_pair = frozenset({first_id, second_id})
+        if control_pair in allowed_intersections or control_pair <= directional_pad_ids:
             continue
         assert not first.intersects(second), f"{first_id} overlaps {second_id}"
 
@@ -56,10 +58,6 @@ def test_preview_layout_keeps_round_controls_circular(size: tuple[int, int]) -> 
         "b",
         "x",
         "y",
-        "dpad_up",
-        "dpad_right",
-        "dpad_down",
-        "dpad_left",
         "left_stick",
         "left_stick_click",
         "right_stick",

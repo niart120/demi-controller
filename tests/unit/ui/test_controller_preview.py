@@ -165,6 +165,35 @@ def test_preview_keeps_keyboard_operation_independent_from_pointer_capture() -> 
     assert model.mouse_input_active is False
 
 
+def test_mouse_input_status_is_below_controller_and_above_imu_indicators() -> None:
+    layout = preview_layout(960, 600)
+
+    assert layout.status_bounds.top >= layout.left_grip_bounds.bottom
+    assert layout.status_bounds.top >= layout.right_grip_bounds.bottom
+    assert layout.status_bounds.bottom <= layout.gyro_bounds.top
+    assert layout.status_bounds.bottom <= layout.accel_bounds.top
+
+
+def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> None:
+    layout = preview_layout(960, 600)
+    dpad_up = layout.controls["dpad_up"]
+    dpad_left = layout.controls["dpad_left"]
+    dpad_right = layout.controls["dpad_right"]
+    dpad_down = layout.controls["dpad_down"]
+    body_center_x = layout.body_bounds.left + layout.body_bounds.width / 2
+
+    assert layout.body_bounds.left <= layout.left_grip_bounds.left
+    assert layout.left_grip_bounds.right <= body_center_x
+    assert body_center_x <= layout.right_grip_bounds.left
+    assert layout.right_grip_bounds.right <= layout.body_bounds.right
+    assert layout.left_grip_bounds.height > layout.left_grip_bounds.width
+    assert layout.right_grip_bounds.height > layout.right_grip_bounds.width
+    assert dpad_up.bottom > dpad_left.top
+    assert dpad_up.bottom > dpad_right.top
+    assert dpad_down.top < dpad_left.bottom
+    assert dpad_down.top < dpad_right.bottom
+
+
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(
     qt_application: object,
 ) -> None:
@@ -246,7 +275,7 @@ def test_grip_colors_fill_grip_regions_and_not_the_stick_surfaces(
     layout = preview_layout(widget.width(), widget.height())
 
     assert _sample_rect(image, layout.left_grip_bounds, 0.20, 0.80) == (160, 32, 32)
-    assert _sample_rect(image, layout.right_grip_bounds, 0.80, 0.80) == (32, 160, 32)
+    assert _sample_rect(image, layout.right_grip_bounds, 0.70, 0.75) == (32, 160, 32)
     assert _sample_rect(image, layout.controls["left_stick"], 0.50, 0.15) == (64, 80, 96)
     assert _sample_rect(image, layout.controls["right_stick"], 0.50, 0.15) == (64, 80, 96)
 
