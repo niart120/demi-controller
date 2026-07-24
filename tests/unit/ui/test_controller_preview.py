@@ -279,6 +279,20 @@ def test_controller_layout_places_the_left_stick_above_the_directional_pad() -> 
     assert layout.controls["left_stick"].bottom <= layout.controls["dpad_up"].top
 
 
+def test_directional_pad_sits_inward_and_balances_the_right_stick() -> None:
+    layout = preview_layout(960, 600)
+    dpad_center = preview_module._directional_pad_path(layout).boundingRect().center()
+    left_stick = preview_module._qrect(layout.controls["left_stick"]).center()
+    right_stick = preview_module._qrect(layout.controls["right_stick"]).center()
+    content_center_x = layout.content_bounds.left + layout.content_bounds.width / 2
+
+    assert dpad_center.x() - left_stick.x() >= layout.content_bounds.width * 0.04
+    assert abs((dpad_center.x() + right_stick.x()) / 2 - content_center_x) <= (
+        layout.content_bounds.width * 0.02
+    )
+    assert abs(dpad_center.y() - right_stick.y()) <= layout.content_bounds.height * 0.02
+
+
 def test_directional_pad_uses_one_connected_cross_path() -> None:
     layout = preview_layout(960, 600)
 

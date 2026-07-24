@@ -14,6 +14,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | user decision | 緩い弧を描くB案を基準に試作し、実画像を見ながら調整する | conversation |
 | user confirmation | 試作2のショルダー部分を採用する | conversation |
 | user feedback | 本体を約3:2へ縮め、Minus/Plus/Home/Captureを小円化し、主要操作群の横間隔を狭める | conversation |
+| user feedback | 3:2化後のD-pad位置を下段の左右バランスに合わせて直す | conversation |
 | visual baseline | unit_047完了時の既定、複合入力、最小表示 | `tmp/gui-audit/unit_047-final/` |
 
 ### 1.3 use case
@@ -24,6 +25,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | 利用者 / ショルダー列 | L/R/ZL/ZRの通常・押下状態 | 4ボタンが同じ高さのショルダー列として外形内に収まる | L/Rだけをフェイス側へ下げない |
 | 利用者 / 本体と主要操作群 | 既定または複合入力 | 約3:2の外形内で左スティック、misc、ABXYが近いまとまりとして読める | 操作部同士を重ねない |
 | 利用者 / misc操作部 | Minus、Plus、Home、Captureの通常・押下状態 | ABXYより一回り小さい4つの円として浅いV字に並ぶ | 記号と押下表示を維持する |
+| 利用者 / D-pad | 方向入力 | 左スティックの右下にあり、右スティックと下段の左右バランスが取れる | 十字形状と押下表示を維持する |
 | 利用者 / 最小表示 | 800x520ウィンドウ | ラベル、外形、操作部が切れず、約3:2の全体比率を維持する | IMU領域を縮小しない |
 
 ## 2. 対象範囲
@@ -34,6 +36,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 - 約3:2へ縮める本体とグリップの横幅。
 - 左スティック、右スティック、ABXYの横方向配置。
 - Minus、Plus、Home、Captureの小円化と浅いV字配置。
+- D-padの横方向配置。
 - 通常幅と最小幅のWindows Qt通常描画による反復調整。
 
 ## 3. 対象外
@@ -60,6 +63,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | 主要操作群 | 同上 | 左スティックとmisc、miscとABXYの横方向の空白がそれぞれ描画領域幅の7%以内に収まる | 各群の外接矩形で比較する |
 | misc形状 | 同上 | Minus、Plus、Home、Captureが同径の円になり、直径がABXYの80%以下になる | 最小ラベルサイズを維持する |
 | misc配置 | 同上 | MinusとPlusを上側外寄り、HomeとCaptureを下側内寄りへ置く | 左右対称の浅いV字 |
+| D-pad配置 | 同上 | D-pad中心を左スティック中心より描画領域幅の4%以上内側へ置き、D-padと右スティックの中点を画面中央から2%以内に収める | 下段の縦中心差も描画領域高さの2%以内 |
 
 ## 6. TDD Test List
 
@@ -72,6 +76,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | refactor-skipped | Left stick, misc controls, and ABXY use compact horizontal spacing | regression | unit | 各空白7%以内、追加整理は不要 |
 | refactor-skipped | Minus, Plus, Home, and Capture are equal circles smaller than ABXY | regression | unit | 直径80%以下、追加整理は不要 |
 | refactor-skipped | Misc controls form a symmetric shallow V | regression | unit | 上外側にMinus/Plus、下内側にHome/Capture |
+| refactor-skipped | The directional pad sits inward from the left stick and balances the right stick | regression | unit | 描画幅36%の位置、追加整理は不要 |
 | green | Default, mixed-input, and minimum states visually read as one compact controller body | visual | integration | 3状態で確認 |
 
 ## 7. 設計メモ
@@ -81,6 +86,7 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 - 上側面はわずかに内側へ入り、グリップの外側曲線と合わせて長方形感を弱める。
 - 3:2化は本体を高くせず、本体、グリップ、操作部を左右から内側へ寄せる。
 - misc操作部は2行2列の矩形をやめ、中央へ向かう浅いV字の小円にする。
+- D-padは左スティックの真下ではなく右下へ置き、右スティックと下段の重心を揃える。
 - 視覚調整は通常幅だけで決めず、最小表示も同じ反復で確認する。
 
 ## 8. 対象ファイル
@@ -113,6 +119,9 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | `uv run pytest tests/unit/ui/test_controller_preview.py::test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v -q -p no:cacheprovider --basetemp tmp/pytest-unit048-misc-red` | red | miscが57.6x36pxの矩形であるため1 failed |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-misc-green-attempt1` | pass | 51 passed、小円と浅いV字を確認 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-compact-attempt2` | pass | 通常幅と最小幅でmisc記号、押下状態、操作群間隔を確認 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_directional_pad_sits_inward_and_balances_the_right_stick -q -p no:cacheprovider --basetemp tmp/pytest-unit048-dpad-red` | red | D-pad中心が左スティック中心より9.6px外側にあるため1 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-dpad-green-attempt1` | pass | 52 passed、D-padを描画幅36%へ移動 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-dpad-attempt1` | pass | 通常幅と最小幅で左スティック右下と下段の左右バランスを確認 |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項
