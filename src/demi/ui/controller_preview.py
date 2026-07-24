@@ -27,6 +27,7 @@ from demi.ui.preview_sensor import (
 )
 
 type RepaintRequest = Callable[[], object]
+type TranslateText = Callable[[str, str], str]
 
 _PRESSED_FILL_COLOR = "#F4C95D"
 _PRESSED_OUTLINE_COLOR = "#FFF1A8"
@@ -145,6 +146,15 @@ def _control_id(button: LogicalButton) -> str:
     return button.value.lower()
 
 
+def _mouse_input_status_text(
+    active: bool,
+    translate: TranslateText = QCoreApplication.translate,
+) -> str:
+    mouse_input = translate("ControllerPreviewWidget", "Mouse input")
+    state = translate("ControllerPreviewWidget", "On" if active else "Off")
+    return f"{mouse_input}: {state}"
+
+
 class ControllerPreviewWidget(QWidget):
     """Render a controller-state model without changing input or runtime state."""
 
@@ -234,7 +244,6 @@ class ControllerPreviewWidget(QWidget):
         painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(silhouette)
-        painter.drawPath(_controller_faceplate_path(layout))
         for control_id, bounds in layout.controls.items():
             if control_id in _STICK_CLICK_IDS or control_id.startswith("dpad_"):
                 continue
@@ -274,12 +283,8 @@ class ControllerPreviewWidget(QWidget):
                 if control_id == "left_stick"
                 else model.right_stick_position
             )
-            radius = min(rect.width(), rect.height()) * 0.17
-            travel = min(rect.width(), rect.height()) * 0.25
-            center = rect.center()
-            knob = QPointF(center.x() + position[0] * travel, center.y() - position[1] * travel)
             painter.setBrush(QColor("#D8D8D8"))
-            painter.drawEllipse(_circle(knob, radius))
+            painter.drawEllipse(_stick_knob_geometry(rect, position))
             return
         painter.setPen(
             QPen(
@@ -298,7 +303,7 @@ class ControllerPreviewWidget(QWidget):
             "home": "H",
             "capture": "C",
         }.get(control_id, control_id.upper())
-        if control_id in {"zl", "l", "r", "zr", "minus", "plus", "home", "capture"}:
+        if control_id in {"zl", "l", "r", "zr"}:
             painter.drawRoundedRect(rect, 7.0, 7.0)
         else:
             painter.drawEllipse(rect)
@@ -377,10 +382,6 @@ class ControllerPreviewWidget(QWidget):
         model: ControllerPreviewModel,
         bounds: PreviewRect,
     ) -> None:
-        translate = QCoreApplication.translate
-        on = translate("ControllerPreviewWidget", "On")
-        off = translate("ControllerPreviewWidget", "Off")
-        mouse_input = translate("ControllerPreviewWidget", "Mouse input")
         mouse_color = "#176B3A" if model.mouse_input_active else "#7A1F1F"
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
         painter.setBrush(QColor(mouse_color))
@@ -388,7 +389,7 @@ class ControllerPreviewWidget(QWidget):
         painter.drawText(
             _qrect(bounds),
             Qt.AlignmentFlag.AlignCenter,
-            f"{mouse_input}: {on if model.mouse_input_active else off} (F5)",
+            _mouse_input_status_text(model.mouse_input_active),
         )
 
     def _draw_sensors(
@@ -453,7 +454,7 @@ class ControllerPreviewWidget(QWidget):
             label_bounds = QRectF(guide_end.x() - 11.0, guide_end.y() - 7.0, 22.0, 14.0)
             original_font = painter.font()
             label_font = painter.font()
-            label_font.setPixelSize(max(8, round(bounds.height() * 0.13)))
+            label_font.setPixelSize(_accel_axis_label_pixel_size(bounds))
             painter.setFont(label_font)
             painter.setPen(QPen(color, 1.0))
             painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, f"+{'XYZ'[index]}")
@@ -488,6 +489,23 @@ class ControllerPreviewWidget(QWidget):
 
 def _circle(center: QPointF, radius: float) -> QRectF:
     return QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+
+def _accel_axis_label_pixel_size(bounds: QRectF) -> int:
+    return max(10, round(bounds.height() * 0.13))
+
+
+def _stick_knob_geometry(bounds: QRectF, position: tuple[float, float]) -> QRectF:
+    diameter = min(bounds.width(), bounds.height())
+    radius = diameter * 0.17
+    travel = diameter * 0.25
+    center = bounds.center()
+    magnitude = max(1.0, hypot(*position))
+    knob = QPointF(
+        center.x() + position[0] / magnitude * travel,
+        center.y() - position[1] / magnitude * travel,
+    )
+    return _circle(knob, radius)
 
 
 def _qrect(bounds: PreviewRect) -> QRectF:
@@ -527,17 +545,74 @@ def _directional_pad_path(layout: PreviewLayout) -> QPainterPath:
 def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
     bounds = _qrect(layout.body_bounds)
     path = QPainterPath()
-    path.moveTo(bounds.left() + bounds.width() * 0.14, bounds.top())
-    path.lineTo(bounds.right() - bounds.width() * 0.14, bounds.top())
+    path.moveTo(
+        bounds.left() + bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
+    )
     path.cubicTo(
+        bounds.left() + bounds.width() * 0.04,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.12,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.20,
+        bounds.top(),
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.24,
+        bounds.top(),
+        bounds.left() + bounds.width() * 0.27,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.left() + bounds.width() * 0.30,
+        bounds.top() + bounds.height() * 0.015,
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.38,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.left() + bounds.width() * 0.43,
+        bounds.top() + bounds.height() * 0.055,
+        bounds.center().x(),
+        bounds.top() + bounds.height() * 0.055,
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.43,
+        bounds.top() + bounds.height() * 0.055,
+        bounds.right() - bounds.width() * 0.38,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.right() - bounds.width() * 0.30,
+        bounds.top() + bounds.height() * 0.015,
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.27,
+        bounds.top() + bounds.height() * 0.015,
+        bounds.right() - bounds.width() * 0.24,
+        bounds.top(),
+        bounds.right() - bounds.width() * 0.20,
+        bounds.top(),
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.12,
+        bounds.top(),
         bounds.right() - bounds.width() * 0.04,
         bounds.top(),
-        bounds.right(),
-        bounds.top() + bounds.height() * 0.10,
-        bounds.right(),
-        bounds.top() + bounds.height() * 0.25,
+        bounds.right() - bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
     )
-    path.lineTo(bounds.right(), bounds.top() + bounds.height() * 0.60)
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.005,
+        bounds.top() + bounds.height() * 0.10,
+        bounds.right() - bounds.width() * 0.02,
+        bounds.top() + bounds.height() * 0.20,
+        bounds.right() - bounds.width() * 0.025,
+        bounds.top() + bounds.height() * 0.30,
+    )
+    path.cubicTo(
+        bounds.right() - bounds.width() * 0.03,
+        bounds.top() + bounds.height() * 0.42,
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.52,
+        bounds.right(),
+        bounds.top() + bounds.height() * 0.60,
+    )
     path.cubicTo(
         bounds.right(),
         bounds.top() + bounds.height() * 0.84,
@@ -555,14 +630,21 @@ def _controller_faceplate_path(layout: PreviewLayout) -> QPainterPath:
         bounds.left(),
         bounds.top() + bounds.height() * 0.60,
     )
-    path.lineTo(bounds.left(), bounds.top() + bounds.height() * 0.25)
     path.cubicTo(
         bounds.left(),
+        bounds.top() + bounds.height() * 0.52,
+        bounds.left() + bounds.width() * 0.03,
+        bounds.top() + bounds.height() * 0.42,
+        bounds.left() + bounds.width() * 0.025,
+        bounds.top() + bounds.height() * 0.30,
+    )
+    path.cubicTo(
+        bounds.left() + bounds.width() * 0.02,
+        bounds.top() + bounds.height() * 0.20,
+        bounds.left() + bounds.width() * 0.005,
         bounds.top() + bounds.height() * 0.10,
-        bounds.left() + bounds.width() * 0.04,
-        bounds.top(),
-        bounds.left() + bounds.width() * 0.14,
-        bounds.top(),
+        bounds.left() + bounds.width() * 0.01,
+        bounds.top() + bounds.height() * 0.015,
     )
     path.closeSubpath()
     return path
@@ -654,11 +736,14 @@ def _gyro_bar_geometry(
     index: int,
     axis: SignedAxisDisplay,
 ) -> tuple[QRectF, QRectF]:
+    heading_height = max(16.0, bounds.height() * 0.28)
+    plot_top = bounds.top() + heading_height
+    plot_height = bounds.height() - heading_height
     track = QRectF(
         bounds.left() + bounds.width() * 0.20,
-        bounds.top() + bounds.height() * (0.40 + index * 0.20),
+        plot_top + plot_height * (0.05 + index * 0.31),
         bounds.width() * 0.76,
-        max(3.0, bounds.height() * 0.10),
+        max(3.0, plot_height * 0.18),
     )
     center_x = track.center().x()
     signed_width = track.width() * 0.5 * axis.magnitude * axis.direction
@@ -675,9 +760,12 @@ def _accel_vector_geometry(
     bounds: QRectF,
     display: SensorDisplay,
 ) -> tuple[QPointF, QPointF, tuple[tuple[QPointF, QPointF], ...]]:
-    center = QPointF(bounds.center().x(), bounds.top() + bounds.height() * 0.58)
-    axis_length = min(bounds.width() * 0.25, bounds.height() * 0.38)
-    basis = ((0.0, -1.0), (-0.78, 0.62), (0.78, 0.62))
+    heading_height = max(16.0, bounds.height() * 0.28)
+    plot_top = bounds.top() + heading_height
+    plot_height = bounds.height() - heading_height
+    center = QPointF(bounds.center().x(), plot_top + plot_height * 0.62)
+    axis_length = min(bounds.width() * 0.25, plot_height * 0.40)
+    basis = ((0.78, -0.62), (0.78, 0.62), (0.0, 1.0))
     guides = tuple(
         (
             QPointF(center.x() - x * axis_length, center.y() - y * axis_length),

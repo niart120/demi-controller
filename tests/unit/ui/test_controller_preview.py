@@ -1,7 +1,8 @@
 from dataclasses import dataclass
+from math import hypot
 
 import pytest
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 import demi.ui.controller_preview as preview_module
@@ -16,7 +17,7 @@ from demi.ui.controller_preview import (
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
-from demi.ui.preview_layout import PreviewRect, preview_layout
+from demi.ui.preview_layout import CONTROL_IDS, PreviewRect, preview_layout
 from demi.ui.preview_sensor import accel_display, gyro_display
 
 
@@ -174,6 +175,31 @@ def test_mouse_input_status_is_below_controller_and_above_imu_indicators() -> No
     assert layout.status_bounds.bottom <= layout.accel_bounds.top
 
 
+@pytest.mark.parametrize(
+    ("active", "expected"),
+    [(False, "Mouse input: Off"), (True, "Mouse input: On")],
+)
+def test_mouse_input_status_text_omits_keyboard_shortcut(
+    active: bool,
+    expected: str,
+) -> None:
+    assert preview_module._mouse_input_status_text(active) == expected
+
+
+def test_mouse_input_status_text_uses_translated_terms_without_keyboard_shortcut() -> None:
+    translations = {
+        "Mouse input": "マウス入力",
+        "On": "有効",
+        "Off": "無効",
+    }
+
+    def translate(_context: str, source: str) -> str:
+        return translations[source]
+
+    assert preview_module._mouse_input_status_text(False, translate) == "マウス入力: 無効"
+    assert preview_module._mouse_input_status_text(True, translate) == "マウス入力: 有効"
+
+
 def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> None:
     layout = preview_layout(960, 600)
     dpad_up = layout.controls["dpad_up"]
@@ -188,13 +214,53 @@ def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> N
     assert dpad_down.top < dpad_right.bottom
 
 
-def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
+def test_controller_layout_keeps_rounded_grips_within_the_faceplate_width() -> None:
     layout = preview_layout(960, 600)
 
-    assert layout.left_grip_bounds.left < layout.body_bounds.left
-    assert layout.right_grip_bounds.right > layout.body_bounds.right
+    assert layout.left_grip_bounds.left == pytest.approx(layout.body_bounds.left)
+    assert layout.right_grip_bounds.right == pytest.approx(layout.body_bounds.right)
     assert layout.left_grip_bounds.bottom <= layout.status_bounds.top
     assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
+
+
+@pytest.mark.parametrize("size", [(960, 600), (800, 475)])
+def test_all_controls_stay_inside_a_three_to_two_silhouette_with_enclosed_shoulders(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
+    faceplate = preview_module._controller_faceplate_path(layout)
+    silhouette = preview_module._controller_silhouette_path(layout)
+    silhouette_bounds = silhouette.boundingRect()
+
+    for control_id in CONTROL_IDS:
+        assert faceplate.contains(preview_module._qrect(layout.controls[control_id])), control_id
+
+    assert silhouette_bounds.top() <= layout.content_bounds.top + 1.0
+    assert 1.45 <= silhouette_bounds.width() / silhouette_bounds.height() <= 1.60
+
+
+@pytest.mark.parametrize("size", [(960, 600), (800, 475)])
+def test_shoulder_row_sits_inside_a_shallow_curved_upper_shell(
+    size: tuple[int, int],
+) -> None:
+    layout = preview_layout(*size)
+    faceplate = preview_module._controller_faceplate_path(layout)
+    body = preview_module._qrect(layout.body_bounds)
+    shoulders = [layout.controls[control_id] for control_id in ("zl", "l", "r", "zr")]
+
+    assert len({shoulder.top for shoulder in shoulders}) == 1
+    assert len({shoulder.height for shoulder in shoulders}) == 1
+    for shoulder in shoulders:
+        assert faceplate.contains(preview_module._qrect(shoulder))
+
+    assert not faceplate.contains(QPointF(body.center().x(), body.top() + body.height() * 0.03))
+    assert faceplate.contains(QPointF(body.center().x(), body.top() + body.height() * 0.10))
+
+    upper_side_y = body.top() + body.height() * 0.30
+    assert not faceplate.contains(QPointF(body.left() + body.width() * 0.01, upper_side_y))
+    assert faceplate.contains(QPointF(body.left() + body.width() * 0.08, upper_side_y))
+    assert not faceplate.contains(QPointF(body.right() - body.width() * 0.01, upper_side_y))
+    assert faceplate.contains(QPointF(body.right() - body.width() * 0.08, upper_side_y))
 
 
 def test_controller_silhouette_contains_both_complete_grip_regions() -> None:
@@ -213,6 +279,20 @@ def test_controller_layout_places_the_left_stick_above_the_directional_pad() -> 
     assert layout.controls["left_stick"].bottom <= layout.controls["dpad_up"].top
 
 
+def test_directional_pad_sits_inward_and_balances_the_right_stick() -> None:
+    layout = preview_layout(960, 600)
+    dpad_center = preview_module._directional_pad_path(layout).boundingRect().center()
+    left_stick = preview_module._qrect(layout.controls["left_stick"]).center()
+    right_stick = preview_module._qrect(layout.controls["right_stick"]).center()
+    content_center_x = layout.content_bounds.left + layout.content_bounds.width / 2
+
+    assert dpad_center.x() - left_stick.x() >= layout.content_bounds.width * 0.04
+    assert abs((dpad_center.x() + right_stick.x()) / 2 - content_center_x) <= (
+        layout.content_bounds.width * 0.02
+    )
+    assert abs(dpad_center.y() - right_stick.y()) <= layout.content_bounds.height * 0.02
+
+
 def test_directional_pad_uses_one_connected_cross_path() -> None:
     layout = preview_layout(960, 600)
 
@@ -222,6 +302,61 @@ def test_directional_pad_uses_one_connected_cross_path() -> None:
     for control_id in ("dpad_up", "dpad_left", "dpad_right", "dpad_down"):
         bounds = preview_module._qrect(layout.controls[control_id])
         assert path.contains(bounds.center())
+
+
+def test_face_controls_and_shoulders_keep_balanced_relative_proportions() -> None:
+    layout = preview_layout(960, 600)
+    controls = layout.controls
+    stick_diameter = controls["left_stick"].width
+    face_button_diameter = controls["a"].width
+    dpad_bounds = preview_module._directional_pad_path(layout).boundingRect()
+
+    assert dpad_bounds.width() <= stick_diameter * 1.2
+    assert dpad_bounds.height() <= stick_diameter * 1.2
+    for control_id in ("zl", "l", "r", "zr"):
+        assert controls[control_id].width <= face_button_diameter * 2.25
+
+    x_center = controls["x"].left + controls["x"].width / 2
+    y_center = controls["y"].left + controls["y"].width / 2
+    a_center = controls["a"].left + controls["a"].width / 2
+    b_center = controls["b"].left + controls["b"].width / 2
+    assert a_center - x_center == pytest.approx(x_center - y_center)
+    assert b_center == pytest.approx(x_center)
+    horizontal_spacing = a_center - x_center
+    vertical_spacing = controls["y"].top - controls["x"].top
+    assert horizontal_spacing == pytest.approx(vertical_spacing)
+
+
+def test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v() -> None:
+    layout = preview_layout(960, 600)
+    controls = layout.controls
+    misc = {control_id: controls[control_id] for control_id in ("minus", "plus", "home", "capture")}
+
+    for bounds in misc.values():
+        assert bounds.width == pytest.approx(bounds.height)
+        assert bounds.width <= controls["a"].width * 0.80
+
+    centers = {
+        control_id: (
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
+        )
+        for control_id, bounds in misc.items()
+    }
+    assert centers["minus"][0] < centers["capture"][0] < centers["home"][0] < centers["plus"][0]
+    assert centers["minus"][1] == pytest.approx(centers["plus"][1])
+    assert centers["home"][1] == pytest.approx(centers["capture"][1])
+    assert centers["minus"][1] < centers["home"][1]
+
+    content_center_x = layout.content_bounds.left + layout.content_bounds.width / 2
+    assert centers["minus"][0] + centers["plus"][0] == pytest.approx(content_center_x * 2)
+    assert centers["home"][0] + centers["capture"][0] == pytest.approx(content_center_x * 2)
+
+    misc_left = min(bounds.left for bounds in misc.values())
+    misc_right = max(bounds.right for bounds in misc.values())
+    abxy_left = min(controls[control_id].left for control_id in ("a", "b", "x", "y"))
+    assert misc_left - controls["left_stick"].right <= layout.content_bounds.width * 0.07
+    assert abxy_left - misc_right <= layout.content_bounds.width * 0.07
 
 
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(
@@ -278,6 +413,32 @@ def test_stick_click_is_not_drawn_as_a_separate_control_over_the_stick(
     assert "right_stick_click" not in drawn_control_ids
 
 
+@pytest.mark.parametrize(
+    "position",
+    [
+        (-1.0, -1.0),
+        (-1.0, 1.0),
+        (1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, 0.0),
+        (1.0, 0.0),
+        (0.0, -1.0),
+        (0.0, 1.0),
+    ],
+)
+def test_stick_knob_remains_completely_inside_its_outer_ring(
+    position: tuple[float, float],
+) -> None:
+    outer_ring = QRectF(0.0, 0.0, 108.0, 108.0)
+    knob = preview_module._stick_knob_geometry(outer_ring, position)
+    center_distance = hypot(
+        knob.center().x() - outer_ring.center().x(),
+        knob.center().y() - outer_ring.center().y(),
+    )
+
+    assert center_distance + knob.width() / 2 <= outer_ring.width() / 2
+
+
 def test_control_label_size_scales_with_the_control() -> None:
     bounds = preview_layout(960, 600).controls["a"]
 
@@ -327,6 +488,24 @@ def test_gyro_indicator_uses_signed_linear_tracks_instead_of_button_like_rings()
     assert zero_fill.width() == 0.0
 
 
+def test_minimum_imu_layout_keeps_plots_below_a_readable_heading_band() -> None:
+    layout = preview_layout(800, 475)
+    gyro_bounds = preview_module._qrect(layout.gyro_bounds)
+    accel_bounds = preview_module._qrect(layout.accel_bounds)
+    display = accel_display(AccelG(0.0, 0.0, 1.0))
+
+    first_track, _ = preview_module._gyro_bar_geometry(
+        gyro_bounds,
+        0,
+        gyro_display(GyroRate(0.0, 0.0, 0.0)).x,
+    )
+    _, _, guides = preview_module._accel_vector_geometry(accel_bounds, display)
+
+    assert first_track.top() >= gyro_bounds.top() + 16.0
+    assert min(point.y() for guide in guides for point in guide) >= accel_bounds.top() + 16.0
+    assert preview_module._accel_axis_label_pixel_size(accel_bounds) >= 10
+
+
 def test_acceleration_indicator_composes_three_axes_into_one_vector() -> None:
     bounds = QRectF(0.0, 0.0, 384.0, 84.0)
     x_only = accel_display(AccelG(0.25, 0.0, 0.0))
@@ -346,9 +525,11 @@ def test_acceleration_indicator_composes_three_axes_into_one_vector() -> None:
     assert combined_end.y() - center.y() == pytest.approx(
         (x_end.y() - center.y()) + (y_end.y() - center.y()) + (z_end.y() - center.y())
     )
-    assert x_end.y() < center.y()  # +X: trigger direction
-    assert y_end.x() < center.x()  # +Y: controller-left direction
-    assert z_end.x() > center.x()  # +Z: face-outward
+    assert x_end.x() > center.x()  # +X: upper-right
+    assert x_end.y() < center.y()
+    assert y_end.x() > center.x()  # +Y: lower-right
+    assert y_end.y() > center.y()
+    assert z_end.x() == pytest.approx(center.x())  # +Z: screen-down
     assert z_end.y() > center.y()
 
 
