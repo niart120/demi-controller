@@ -386,6 +386,24 @@ def test_gyro_indicator_uses_signed_linear_tracks_instead_of_button_like_rings()
     assert zero_fill.width() == 0.0
 
 
+def test_minimum_imu_layout_keeps_plots_below_a_readable_heading_band() -> None:
+    layout = preview_layout(800, 480)
+    gyro_bounds = preview_module._qrect(layout.gyro_bounds)
+    accel_bounds = preview_module._qrect(layout.accel_bounds)
+    display = accel_display(AccelG(0.0, 0.0, 1.0))
+
+    first_track, _ = preview_module._gyro_bar_geometry(
+        gyro_bounds,
+        0,
+        gyro_display(GyroRate(0.0, 0.0, 0.0)).x,
+    )
+    _, _, guides = preview_module._accel_vector_geometry(accel_bounds, display)
+
+    assert first_track.top() >= gyro_bounds.top() + 16.0
+    assert min(point.y() for guide in guides for point in guide) >= accel_bounds.top() + 16.0
+    assert preview_module._accel_axis_label_pixel_size(accel_bounds) >= 10
+
+
 def test_acceleration_indicator_composes_three_axes_into_one_vector() -> None:
     bounds = QRectF(0.0, 0.0, 384.0, 84.0)
     x_only = accel_display(AccelG(0.25, 0.0, 0.0))

@@ -448,7 +448,7 @@ class ControllerPreviewWidget(QWidget):
             label_bounds = QRectF(guide_end.x() - 11.0, guide_end.y() - 7.0, 22.0, 14.0)
             original_font = painter.font()
             label_font = painter.font()
-            label_font.setPixelSize(max(8, round(bounds.height() * 0.13)))
+            label_font.setPixelSize(_accel_axis_label_pixel_size(bounds))
             painter.setFont(label_font)
             painter.setPen(QPen(color, 1.0))
             painter.drawText(label_bounds, Qt.AlignmentFlag.AlignCenter, f"+{'XYZ'[index]}")
@@ -483,6 +483,10 @@ class ControllerPreviewWidget(QWidget):
 
 def _circle(center: QPointF, radius: float) -> QRectF:
     return QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+
+def _accel_axis_label_pixel_size(bounds: QRectF) -> int:
+    return max(10, round(bounds.height() * 0.13))
 
 
 def _stick_knob_geometry(bounds: QRectF, position: tuple[float, float]) -> QRectF:
@@ -662,11 +666,14 @@ def _gyro_bar_geometry(
     index: int,
     axis: SignedAxisDisplay,
 ) -> tuple[QRectF, QRectF]:
+    heading_height = max(16.0, bounds.height() * 0.28)
+    plot_top = bounds.top() + heading_height
+    plot_height = bounds.height() - heading_height
     track = QRectF(
         bounds.left() + bounds.width() * 0.20,
-        bounds.top() + bounds.height() * (0.40 + index * 0.20),
+        plot_top + plot_height * (0.05 + index * 0.31),
         bounds.width() * 0.76,
-        max(3.0, bounds.height() * 0.10),
+        max(3.0, plot_height * 0.18),
     )
     center_x = track.center().x()
     signed_width = track.width() * 0.5 * axis.magnitude * axis.direction
@@ -683,8 +690,11 @@ def _accel_vector_geometry(
     bounds: QRectF,
     display: SensorDisplay,
 ) -> tuple[QPointF, QPointF, tuple[tuple[QPointF, QPointF], ...]]:
-    center = QPointF(bounds.center().x(), bounds.top() + bounds.height() * 0.58)
-    axis_length = min(bounds.width() * 0.25, bounds.height() * 0.38)
+    heading_height = max(16.0, bounds.height() * 0.28)
+    plot_top = bounds.top() + heading_height
+    plot_height = bounds.height() - heading_height
+    center = QPointF(bounds.center().x(), plot_top + plot_height * 0.62)
+    axis_length = min(bounds.width() * 0.25, plot_height * 0.40)
     basis = ((0.0, -1.0), (-0.78, 0.62), (0.78, 0.62))
     guides = tuple(
         (
