@@ -177,8 +177,8 @@
 | `uv run ruff format --check .` | passed | 148 files formatted |
 | `uv run ruff check .` | passed | 全lint検査成功 |
 | `uv run ty check --no-progress` | passed | 全型検査成功 |
-| `uv run pytest tests/unit` | passed | `302 passed` |
-| `uv run pytest tests/integration` | passed | `131 passed`。controller、input、package、UIを含む |
+| `uv run pytest tests/unit` | passed | `303 passed`。integrationとの並行実行では`tmp/pytest`の清掃が競合したため、単独で再実行 |
+| `uv run pytest tests/integration` | passed | `131 passed`。controller、input、package、UIを含む。単独で再実行 |
 | `uv build` | passed | sdistとwheelを作成 |
 | `git diff --check` | passed | 空白エラーなし |
 | `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | 仮テキスト標識なし |
@@ -197,6 +197,8 @@
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `22 passed`。Action列移動、delegate、keyboard操作、Conflict表示 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `23 passed`。ゴミ箱icon、tooltip、既存の行削除操作 |
 | `uv run ty check --no-progress src/demi/ui/dialogs/mapping.py tests/unit/ui/test_mapping_model.py tests/unit/ui/test_mapping_delegate.py tests/integration/ui/test_mapping_dialog.py` | passed | ゴミ箱iconのQt model roleとdelegate型境界 |
+| `uv run python .agents\skills\inspect-gui-states\scripts\capture_gui.py --scenario tmp\gui-audit\unit041-scenario.py --output tmp\gui-audit\unit041-layout-followup-20260724` | passed | Windows通常描画。Connection、Bindings、追加menu、Mouse、Colorsの5 PNG |
+| `view_image` によるConnectionとBindings PNGの原寸確認 | passed | 800x520でgroup順、列順、右端のゴミ箱iconを確認。切れ、重なり、横scrollなし |
 
 ## 10. 先送り事項
 
