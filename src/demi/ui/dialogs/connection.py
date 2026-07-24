@@ -177,8 +177,8 @@ class ConnectionDialog(QDialog):
         global_settings_form.addRow(self.discovery_label)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(self.profile_group)
         layout.addWidget(self.global_settings_group)
+        layout.addWidget(self.profile_group)
         layout.addWidget(self.connection_error_label)
         layout.addWidget(self.button_box)
 

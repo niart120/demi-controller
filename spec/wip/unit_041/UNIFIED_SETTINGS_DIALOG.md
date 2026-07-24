@@ -120,7 +120,7 @@
 | refactor-done | Settingsは`Connection`、`Bindings`、`Mouse`、`Colors`を入れ子なしで表示する | regression | integration | 既存mapping pagesを外側tabへ移し、入力待受の所有期間を共有dialogへ統合 |
 | refactor-done | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | 4 factoryへ分離し、`mapping_action`と`Mappings`表記を除去 |
 | refactor-done | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換。全31 targetの重複・欠落なし |
-| todo | Connectionタブは`Global settings`を`Controller profile`より上に表示する | regression | integration | groupの表示順だけを変更し、所属controlは維持する |
+| refactor-skipped | Connectionタブは`Global settings`を`Controller profile`より上に表示する | regression | integration | `6 passed`。groupの追加順だけで完結しており追加整理なし |
 | todo | Bindings表は`Action`を`Inverted`と`Conflict`の間に表示する | regression | unit / integration | delegateとkeyboard操作も移動後の列へ追従させる |
 | todo | binding削除セルはQt標準のゴミ箱アイコンを中央表示し、説明用ツールチップを持つ | regression | unit / integration | 削除対象行と操作方法は維持する |
 
@@ -193,6 +193,7 @@
 | `view_image` によるfollow-up PNGの原寸確認 | passed | 800x520で列、チェック、行操作、4タブ、分類menuの切れ・重なりなし |
 | `.venv\Scripts\pyside6-lrelease.exe src\demi\i18n\demi_ja.ts -qm src\demi\i18n\demi_ja.qm` | passed | `155 finished`、`0 unfinished` |
 | `uv run pytest tests/integration/ui/test_localization.py tests/integration/package/test_translation_catalog.py -q` | passed | `3 passed`。4 action、4 tab、分類menu、行内Remove |
+| `uv run pytest tests/integration/ui/test_connection_dialog.py -q` | passed | `6 passed`。`Global settings`、`Controller profile`の表示順と既存保存操作 |
 
 ## 10. 先送り事項
 

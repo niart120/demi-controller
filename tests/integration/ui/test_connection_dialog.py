@@ -214,6 +214,8 @@ def test_connection_dialog_separates_profile_and_global_settings_then_saves_with
     assert dialog.profile_group.title() == "Controller profile"
     assert isinstance(dialog.global_settings_group, QGroupBox)
     assert dialog.global_settings_group.title() == "Global settings"
+    assert dialog.layout().indexOf(dialog.global_settings_group) == 0
+    assert dialog.layout().indexOf(dialog.profile_group) == 1
     assert not hasattr(dialog, "bond_slot_edit")
     assert not hasattr(dialog, "timeout_edit")
     assert isinstance(dialog.button_box, QDialogButtonBox)
