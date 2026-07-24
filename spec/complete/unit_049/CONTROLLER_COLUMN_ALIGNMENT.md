@@ -84,7 +84,18 @@
 | `uv run pytest tests/unit/ui/test_preview_layout.py::test_controller_status_and_imu_share_one_horizontal_column -q -p no:cacheprovider --basetemp tmp/pytest-unit049-column-red` | red | IMU左端がMouse input左端より115.2px外側にあるため2 failed |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit049-column-green` | pass | 54 passed、共通左右端とIMU等幅分割を確認 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_049-column-attempt1` | pass | 既定、複合入力、最小表示で内向きグリップと中央カラムを確認 |
-| standard gate | not run | 完了前に実行する |
+| `uv sync --dev` | pass | 77 packages resolved、74 packages checked |
+| `uv lock --check` | pass | lockfile変更なし |
+| `uv run ruff format --check .` | pass | 148 files already formatted |
+| `uv run ruff check .` | pass | All checks passed |
+| `uv run ty check --no-progress` | pass | All checks passed |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit049-all-unit` | pass | 331 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit049-integration` | environment failure | 129 passed、PyPIへの接続拒否によりpackage build 3件が失敗 |
+| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit049-integration-network` | pass | ネットワーク許可下で132 passed |
+| `uv build` | pass | sdistとwheelを作成 |
+| `git diff --check` | pass | whitespace errorなし |
+| `docs-quality-review` | pass | `spec/initial/ui.md`と本仕様の役割、事実整合、会話依存語、仮テキスト、検証根拠を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_049-final` | pass | 既定、複合入力、最小表示でグリップ内包、共通カラム、IMU可読性を確認 |
 
 ## 10. 先送り事項
 
