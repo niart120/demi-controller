@@ -234,7 +234,6 @@ class ControllerPreviewWidget(QWidget):
         painter.setPen(QPen(QColor("#E0E0E0"), 2.0))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(silhouette)
-        painter.drawPath(_controller_faceplate_path(layout))
         for control_id, bounds in layout.controls.items():
             if control_id in _STICK_CLICK_IDS or control_id.startswith("dpad_"):
                 continue

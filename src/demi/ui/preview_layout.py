@@ -51,17 +51,17 @@ class PreviewLayout:
 
 
 _RELATIVE_CONTROLS = {
-    "zl": (0.08, 0.06, 0.12, 0.07),
-    "l": (0.22, 0.06, 0.12, 0.07),
-    "r": (0.66, 0.06, 0.12, 0.07),
-    "zr": (0.80, 0.06, 0.12, 0.07),
+    "zl": (0.08, 0.09, 0.12, 0.07),
+    "l": (0.22, 0.09, 0.12, 0.07),
+    "r": (0.66, 0.09, 0.12, 0.07),
+    "zr": (0.80, 0.09, 0.12, 0.07),
     "dpad_up": (0.255, 0.53, 0.09, 0.065),
     "dpad_left": (0.21, 0.59, 0.09, 0.065),
     "dpad_right": (0.30, 0.59, 0.09, 0.065),
     "dpad_down": (0.255, 0.65, 0.09, 0.065),
     "x": (0.775, 0.28, 0.055, 0.07),
     "y": (0.71, 0.36, 0.055, 0.07),
-    "a": (0.84, 0.36, 0.055, 0.07),
+    "a": (0.81, 0.36, 0.055, 0.07),
     "b": (0.775, 0.44, 0.055, 0.07),
     "minus": (0.40, 0.28, 0.06, 0.06),
     "plus": (0.54, 0.28, 0.06, 0.06),
@@ -69,8 +69,8 @@ _RELATIVE_CONTROLS = {
     "capture": (0.54, 0.40, 0.06, 0.06),
     "left_stick": (0.15, 0.31, 0.16, 0.18),
     "left_stick_click": (0.205, 0.37, 0.05, 0.06),
-    "right_stick": (0.61, 0.58, 0.16, 0.18),
-    "right_stick_click": (0.665, 0.64, 0.05, 0.06),
+    "right_stick": (0.57, 0.55, 0.16, 0.18),
+    "right_stick_click": (0.625, 0.61, 0.05, 0.06),
 }
 CONTROL_IDS = frozenset(_RELATIVE_CONTROLS)
 _CONTENT_ASPECT_RATIO = 8 / 5
@@ -127,7 +127,7 @@ def preview_layout(width: int, height: int) -> PreviewLayout:
         )
     return PreviewLayout(
         content_bounds=content_bounds,
-        body_bounds=_scaled_rect(content_bounds, 0.13, 0.16, 0.74, 0.52),
+        body_bounds=_scaled_rect(content_bounds, 0.13, 0.16, 0.74, 0.60),
         left_grip_bounds=_scaled_rect(content_bounds, 0.04, 0.40, 0.21, 0.47),
         right_grip_bounds=_scaled_rect(content_bounds, 0.75, 0.40, 0.21, 0.47),
         status_bounds=_scaled_rect(content_bounds, 0.18, 0.875, 0.64, 0.04),

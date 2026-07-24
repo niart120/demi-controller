@@ -16,7 +16,7 @@ from demi.ui.controller_preview import (
     controller_preview_model,
 )
 from demi.ui.main_window import MainWindow
-from demi.ui.preview_layout import PreviewRect, preview_layout
+from demi.ui.preview_layout import CONTROL_IDS, PreviewRect, preview_layout
 from demi.ui.preview_sensor import accel_display, gyro_display
 
 
@@ -195,6 +195,18 @@ def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
     assert layout.right_grip_bounds.right > layout.body_bounds.right
     assert layout.left_grip_bounds.bottom <= layout.status_bounds.top
     assert layout.right_grip_bounds.bottom <= layout.status_bounds.top
+
+
+def test_face_controls_stay_inside_the_faceplate_and_shoulders_touch_its_top_edge() -> None:
+    layout = preview_layout(960, 600)
+    faceplate = preview_module._controller_faceplate_path(layout)
+    face_control_ids = CONTROL_IDS.difference({"zl", "l", "r", "zr"})
+
+    for control_id in face_control_ids:
+        assert faceplate.contains(preview_module._qrect(layout.controls[control_id])), control_id
+
+    for control_id in ("zl", "l", "r", "zr"):
+        assert layout.controls[control_id].bottom == pytest.approx(layout.body_bounds.top)
 
 
 def test_controller_silhouette_contains_both_complete_grip_regions() -> None:
