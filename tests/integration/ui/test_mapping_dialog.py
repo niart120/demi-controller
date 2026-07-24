@@ -477,11 +477,7 @@ def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row
     qt_application.processEvents()
 
     assert dialog.mapping_model.rowCount() == len(original_bindings)
-    selection_model = dialog.table.selectionModel()
-    assert selection_model is not None
-    selection_model.clearCurrentIndex()
-    qt_application.processEvents()
-    assert not dialog.remove_binding_button.isEnabled()
+    assert not hasattr(dialog, "remove_binding_button")
     target_index = dialog.target_combo.findData(BindingTarget.RIGHT_STICK_UP)
     assert target_index >= 0
     dialog.target_combo.setCurrentIndex(target_index)
@@ -492,11 +488,17 @@ def test_mapping_dialog_adds_a_selected_target_and_removes_only_the_selected_row
     added_row = len(original_bindings)
     assert dialog.mapping_model.rowCount() == added_row + 1
     assert dialog.table.currentIndex().row() == added_row
-    assert dialog.remove_binding_button.isEnabled()
     assert editor.draft.profiles[0].bindings[added_row].target is BindingTarget.RIGHT_STICK_UP
     assert editor.draft.profiles[0].bindings[added_row].source == "KEY:UNASSIGNED"
 
-    dialog.remove_binding_button.click()
+    remove_index = dialog.mapping_model.index(added_row, 5)
+    dialog.table.scrollTo(remove_index)
+    qt_application.processEvents()
+    QTest.mouseClick(
+        dialog.table.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=dialog.table.visualRect(remove_index).center(),
+    )
     qt_application.processEvents()
 
     assert dialog.mapping_model.rowCount() == len(original_bindings)

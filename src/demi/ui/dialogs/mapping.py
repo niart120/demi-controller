@@ -103,7 +103,7 @@ class MappingActionDelegate(QStyledItemDelegate):
 class MappingTableModel(QAbstractTableModel):
     """Expose the active settings draft as a Qt table model."""
 
-    _HEADERS = ("Target", "Input", "Inverted", "Conflict", "Action")
+    _HEADERS = ("Target", "Input", "Inverted", "Conflict", "Action", "Remove")
 
     def __init__(self, editor: SettingsEditor, parent: QObject | None = None) -> None:
         """Create a table model backed by one application-owned draft.
@@ -172,6 +172,7 @@ class MappingTableModel(QAbstractTableModel):
             None,
             self._row_status.get(index.row()) or self._conflict_text(index.row()),
             action_text,
+            self.tr("Remove"),
         )
         return values[index.column()]
 
@@ -410,18 +411,22 @@ class MappingDialog(QDialog):
             on_activated=self._activate_row_action,
             parent=self.table,
         )
+        self._remove_binding_delegate = MappingActionDelegate(
+            on_activated=self._remove_binding_row,
+            parent=self.table,
+        )
         self.table.setItemDelegateForColumn(4, self._mapping_action_delegate)
+        self.table.setItemDelegateForColumn(5, self._remove_binding_delegate)
         table_header = self.table.horizontalHeader()
         for column in range(3):
             table_header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        table_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.target_combo = QComboBox(self)
         for target in BindingTarget:
             self.target_combo.addItem(target.value, target)
         self.add_binding_button = QPushButton(self.tr("Add binding"), self)
-        self.remove_binding_button = QPushButton(self.tr("Remove binding"), self)
-        self.remove_binding_button.setEnabled(False)
         mouse_settings = editor.draft.input.mouse
         self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
@@ -467,7 +472,6 @@ class MappingDialog(QDialog):
         binding_actions.addWidget(QLabel(self.tr("Target"), bindings_page))
         binding_actions.addWidget(self.target_combo, 1)
         binding_actions.addWidget(self.add_binding_button)
-        binding_actions.addWidget(self.remove_binding_button)
         bindings_layout.addLayout(binding_actions)
         bindings_layout.addWidget(self.restore_button)
         mouse_page = QWidget(self)
@@ -503,13 +507,9 @@ class MappingDialog(QDialog):
         self.assign_escape_action.triggered.connect(self.assign_escape)
         self.tabs.currentChanged.connect(self._handle_tab_changed)
         self.add_binding_button.clicked.connect(self.add_binding)
-        self.remove_binding_button.clicked.connect(self.remove_selected_binding)
         self.restore_button.clicked.connect(self.restore_default_profile)
         self.button_box.accepted.connect(self.request_accept)
         self.button_box.rejected.connect(self.request_reject)
-        selection_model = self.table.selectionModel()
-        if selection_model is not None:
-            selection_model.currentRowChanged.connect(self._sync_binding_row_actions)
         self.mouse_gyro_enabled_checkbox.toggled.connect(
             lambda enabled: editor.update_mouse(gyro_enabled=enabled)
         )
@@ -590,13 +590,9 @@ class MappingDialog(QDialog):
             return
         self.table.selectRow(self._mapping_model.rowCount() - 1)
 
-    def remove_selected_binding(self) -> None:
-        """Remove the selected binding row while preserving surrounding order."""
-        selected = self.table.currentIndex()
-        if not selected.isValid():
-            return
+    def _remove_binding_row(self, row: int) -> None:
+        """Remove the activated binding row while preserving surrounding order."""
         self.cancel_capture()
-        row = selected.row()
         try:
             self._mapping_model.remove_binding(row)
         except DomainValueError:
@@ -604,8 +600,6 @@ class MappingDialog(QDialog):
         remaining = self._mapping_model.rowCount()
         if remaining:
             self.table.selectRow(min(row, remaining - 1))
-        else:
-            self.remove_binding_button.setEnabled(False)
 
     def set_source(self, row: int, source: str) -> bool:
         """Update one mapping source while keeping invalid input visible.
@@ -762,6 +756,14 @@ class MappingDialog(QDialog):
                     )
                     event.accept()
                     return True
+            if (
+                watched is self.table
+                and current.column() == 5
+                and event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space}
+            ):
+                self._remove_binding_row(current.row())
+                event.accept()
+                return True
             if event.key() == Qt.Key.Key_Escape and self._capture_row is not None:
                 self.cancel_capture()
                 event.accept()
@@ -792,9 +794,6 @@ class MappingDialog(QDialog):
         if self.set_source(row, source):
             self._capture_row = None
         return True
-
-    def _sync_binding_row_actions(self, current: QModelIndex, _previous: QModelIndex) -> None:
-        self.remove_binding_button.setEnabled(current.isValid())
 
     def _handle_conflict_confirmation(self, button: QAbstractButton) -> None:
         confirmation = self._conflict_confirmation

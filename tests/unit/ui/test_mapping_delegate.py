@@ -41,13 +41,16 @@ def test_mapping_delegate_routes_mouse_and_keyboard_activation_to_the_same_row(
     assert model.data(index, Qt.ItemDataRole.DisplayRole) == "Remap"
 
 
-def test_mapping_dialog_uses_one_delegate_without_per_row_widgets(
+def test_mapping_dialog_uses_shared_delegates_without_per_row_widgets(
     qt_application: object,
 ) -> None:
     assert qt_application is not None
     dialog = MappingDialog(SettingsEditor(AppSettings.default()))
 
     assert isinstance(dialog.table.itemDelegateForColumn(4), MappingActionDelegate)
+    assert isinstance(dialog.table.itemDelegateForColumn(5), MappingActionDelegate)
     assert all(
-        dialog.table.indexWidget(dialog.mapping_model.index(row, 4)) is None for row in range(33)
+        dialog.table.indexWidget(dialog.mapping_model.index(row, column)) is None
+        for row in range(33)
+        for column in (4, 5)
     )

@@ -107,7 +107,7 @@
 | refactor-skipped | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画3状態で切れ、重なり、操作欠落なし |
 | refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
 | refactor-done | Inverted列は反転可能な行だけ標準チェック状態を表示し、その場でdraftを更新する | regression | unit / integration | 表外checkboxと選択行同期を除去。Spaceと標準delegateの更新経路を使用 |
-| todo | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonを除去 |
+| refactor-done | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonと選択行同期を除去。Remapと同じdelegate方式を再利用 |
 | todo | Settingsは`Bindings`、`Mouse`、`Connection`、`Colors`を入れ子なしで表示する | regression | integration | `Mappings` actionは`Bindings`を初期表示 |
 | todo | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換する候補を画像確認 |
 
@@ -171,6 +171,7 @@
 | `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | `[TODO]`、`TBD`、`xxx`なし |
 | `rg`による廃止UI文言と部品名の残存検索 | passed | 旧schema互換とcontroller command内部値を除き残存なし |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `20 passed`。行内Invertedトグルと既存mapping操作 |
+| `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | passed | `22 passed`。行内Removeとdelegate回帰 |
 
 ## 10. 先送り事項
 
