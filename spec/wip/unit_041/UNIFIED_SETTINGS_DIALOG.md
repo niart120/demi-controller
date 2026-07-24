@@ -17,6 +17,8 @@
 | user request | 接続プロファイル削除、ボンドスロット除去、プロファイル設定と全体設定の区別、接続タイムアウトの非公開化 | conversation |
 | user review | 削除操作と反転トグルをbinding行へ置き、行との対応を明確にする | conversation |
 | user review | `Bindings` / `Mouse gyro` の入れ子をなくし、`Mouse` をSettings直下へ置く | conversation |
+| user review | ツールバーのSettingsメニューもタブと同じ名称・順序へ揃える | conversation |
+| user review | タブとSettingsメニューを`Connection`、`Bindings`、`Mouse`、`Colors`の順にする | conversation |
 | user review | binding追加UIを利用者の選択負荷と画面占有の観点から再検討する | conversation |
 | initial design | Qt標準部品、単一モーダル、draftの保存・取消契約 | `spec/initial/ui.md` |
 | initial design | 設定 schema と旧設定読み込み | `spec/initial/configuration.md` |
@@ -38,7 +40,8 @@
 ## 2. 対象範囲
 
 - ツールバーの `Settings` 階層と3つの子action。
-- `Bindings`、`Mouse`、`Connection`、`Colors` の4タブを持つ単一設定ダイアログ。
+- `Connection`、`Bindings`、`Mouse`、`Colors` の4タブを持つ単一設定ダイアログ。
+- ツールバーの `Settings` メニューに同名・同順序の4項目を置く。
 - 1つの設定draftをタブ間で共有する保存・取消処理。
 - binding行内の反転トグルと削除操作。
 - binding targetを分類して選択する追加操作。
@@ -82,7 +85,8 @@
 | binding追加 | 分類された一覧からtargetを選択 | `KEY:UNASSIGNED`、amount `1.0`、非反転の行を末尾へ追加する | 常設のtarget選択欄で表の横幅を消費しない |
 | binding削除 | 行内の削除操作を実行 | 対象行だけを削除し、残りの順序を維持する | 不正indexではdraftを変更しない |
 | binding反転 | 行内の反転トグルを操作 | button targetだけが更新され、stickと診断targetは変更不可 | 表外の選択行用checkboxを置かない |
-| タブ平坦化 | 設定ダイアログを開く | `Bindings`、`Mouse`、`Connection`、`Colors` が同じ階層に並ぶ | `Mappings`内の入れ子タブを表示しない |
+| タブ平坦化 | 設定ダイアログを開く | `Connection`、`Bindings`、`Mouse`、`Colors` が同じ階層に並ぶ | `Mappings`内の入れ子タブを表示しない |
+| メニュー整合 | ツールバーの`Settings`を開く | `Connection`、`Bindings`、`Mouse`、`Colors` がタブと同じ順序で表示される | 各項目は同名タブを初期表示する |
 | 未割り当て競合 | 未割り当て行が複数ある | `KEY:UNASSIGNED` 同士を競合として扱わない | 実入力sourceの競合判定は維持する |
 | Connection区分 | Connectionタブを表示 | 接続プロファイル操作と全体設定を別groupで表示する | adapter、起動時再接続、診断レベルは全体設定 |
 | 保存 | 有効なConnection draftで `Save` | repositoryへ保存してダイアログを閉じ、`ConnectSaved` を発行しない | adapter未検出でも保存済み選択値は保存可能 |
@@ -108,7 +112,8 @@
 | refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
 | refactor-done | Inverted列は反転可能な行だけ標準チェック状態を表示し、その場でdraftを更新する | regression | unit / integration | 表外checkboxと選択行同期を除去。Spaceと標準delegateの更新経路を使用 |
 | refactor-done | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonと選択行同期を除去。Remapと同じdelegate方式を再利用 |
-| todo | Settingsは`Bindings`、`Mouse`、`Connection`、`Colors`を入れ子なしで表示する | regression | integration | `Mappings` actionは`Bindings`を初期表示 |
+| refactor-done | Settingsは`Connection`、`Bindings`、`Mouse`、`Colors`を入れ子なしで表示する | regression | integration | 既存mapping pagesを外側tabへ移し、入力待受の所有期間を共有dialogへ統合 |
+| todo | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | `Mappings`表記を除去 |
 | todo | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換する候補を画像確認 |
 
 ## 7. 設計メモ
@@ -172,6 +177,7 @@
 | `rg`による廃止UI文言と部品名の残存検索 | passed | 旧schema互換とcontroller command内部値を除き残存なし |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `20 passed`。行内Invertedトグルと既存mapping操作 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | passed | `22 passed`。行内Removeとdelegate回帰 |
+| `uv run pytest tests/integration/ui/test_unified_settings_dialog.py -q` | passed | `3 passed`。4タブの平坦化、順序、共有draft |
 
 ## 10. 先送り事項
 

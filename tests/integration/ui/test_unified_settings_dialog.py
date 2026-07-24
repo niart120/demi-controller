@@ -9,7 +9,7 @@ from demi.domain.settings import AppSettings
 from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
 
 
-def test_settings_dialog_shares_one_draft_across_three_tabs_and_saves_once(
+def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
     qt_application: QApplication,
 ) -> None:
     editor = SettingsEditor(AppSettings.default())
@@ -33,11 +33,15 @@ def test_settings_dialog_shares_one_draft_across_three_tabs_and_saves_once(
 
     assert dialog.windowTitle() == "Settings"
     assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
-        "Mappings",
         "Connection",
+        "Bindings",
+        "Mouse",
         "Colors",
     ]
     assert dialog.current_tab is SettingsTab.CONNECTION
+    assert dialog.tabs.widget(SettingsTab.BINDINGS) is dialog.mapping_page.bindings_page
+    assert dialog.tabs.widget(SettingsTab.MOUSE) is dialog.mapping_page.mouse_page
+    assert not dialog.mapping_page.tabs.isVisible()
     assert not dialog.mapping_page.button_box.isVisible()
     assert not dialog.connection_page.button_box.isVisible()
     assert not dialog.colors_page.button_box.isVisible()
@@ -50,7 +54,7 @@ def test_settings_dialog_shares_one_draft_across_three_tabs_and_saves_once(
     dialog.mapping_page.add_binding_button.click()
     assert dialog.colors_page.set_color("body", "#ABCDEF")
 
-    dialog.tabs.setCurrentIndex(SettingsTab.MAPPINGS)
+    dialog.tabs.setCurrentIndex(SettingsTab.BINDINGS)
     assert editor.draft.connection.adapter_id == "usb:0"
     assert editor.draft.connection.reconnect_on_start is False
     assert editor.draft.profiles[0].bindings[-1].target is BindingTarget.BUTTON_A
@@ -107,7 +111,7 @@ def test_settings_dialog_escape_from_an_embedded_page_cancels_the_whole_draft_on
     cancellations: list[str] = []
     dialog = SettingsDialog(
         editor,
-        initial_tab=SettingsTab.MAPPINGS,
+        initial_tab=SettingsTab.BINDINGS,
         connected=False,
         on_rescan=lambda: None,
         on_save=lambda: True,

@@ -465,22 +465,22 @@ class MappingDialog(QDialog):
             self,
         )
 
-        bindings_page = QWidget(self)
-        bindings_layout = QVBoxLayout(bindings_page)
+        self.bindings_page = QWidget(self)
+        bindings_layout = QVBoxLayout(self.bindings_page)
         bindings_layout.addWidget(self.table)
         binding_actions = QHBoxLayout()
-        binding_actions.addWidget(QLabel(self.tr("Target"), bindings_page))
+        binding_actions.addWidget(QLabel(self.tr("Target"), self.bindings_page))
         binding_actions.addWidget(self.target_combo, 1)
         binding_actions.addWidget(self.add_binding_button)
         bindings_layout.addLayout(binding_actions)
         bindings_layout.addWidget(self.restore_button)
-        mouse_page = QWidget(self)
-        mouse_layout = QVBoxLayout(mouse_page)
+        self.mouse_page = QWidget(self)
+        mouse_layout = QVBoxLayout(self.mouse_page)
         mouse_layout.addWidget(self.mouse_gyro_group)
         mouse_layout.addStretch()
         self.tabs = QTabWidget(self)
-        self.tabs.addTab(bindings_page, self.tr("Bindings"))
-        self.tabs.addTab(mouse_page, self.tr("Mouse gyro"))
+        self.tabs.addTab(self.bindings_page, self.tr("Bindings"))
+        self.tabs.addTab(self.mouse_page, self.tr("Mouse gyro"))
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.tabs)
@@ -543,6 +543,25 @@ class MappingDialog(QDialog):
     def mapping_model(self) -> MappingTableModel:
         """Return the binding table model for row-oriented dialog actions."""
         return self._mapping_model
+
+    def take_pages(self) -> tuple[QWidget, QWidget]:
+        """Detach the binding and mouse pages for a flat parent tab widget."""
+        while self.tabs.count():
+            self.tabs.removeTab(0)
+        return self.bindings_page, self.mouse_page
+
+    def activate_input_handling(self) -> None:
+        """Start input handling for direct or embedded dialog use."""
+        if self._input_filter_application is not None:
+            return
+        _invoke(self._on_dialog_opened)
+        self._install_input_filter()
+
+    def deactivate_input_handling(self) -> None:
+        """Stop remapping and input handling when the owner is hidden."""
+        self._capture_row = None
+        self._mapping_model.cancel_capture()
+        self._remove_input_filter()
 
     def begin_capture_row(self, row: int) -> None:
         """Arm one explicit binding row for the next supported input event."""
@@ -697,15 +716,12 @@ class MappingDialog(QDialog):
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt override name.
         """Neutralize capture before accepting dialog-local input events."""
-        _invoke(self._on_dialog_opened)
-        self._install_input_filter()
+        self.activate_input_handling()
         super().showEvent(event)
 
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt override name.
         """Stop listening for dialog input once this dialog is hidden."""
-        self._capture_row = None
-        self._mapping_model.cancel_capture()
-        self._remove_input_filter()
+        self.deactivate_input_handling()
         super().hideEvent(event)
 
     def request_reject(self) -> None:
@@ -829,7 +845,14 @@ class MappingDialog(QDialog):
             self._input_filter_application = None
 
     def _belongs_to_dialog(self, watched: QObject) -> bool:
-        return watched is self or (isinstance(watched, QWidget) and self.isAncestorOf(watched))
+        return (
+            watched is self
+            or watched is self.table
+            or (
+                isinstance(watched, QWidget)
+                and (self.isAncestorOf(watched) or self.table.isAncestorOf(watched))
+            )
+        )
 
 
 def _invoke(callback: CaptureTransition | None) -> None:

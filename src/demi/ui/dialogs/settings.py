@@ -4,6 +4,7 @@ from collections.abc import Callable
 from enum import IntEnum
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QHideEvent, QShowEvent
 from PySide6.QtWidgets import (
     QAbstractButton,
     QDialog,
@@ -28,15 +29,16 @@ type PreviewAction = Callable[[ControllerColorSettings], object]
 
 
 class SettingsTab(IntEnum):
-    """Stable tab indices for the three settings entry points."""
+    """Stable tab indices for the four flat settings pages."""
 
-    MAPPINGS = 0
-    CONNECTION = 1
-    COLORS = 2
+    CONNECTION = 0
+    BINDINGS = 1
+    MOUSE = 2
+    COLORS = 3
 
 
 class SettingsDialog(QDialog):
-    """Edit one shared settings draft through three tabbed settings pages."""
+    """Edit one shared settings draft through four flat settings pages."""
 
     def __init__(
         self,
@@ -118,11 +120,15 @@ class SettingsDialog(QDialog):
             page.setMinimumSize(0, 0)
             page.button_box.hide()
 
+        bindings_page, mouse_page = self.mapping_page.take_pages()
+        self.mapping_page.hide()
         self.tabs = QTabWidget(self)
-        self.tabs.addTab(self.mapping_page, self.tr("Mappings"))
         self.tabs.addTab(self.connection_page, self.tr("Connection"))
+        self.tabs.addTab(bindings_page, self.tr("Bindings"))
+        self.tabs.addTab(mouse_page, self.tr("Mouse"))
         self.tabs.addTab(self.colors_page, self.tr("Colors"))
         self.tabs.setCurrentIndex(int(initial_tab))
+        self.tabs.currentChanged.connect(self._handle_tab_changed)
 
         self.save_error_label = QLabel("", self)
         self.button_box = QDialogButtonBox(
@@ -174,10 +180,24 @@ class SettingsDialog(QDialog):
             self._on_preview(self._saved_colors)
         super().reject()
 
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 - Qt override name.
+        """Activate binding input handling while this dialog is visible."""
+        self.mapping_page.activate_input_handling()
+        super().showEvent(event)
+
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802 - Qt override name.
+        """Stop binding input handling with this dialog."""
+        self.mapping_page.deactivate_input_handling()
+        super().hideEvent(event)
+
     def _cancel_from_page(self) -> bool:
         """Route an embedded page cancellation to the shared draft owner."""
         self.reject()
         return self._cancel_requested
+
+    def _handle_tab_changed(self, index: int) -> None:
+        if index != int(SettingsTab.BINDINGS):
+            self.mapping_page.cancel_capture()
 
     def _open_conflict_confirmation(self, summary: str) -> None:
         if self._conflict_confirmation is not None:
