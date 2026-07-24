@@ -87,7 +87,7 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | 最初のUI構造item |
+| refactor-skipped | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | Settings menu階層はgreen。選択タブroutingは次の統合dialog cycleで確認 |
 | todo | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 色preview取消も確認 |
 | todo | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | 不正indexと未割り当て競合を含む |
 | todo | Mappingsタブはtarget指定追加と選択行削除を標準controlから実行する | new | integration | modelの行通知とbutton状態を確認 |
@@ -134,6 +134,7 @@
 
 | command | result | notes |
 |---|---|---|
+| `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_main_window_dialogs.py tests/integration/ui/test_main_window_snapshot.py -q` | passed | `6 passed`。Settings menuと既存dialog起動回帰 |
 | TDD itemごとの対象pytest | not run | 実装前 |
 | `uv run pytest tests/unit` | not run | 実装前 |
 | `uv run pytest tests/integration` | not run | 実装前 |
