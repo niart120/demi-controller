@@ -100,7 +100,7 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f5(
 
         QCoreApplication.sendEvent(
             dialog.table,
-                QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
+            QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F4, Qt.KeyboardModifier.NoModifier),
         )
         assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
         assert coordinator.publisher.state.held_keys == set()

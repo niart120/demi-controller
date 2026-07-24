@@ -60,7 +60,7 @@
 | refactor-skipped | Held IMU-neutral produces physical neutral IMU and overrides active diagnostic rotation | new | unit | input | green: 2026-07-24 |
 | refactor-skipped | Bindings table has a blank remove header and colors swatches keep their size hint at wider dialog widths | regression | integration | ui | green: 2026-07-24 |
 | refactor-skipped | F5 toggles pointer capture, F4 has no capture side effect, and no Start mouse action exists | regression | integration | ui | green: 2026-07-24 |
-| refactor-skipped | Main window visibly distinguishes enabled and disabled mouse input | new | integration | ui | widget assertion green; visual review follows |
+| refactor-skipped | Main window visibly distinguishes enabled and disabled mouse input | new | integration | ui | widget assertion and Windows GUI capture green |
 
 ## 7. 設計メモ
 
@@ -88,8 +88,16 @@
 | `uv run pytest tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py -q -p no:cacheprovider` | pass | 40 passed |
 | `uv run ruff check src/demi/domain/mapping.py src/demi/input/mapper.py src/demi/input/publisher.py tests/unit/domain/test_mapping.py tests/unit/input/test_publisher.py` | pass | targeted static check |
 | `uv run pytest tests/unit/ui/test_toolbar.py tests/unit/ui/test_mapping_model.py tests/integration/ui/test_qt_input_capture.py -q -p no:cacheprovider` | pass | 13 passed |
-| GUI state capture | not run | 実装後にWindows描画で確認 |
-| standard gate | not run | 完了前に実行 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_042/scenario.py --output tmp/gui-audit/unit_042/output` | pass | Windows Qt描画でOFF/ONを確認 |
+| `uv lock --check` | pass | lockfile整合 |
+| `uv run ruff format --check .` | pass | 148 files formatted |
+| `uv run ruff check .` | pass | static check |
+| `uv run ty check --no-progress` | pass | type check |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_042` | pass | 303 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-integration-unit_042` | pass | 131 passed |
+| `uv build` | pass | wheelとsdistを生成 |
+| `git diff --check` | pass | whitespace errorなし |
+| standard pytest basetemp | not run | `tmp/pytest` がWinError 5で読めず、専用basetempで代替した |
 
 ## 10. 先送り事項
 
@@ -99,5 +107,5 @@
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を更新した
-- [ ] 検証結果または未実行理由を記録した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] 検証結果または未実行理由を記録した
+- [x] package / release / public API に触れる場合の gate を記録した

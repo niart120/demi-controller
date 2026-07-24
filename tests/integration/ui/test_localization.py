@@ -186,7 +186,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
             5,
             Qt.Orientation.Horizontal,
         )
-            == ""
+        == ""
     )
     assert settings_dialog.connection_page.profile_group.title() == ("コントローラープロファイル")
     assert settings_dialog.connection_page.global_settings_group.title() == "全体設定"

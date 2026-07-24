@@ -207,8 +207,7 @@ class InputPublisher:
                 self._profile, evaluation_state
             )
             gyro_rate = GyroRate(
-                gyro_rate.x_radians_per_second
-                + direct_diagnostic_gyro.x_radians_per_second,
+                gyro_rate.x_radians_per_second + direct_diagnostic_gyro.x_radians_per_second,
                 gyro_rate.y_radians_per_second,
                 gyro_rate.z_radians_per_second,
             )

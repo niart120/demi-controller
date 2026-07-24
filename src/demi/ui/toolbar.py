@@ -94,9 +94,7 @@ class MainToolBar(QToolBar):
         )
         self.connection_action.setEnabled(connection_available)
         mouse_state = (
-            self.tr("Mouse input: ON (F5)")
-            if is_captured
-            else self.tr("Mouse input: OFF (F5)")
+            self.tr("Mouse input: ON (F5)") if is_captured else self.tr("Mouse input: OFF (F5)")
         )
         mouse_color = "#176B3A" if is_captured else "#7A1F1F"
         self.mouse_input_status.setText(mouse_state)
@@ -133,4 +131,3 @@ class MainToolBar(QToolBar):
             shortcuts: Portable Qt key sequence strings owned by local actions.
         """
         self.connection_action.setShortcuts([QKeySequence(shortcut) for shortcut in shortcuts])
-
