@@ -68,11 +68,11 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | refactor-skipped | All four shoulder buttons share one row and remain enclosed at normal and minimum sizes | regression | unit | L/Rを含む、追加整理は不要 |
 | refactor-skipped | The upper outline uses a shallow center dip instead of a full-width flat edge | regression | unit | 深さ5.5%、追加整理は不要 |
 | refactor-skipped | The upper side outline curves inward instead of continuing as a vertical slab edge | regression | unit | 絞り2.5〜3%、追加整理は不要 |
-| todo | The complete silhouette stays near 3:2 and all controls remain enclosed | regression | unit | 高さを維持して横幅を縮小 |
-| todo | Left stick, misc controls, and ABXY use compact horizontal spacing | regression | unit | 各空白7%以内 |
-| todo | Minus, Plus, Home, and Capture are equal circles smaller than ABXY | regression | unit | 直径80%以下 |
-| todo | Misc controls form a symmetric shallow V | regression | unit | 上外側にMinus/Plus、下内側にHome/Capture |
-| todo | Default, mixed-input, and minimum states visually read as one compact controller body | visual | integration | `inspect-gui-states` |
+| refactor-skipped | The complete silhouette stays near 3:2 and all controls remain enclosed | regression | unit | 比率1.519、追加整理は不要 |
+| refactor-skipped | Left stick, misc controls, and ABXY use compact horizontal spacing | regression | unit | 各空白7%以内、追加整理は不要 |
+| refactor-skipped | Minus, Plus, Home, and Capture are equal circles smaller than ABXY | regression | unit | 直径80%以下、追加整理は不要 |
+| refactor-skipped | Misc controls form a symmetric shallow V | regression | unit | 上外側にMinus/Plus、下内側にHome/Capture |
+| green | Default, mixed-input, and minimum states visually read as one compact controller body | visual | integration | 3状態で確認 |
 
 ## 7. 設計メモ
 
@@ -107,6 +107,12 @@ unit_047でショルダーボタンを収めた直線的な上面を、コント
 | `uv run ruff check src/demi/ui/controller_preview.py src/demi/ui/preview_layout.py tests/unit/ui/test_controller_preview.py` | pass | lint errorなし |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-trial-gate-formatted` | pass | 50 passed |
 | `git diff --check` | pass | whitespace errorなし |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_all_controls_stay_inside_a_three_to_two_silhouette_with_enclosed_shoulders -q -p no:cacheprovider --basetemp tmp/pytest-unit048-three-two-red` | red | 外形比率1.938のため2 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-three-two-green-attempt1` | pass | 50 passed、通常幅と最小幅で外形比率1.519 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-three-two-attempt1` | pass | 3:2外形と内側へ寄せた主要操作群を3状態で確認 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v -q -p no:cacheprovider --basetemp tmp/pytest-unit048-misc-red` | red | miscが57.6x36pxの矩形であるため1 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit048-misc-green-attempt1` | pass | 51 passed、小円と浅いV字を確認 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_048-compact-attempt2` | pass | 通常幅と最小幅でmisc記号、押下状態、操作群間隔を確認 |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項

@@ -224,7 +224,7 @@ def test_controller_layout_places_external_grips_below_the_faceplate() -> None:
 
 
 @pytest.mark.parametrize("size", [(960, 600), (800, 475)])
-def test_all_controls_stay_inside_a_two_to_one_silhouette_with_enclosed_shoulders(
+def test_all_controls_stay_inside_a_three_to_two_silhouette_with_enclosed_shoulders(
     size: tuple[int, int],
 ) -> None:
     layout = preview_layout(*size)
@@ -236,7 +236,7 @@ def test_all_controls_stay_inside_a_two_to_one_silhouette_with_enclosed_shoulder
         assert faceplate.contains(preview_module._qrect(layout.controls[control_id])), control_id
 
     assert silhouette_bounds.top() <= layout.content_bounds.top + 1.0
-    assert 1.9 <= silhouette_bounds.width() / silhouette_bounds.height() <= 2.1
+    assert 1.45 <= silhouette_bounds.width() / silhouette_bounds.height() <= 1.60
 
 
 @pytest.mark.parametrize("size", [(960, 600), (800, 475)])
@@ -311,6 +311,38 @@ def test_face_controls_and_shoulders_keep_balanced_relative_proportions() -> Non
     horizontal_spacing = a_center - x_center
     vertical_spacing = controls["y"].top - controls["x"].top
     assert horizontal_spacing == pytest.approx(vertical_spacing)
+
+
+def test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v() -> None:
+    layout = preview_layout(960, 600)
+    controls = layout.controls
+    misc = {control_id: controls[control_id] for control_id in ("minus", "plus", "home", "capture")}
+
+    for bounds in misc.values():
+        assert bounds.width == pytest.approx(bounds.height)
+        assert bounds.width <= controls["a"].width * 0.80
+
+    centers = {
+        control_id: (
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
+        )
+        for control_id, bounds in misc.items()
+    }
+    assert centers["minus"][0] < centers["home"][0] < centers["capture"][0] < centers["plus"][0]
+    assert centers["minus"][1] == pytest.approx(centers["plus"][1])
+    assert centers["home"][1] == pytest.approx(centers["capture"][1])
+    assert centers["minus"][1] < centers["home"][1]
+
+    content_center_x = layout.content_bounds.left + layout.content_bounds.width / 2
+    assert centers["minus"][0] + centers["plus"][0] == pytest.approx(content_center_x * 2)
+    assert centers["home"][0] + centers["capture"][0] == pytest.approx(content_center_x * 2)
+
+    misc_left = min(bounds.left for bounds in misc.values())
+    misc_right = max(bounds.right for bounds in misc.values())
+    abxy_left = min(controls[control_id].left for control_id in ("a", "b", "x", "y"))
+    assert misc_left - controls["left_stick"].right <= layout.content_bounds.width * 0.07
+    assert abxy_left - misc_right <= layout.content_bounds.width * 0.07
 
 
 def test_pressed_button_fill_has_clear_contrast_from_neutral_fill(

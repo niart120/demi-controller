@@ -51,26 +51,26 @@ class PreviewLayout:
 
 
 _RELATIVE_CONTROLS = {
-    "zl": (0.12, 0.02, 0.095, 0.07),
-    "l": (0.23, 0.02, 0.095, 0.07),
-    "r": (0.675, 0.02, 0.095, 0.07),
-    "zr": (0.785, 0.02, 0.095, 0.07),
+    "zl": (0.19, 0.02, 0.078, 0.065),
+    "l": (0.275, 0.02, 0.078, 0.065),
+    "r": (0.647, 0.02, 0.078, 0.065),
+    "zr": (0.732, 0.02, 0.078, 0.065),
     "dpad_up": (0.27, 0.37, 0.04, 0.096),
     "dpad_left": (0.23, 0.434, 0.06, 0.064),
     "dpad_right": (0.29, 0.434, 0.06, 0.064),
     "dpad_down": (0.27, 0.466, 0.04, 0.096),
-    "x": (0.7325, 0.12, 0.055, 0.07),
-    "y": (0.6825, 0.20, 0.055, 0.07),
-    "a": (0.7825, 0.20, 0.055, 0.07),
-    "b": (0.7325, 0.28, 0.055, 0.07),
-    "minus": (0.40, 0.14, 0.06, 0.06),
-    "plus": (0.54, 0.14, 0.06, 0.06),
-    "home": (0.40, 0.26, 0.06, 0.06),
-    "capture": (0.54, 0.26, 0.06, 0.06),
-    "left_stick": (0.15, 0.15, 0.16, 0.18),
-    "left_stick_click": (0.205, 0.21, 0.05, 0.06),
-    "right_stick": (0.57, 0.39, 0.16, 0.18),
-    "right_stick_click": (0.625, 0.45, 0.05, 0.06),
+    "x": (0.6725, 0.14, 0.055, 0.07),
+    "y": (0.6225, 0.22, 0.055, 0.07),
+    "a": (0.7225, 0.22, 0.055, 0.07),
+    "b": (0.6725, 0.30, 0.055, 0.07),
+    "minus": (0.409, 0.17, 0.042, 0.05),
+    "plus": (0.549, 0.17, 0.042, 0.05),
+    "home": (0.449, 0.235, 0.042, 0.05),
+    "capture": (0.509, 0.235, 0.042, 0.05),
+    "left_stick": (0.225, 0.15, 0.15, 0.18),
+    "left_stick_click": (0.275, 0.21, 0.05, 0.06),
+    "right_stick": (0.545, 0.39, 0.15, 0.18),
+    "right_stick_click": (0.595, 0.45, 0.05, 0.06),
 }
 CONTROL_IDS = frozenset(_RELATIVE_CONTROLS)
 _CONTENT_ASPECT_RATIO = 8 / 5
@@ -84,6 +84,10 @@ _ROUND_CONTROL_IDS = frozenset(
         "left_stick_click",
         "right_stick",
         "right_stick_click",
+        "minus",
+        "plus",
+        "home",
+        "capture",
     }
 )
 
@@ -127,9 +131,9 @@ def preview_layout(width: int, height: int) -> PreviewLayout:
         )
     return PreviewLayout(
         content_bounds=content_bounds,
-        body_bounds=_scaled_rect(content_bounds, 0.10, 0.00, 0.80, 0.65),
-        left_grip_bounds=_scaled_rect(content_bounds, 0.08, 0.30, 0.18, 0.39),
-        right_grip_bounds=_scaled_rect(content_bounds, 0.74, 0.30, 0.18, 0.39),
+        body_bounds=_scaled_rect(content_bounds, 0.18, 0.00, 0.64, 0.65),
+        left_grip_bounds=_scaled_rect(content_bounds, 0.17, 0.30, 0.16, 0.39),
+        right_grip_bounds=_scaled_rect(content_bounds, 0.67, 0.30, 0.16, 0.39),
         status_bounds=_scaled_rect(content_bounds, 0.18, 0.71, 0.64, 0.045),
         gyro_bounds=_scaled_rect(content_bounds, 0.06, 0.78, 0.40, 0.20),
         accel_bounds=_scaled_rect(content_bounds, 0.54, 0.78, 0.40, 0.20),

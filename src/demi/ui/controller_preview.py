@@ -303,7 +303,7 @@ class ControllerPreviewWidget(QWidget):
             "home": "H",
             "capture": "C",
         }.get(control_id, control_id.upper())
-        if control_id in {"zl", "l", "r", "zr", "minus", "plus", "home", "capture"}:
+        if control_id in {"zl", "l", "r", "zr"}:
             painter.drawRoundedRect(rect, 7.0, 7.0)
         else:
             painter.drawEllipse(rect)
