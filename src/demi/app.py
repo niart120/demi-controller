@@ -265,6 +265,7 @@ class ApplicationSession:
             error=presentation.error,
             color_reconnect_pending=presentation.color_reconnect_pending,
             connection_retryable=self._connection_retryable,
+            controller_profile_exists=self._paths.controller_profile_file.is_file(),
         )
 
     def begin(self) -> None:
@@ -432,6 +433,19 @@ class ApplicationSession:
         }:
             return
         self._runtime.post(DiscoverAdapters())
+
+    def delete_controller_profile(self) -> bool:
+        """Delete the fixed controller connection profile, if it exists.
+
+        Returns:
+            Whether the profile is absent after the deletion attempt.
+        """
+        try:
+            self._paths.controller_profile_file.unlink(missing_ok=True)
+        except OSError:
+            self._presentation.set_warning("Could not delete controller profile")
+            return False
+        return True
 
     def cancel_pairing(self) -> bool:
         """Return a pairing confirmation to its editable connection draft."""

@@ -64,7 +64,9 @@ def test_default_user_interface_uses_english_source_text(
         assert save_button.text() == "Save"
         assert cancel_button.text() == "Cancel"
 
-    assert connection.connect_button.text() == "Save and connect"
+    assert connection.save_button.text() == "Save"
+    assert connection.profile_group.title() == "Controller profile"
+    assert connection.global_settings_group.title() == "Global settings"
     connection_cancel = connection.button_box.button(QDialogButtonBox.StandardButton.Cancel)
     assert connection_cancel is not None
     assert connection_cancel.text() == "Cancel"

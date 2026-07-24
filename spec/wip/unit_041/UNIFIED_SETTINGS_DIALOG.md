@@ -91,9 +91,9 @@
 | todo | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 色preview取消も確認 |
 | refactor-skipped | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | `12 passed`。責務は既存editor内で完結しており追加整理なし |
 | refactor-skipped | Mappingsタブはtarget指定追加と選択行削除を標準controlから実行する | new | integration | `19 passed`。既存model/view境界へ行操作を追加し、別責務の抽出なし |
-| todo | Connectionタブはprofile操作と全体設定を別groupで表示し、bond slotとtimeout controlを表示しない | new / regression | integration | 利用者向け境界 |
-| todo | ConnectionのSaveは設定を保存するが接続commandを発行しない | regression | unit / integration | `Save and connect`を廃止 |
-| todo | 固定接続profileの削除は確認時だけprofileファイルを削除してUI状態を更新する | new / edge | unit / integration | profileなし、取消を含む |
+| refactor-skipped | Connectionタブはprofile操作と全体設定を別groupで表示し、bond slotとtimeout controlを表示しない | new / regression | integration | `Controller profile`と`Global settings`へ分離し、旧controlを除去 |
+| refactor-skipped | ConnectionのSaveは設定を保存するが接続commandを発行しない | regression | unit / integration | router経由でrepository保存と`ConnectSaved`不在を確認 |
+| refactor-skipped | 固定接続profileの削除は確認時だけprofileファイルを削除してUI状態を更新する | new / edge | unit / integration | 取消、確認、固定path以外の維持、存在表示を確認 |
 | refactor-skipped | current codecはbond slotとtimeoutを出力せず、旧v1 keyを無視して読み込む | regression | unit | current出力から除去し、旧keyは型に依存せず無視。domainと固定pathを整理 |
 | refactor-skipped | connect、startup reconnect、pairingは固定profileパスと30秒timeoutを使う | regression | unit | 3 command経路を固定値へ統一。application境界の定数で完結 |
 | todo | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | catalog再生成を含む |
@@ -139,6 +139,7 @@
 | `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | editor cycleのlint |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `19 passed`。target指定追加、選択行削除、既存mapping操作 |
 | `uv run pytest tests/unit -q` | passed | `300 passed`。connection domain、codec旧設定互換、固定profile path、3 command経路を含む |
+| `uv run pytest tests/unit tests/integration/ui -q` | passed | `410 passed`。Connectionの区分、Save非接続、profile削除routingを含む |
 | TDD itemごとの対象pytest | not run | 実装前 |
 | `uv run pytest tests/unit` | not run | 実装前 |
 | `uv run pytest tests/integration` | not run | 実装前 |

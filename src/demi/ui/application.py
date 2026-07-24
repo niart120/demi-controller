@@ -263,7 +263,8 @@ class QtApplicationEventRouter:
             editor,
             on_rescan=self._rescan_adapters,
             on_request_pairing=self._request_pairing,
-            on_save_and_connect=self._save_connection_and_connect,
+            on_save=self._save_settings,
+            on_delete_profile=self._delete_controller_profile,
             on_cancel=self._cancel_settings,
             parent=parent,
         )
@@ -313,15 +314,14 @@ class QtApplicationEventRouter:
             session.rescan_adapters()
             self.refresh()
 
-    def _save_connection_and_connect(self) -> bool:
-        """Persist a connection draft and request the existing connect action."""
-        if not self._save_settings():
-            return False
+    def _delete_controller_profile(self) -> bool:
+        """Delete the fixed connection profile through the session boundary."""
         session = self._session
-        if session is not None:
-            session.connection_action()
-            self.refresh()
-        return True
+        if session is None:
+            return False
+        deleted = session.delete_controller_profile()
+        self.refresh()
+        return deleted
 
     def _request_pairing(self) -> bool:
         """Replace an editable connection dialog with pairing confirmation."""

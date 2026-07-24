@@ -701,6 +701,36 @@ def test_session_requires_pairing_confirmation_and_an_explicit_color_reconnect()
     assert isinstance(runtime.commands[-1], RecreateWithColors)
 
 
+def test_session_deletes_only_the_fixed_controller_profile(tmp_path: Path) -> None:
+    settings = AppSettings.default()
+    runtime = FakeRuntime()
+    paths = SettingsPaths(tmp_path / "config", tmp_path / "data", tmp_path / "log")
+    profile_file = paths.controller_profile_file
+    sibling_file = profile_file.with_name("other.json")
+    profile_file.parent.mkdir(parents=True)
+    profile_file.write_text("profile", encoding="utf-8")
+    sibling_file.write_text("other", encoding="utf-8")
+    repository = FakeRepository(SettingsLoadResult(settings, SettingsLoadStatus.LOADED))
+    session = ApplicationSession(
+        settings=settings,
+        paths=paths,
+        repository=repository,
+        runtime=runtime,
+        coordinator=make_coordinator(runtime),
+    )
+
+    assert session.ui_snapshot.controller_profile_exists is True
+
+    assert session.delete_controller_profile() is True
+
+    assert not profile_file.exists()
+    assert sibling_file.read_text(encoding="utf-8") == "other"
+    assert session.ui_snapshot.controller_profile_exists is False
+    assert repository.saved == []
+    assert runtime.commands == []
+    assert session.delete_controller_profile() is True
+
+
 def test_session_reconfigures_diagnostic_logging_and_logs_only_error_category() -> None:
     settings = AppSettings.default()
     runtime = FakeRuntime()

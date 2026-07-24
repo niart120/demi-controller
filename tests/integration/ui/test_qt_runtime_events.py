@@ -297,17 +297,18 @@ def test_mapping_dialog_saves_mouse_gyro_settings_and_discards_cancelled_edits(
 def test_router_routes_connection_dialog_actions_through_the_application_session(
     qt_application: QApplication,
 ) -> None:
-    """Keep connection discovery, pairing, and saved connect outside widgets."""
+    """Keep connection discovery, pairing, and save-without-connect outside widgets."""
     settings = AppSettings.default()
     runtime = _Runtime()
     coordinator = CaptureCoordinator(
         publisher=InputPublisher(clock=SystemClock(), sink=runtime),
         pointer_capture=_PointerCapture(),
     )
+    repository = _Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN))
     session = ApplicationSession(
         settings=settings,
         paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
-        repository=_Repository(SettingsLoadResult(settings, SettingsLoadStatus.FIRST_RUN)),
+        repository=repository,
         runtime=runtime,
         coordinator=coordinator,
     )
@@ -341,12 +342,13 @@ def test_router_routes_connection_dialog_actions_through_the_application_session
     assert isinstance(restored_dialog, ConnectionDialog)
     assert session.dialogs.model.kind is DialogKind.CONNECTION
 
-    restored_dialog.request_connect()
+    restored_dialog.request_save()
     qt_application.processEvents()
 
     assert window.active_settings_dialog is None
     assert session.dialogs.model.kind is DialogKind.NONE
-    assert isinstance(runtime.commands[-1], ConnectSaved)
+    assert repository.saved[-1].connection.adapter_id == "usb:0"
+    assert not any(isinstance(command, ConnectSaved) for command in runtime.commands)
 
 
 def test_router_routes_colors_preview_cancel_and_reconnect_through_the_session(

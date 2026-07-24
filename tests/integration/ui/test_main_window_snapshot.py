@@ -172,7 +172,7 @@ def test_main_window_refreshes_connection_candidates_without_auto_selecting(
     assert dialog.adapter_model.rowCount() == 2
     assert dialog.adapter_combo.currentIndex() == -1
     assert editor.draft.connection.adapter_id == "usb:missing"
-    assert not dialog.connect_button.isEnabled()
+    assert dialog.save_button.isEnabled()
     assert not dialog.pairing_button.isEnabled()
 
     window.refresh(
@@ -192,5 +192,5 @@ def test_main_window_refreshes_connection_candidates_without_auto_selecting(
     assert dialog.adapter_model.rowCount() == 0
     assert not dialog.adapter_combo.isEnabled()
     assert dialog.rescan_button.isEnabled()
-    assert not dialog.connect_button.isEnabled()
+    assert dialog.save_button.isEnabled()
     assert not dialog.pairing_button.isEnabled()

@@ -514,6 +514,7 @@ class MainWindow(QMainWindow):
         dialog = self._active_settings_dialog
         if isinstance(dialog, ConnectionDialog):
             dialog.set_adapters(snapshot.adapters)
+            dialog.set_profile_exists(snapshot.controller_profile_exists)
 
     def _on_input_evaluation_timeout(self) -> None:
         if not self._shutdown_started and self._input_coordinator is not None:
