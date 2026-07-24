@@ -175,6 +175,31 @@ def test_mouse_input_status_is_below_controller_and_above_imu_indicators() -> No
     assert layout.status_bounds.bottom <= layout.accel_bounds.top
 
 
+@pytest.mark.parametrize(
+    ("active", "expected"),
+    [(False, "Mouse input: Off"), (True, "Mouse input: On")],
+)
+def test_mouse_input_status_text_omits_keyboard_shortcut(
+    active: bool,
+    expected: str,
+) -> None:
+    assert preview_module._mouse_input_status_text(active) == expected
+
+
+def test_mouse_input_status_text_uses_translated_terms_without_keyboard_shortcut() -> None:
+    translations = {
+        "Mouse input": "マウス入力",
+        "On": "有効",
+        "Off": "無効",
+    }
+
+    def translate(_context: str, source: str) -> str:
+        return translations[source]
+
+    assert preview_module._mouse_input_status_text(False, translate) == "マウス入力: 無効"
+    assert preview_module._mouse_input_status_text(True, translate) == "マウス入力: 有効"
+
+
 def test_controller_layout_forms_lower_grips_and_a_joined_directional_pad() -> None:
     layout = preview_layout(960, 600)
     dpad_up = layout.controls["dpad_up"]

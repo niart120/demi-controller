@@ -66,7 +66,7 @@
 |---|---|---|---|---|
 | refactor-done | Shoulder buttons are enclosed by a continuous upper faceplate and the complete silhouette stays near a 2:1 ratio | regression | unit | 箱状ツノを廃止し、上段を連続した外形へ変更 |
 | refactor-skipped | ABXY centers use equal horizontal and vertical spacing | regression | unit | 縦横48px、追加整理は不要 |
-| todo | Mouse input status text omits the F5 shortcut in English and Japanese | regression | unit / integration | F5動作は対象外 |
+| refactor-done | Mouse input status text omits the F5 shortcut in English and Japanese | regression | unit / integration | 翻訳可能な状態文言生成を描画から分離、F5動作は対象外 |
 | todo | Gyro and acceleration regions have at least 90px height in the minimum window | regression | unit | 状態領域との非交差 |
 | todo | Positive acceleration axes project to +X upper-right, +Y lower-right, and +Z downward | regression | unit | 右Joy-Con軸画像 |
 
@@ -99,6 +99,9 @@
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-abxy-red` | red | ABXY中心間隔が横62.4px、縦48pxで不一致 |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-abxy-green` | pass | 45 passed、ABXY中心間隔は縦横48px |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-abxy-green` | pass | 通常幅と最小幅で箱状ツノの解消、上部余白の削減、ABXY等間隔を確認 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-status-red` | red | 状態文言生成境界が未実装で3 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit047-status-green` | pass | 31 passed、英語・日本語のON/OFF文言からF5を除外 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_047-status-green` | pass | 日本語の有効状態が `マウス入力: 有効` だけを表示することを確認 |
 | standard gate | not run | 完了前に実行する |
 
 ## 10. 先送り事項

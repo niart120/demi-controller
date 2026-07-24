@@ -27,6 +27,7 @@ from demi.ui.preview_sensor import (
 )
 
 type RepaintRequest = Callable[[], object]
+type TranslateText = Callable[[str, str], str]
 
 _PRESSED_FILL_COLOR = "#F4C95D"
 _PRESSED_OUTLINE_COLOR = "#FFF1A8"
@@ -143,6 +144,15 @@ def _control_id(button: LogicalButton) -> str:
     if button is LogicalButton.RIGHT_STICK:
         return "right_stick_click"
     return button.value.lower()
+
+
+def _mouse_input_status_text(
+    active: bool,
+    translate: TranslateText = QCoreApplication.translate,
+) -> str:
+    mouse_input = translate("ControllerPreviewWidget", "Mouse input")
+    state = translate("ControllerPreviewWidget", "On" if active else "Off")
+    return f"{mouse_input}: {state}"
 
 
 class ControllerPreviewWidget(QWidget):
@@ -372,10 +382,6 @@ class ControllerPreviewWidget(QWidget):
         model: ControllerPreviewModel,
         bounds: PreviewRect,
     ) -> None:
-        translate = QCoreApplication.translate
-        on = translate("ControllerPreviewWidget", "On")
-        off = translate("ControllerPreviewWidget", "Off")
-        mouse_input = translate("ControllerPreviewWidget", "Mouse input")
         mouse_color = "#176B3A" if model.mouse_input_active else "#7A1F1F"
         painter.setPen(QPen(QColor("#FFFFFF"), 1.0))
         painter.setBrush(QColor(mouse_color))
@@ -383,7 +389,7 @@ class ControllerPreviewWidget(QWidget):
         painter.drawText(
             _qrect(bounds),
             Qt.AlignmentFlag.AlignCenter,
-            f"{mouse_input}: {on if model.mouse_input_active else off} (F5)",
+            _mouse_input_status_text(model.mouse_input_active),
         )
 
     def _draw_sensors(
