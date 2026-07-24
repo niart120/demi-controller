@@ -72,6 +72,16 @@
 | `uv run pytest tests/unit/ui/test_controller_preview.py::test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v -q -p no:cacheprovider --basetemp tmp/pytest-unit050-misc-order-green` | pass | 1 passed、CaptureがHomeより左 |
 | `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit050-ui-formatted` | pass | 54 passed、浅いV字、等径、共通カラムを維持 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_050-final` | pass | 3状態でCが左、Hが右。複合入力と最小表示では右側Homeの押下色を確認 |
+| `uv sync --dev` | pass | 77 packages resolved、74 packages checked |
+| `uv lock --check` | pass | lockfile変更なし |
+| `uv run ruff format --check .` | pass | 148 files already formatted |
+| `uv run ruff check .` | pass | All checks passed |
+| `uv run ty check --no-progress` | pass | All checks passed |
+| `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit050-all-unit` | pass | 331 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider --basetemp tmp/pytest-unit050-integration-network` | pass | 132 passed |
+| `uv build` | pass | sdistとwheelを作成 |
+| `git diff --check` | pass | whitespace errorなし |
+| `docs-quality-review` | pass | `spec/initial/ui.md`と本仕様の物理配置、検証根拠、会話依存語、仮テキストを確認 |
 
 ## 10. 先送り事項
 
