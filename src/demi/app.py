@@ -913,7 +913,8 @@ def _safe_error_message(category: ControllerErrorCategory) -> str:
     messages = {
         ControllerErrorCategory.ADAPTER_NOT_FOUND: "USB adapter not found",
         ControllerErrorCategory.ADAPTER_OPEN_FAILED: "Could not open USB adapter",
-        ControllerErrorCategory.BOND_NOT_FOUND: "Saved bond not found",
+        ControllerErrorCategory.BOND_NOT_FOUND: "Saved pairing profile not found or incompatible",
+        ControllerErrorCategory.PAIRING_PROFILE_EXISTS: "Pairing profile slot already exists",
         ControllerErrorCategory.PAIRING_TIMEOUT: "Pairing timed out",
         ControllerErrorCategory.RECONNECT_FAILED: "Could not reconnect saved connection",
         ControllerErrorCategory.CONNECTION_LOST: "Connection lost",

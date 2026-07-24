@@ -2,7 +2,9 @@
 
 ## 1. 対象契約
 
-0.1.0は `swbt-python>=0.4.0,<0.5.0` を対象とする。Project_Demiは周期送信型を使わず、送信完了をawaitできるDirect公開型だけに依存する。主に次の公開要素を使う。
+0.1.0は `swbt-python>=0.5.1,<0.6.0` を対象とする。Project_Demiは周期送信型を使わず、
+入力レポートをBumbleの送信キューへ受理させるまでawaitできるDirect公開型だけに依存する。
+HCIの送信完了や対象機器への反映は、このawaitの完了条件に含めない。主に次の公開要素を使う。
 
 ```python
 from swbt import (
@@ -72,7 +74,7 @@ SwbtControllerAdapter
 ```python
 controller = DirectProController(
     adapter=adapter_id,
-    key_store_path=bond_path,
+    profile_path=bond_path,
     controller_colors=colors,
 )
 await controller.open()
@@ -86,36 +88,66 @@ await controller.open()
 
 #### 再接続
 
-保存済みボンドが存在する場合:
+保存済みswbtプロファイルが存在する場合:
 
 ```python
 await controller.reconnect(timeout=timeout_seconds)
 ```
 
-または0.2系の推奨APIに従い、ペアリングを許可しない `connect()` を使う。実装時に公開契約へ合わせ、アプリケーション側の `Reconnect` コマンド名は変えない。
+アプリケーション側の `ConnectSaved` コマンド名と `bond_path` fieldは、Project_Demiが所有する
+保存スロット境界として維持する。swbt公開APIへ渡すときだけ `profile_path` に写像する。
 
 #### 新規ペアリング
 
-ユーザー確認後だけ:
+ユーザー確認後、未使用の保存スロットでは新しいプロファイルを作成する。
 
 ```python
+controller = await DirectProController.create_profile(
+    adapter=adapter_id,
+    profile_path=bond_path,
+    local_address=None,
+    pair_timeout=timeout_seconds,
+    controller_colors=colors,
+)
+```
+
+`create_profile()` の戻り値は初回ペアリング済みである。Project_Demiは同じcontrollerに
+`open()`や`connect()`を重ねて呼ばない。`local_address=None`により、アダプターが起動後に
+報告する現在のBluetoothアドレスを使い、Project_DemiからCSRの揮発領域を書き換えない。
+
+初回ペアリングの失敗後にプロファイルが残っている場合は、同じスロットから再試行できる。
+
+```python
+controller = DirectProController(
+    adapter=adapter_id,
+    profile_path=bond_path,
+    controller_colors=colors,
+)
+await controller.open()
 await controller.connect(
     timeout=timeout_seconds,
     allow_pairing=True,
 )
 ```
 
-アプリ起動時の自動再接続では `allow_pairing=True` を使わない。
+既存プロファイルに保存済みペアリング情報があれば再接続を優先し、なければペアリングする。
+swbt 0.4のkey-store JSONや壊れたプロファイルは、`open()`時の検証エラーとして扱う。
+アプリ起動時の自動再接続では `create_profile()` を使わない。
 
 ### 3.3 接続直後
 
-接続成功後、入力受付開始前に次を行う。
+swbt-python 0.5.1 の `create_profile()`、`connect()`、`reconnect()` は、HID link 接続だけでは
+復帰せず、初期subcommand応答とplayer割り当てが完了したprotocol-ready状態まで待つ。
+Project_Demiは、この公開APIが正常復帰した後、入力受付開始前に次を行う。
 
-1. ボタン解放、スティック中央、ジャイロ0、加速度 `(0, 0, +1) G` のrest `InputState`を `send()` し、完了を待つ
+1. ボタン解放、スティック中央、ジャイロ0、加速度 `(0, 0, +1) G` のrest `InputState`を `send()` し、Bumbleの送信キュー受理を待つ
 2. 接続状態を `CONNECTED` へ更新
 3. UIへ接続イベントを通知
 4. 最新フレームが捕捉中でなければrest状態を維持
 5. ユーザーが明示的に捕捉を開始してから入力適用
+
+`CONNECTED`通知と通常フレーム送信はprotocol-ready後に限る。Project_Demi側でHID channel
+openを接続完了として再判定したり、固定時間の待機を追加したりしない。
 
 ### 3.4 切断
 
@@ -124,7 +156,7 @@ await controller.connect(
 3. コントローラーを閉じる
 4. 内部参照を破棄
 5. UIへ切断イベント
-6. ボンドファイルは保持
+6. swbtプロファイルは保持
 
 例外が発生しても手順3以降へ進む。
 
@@ -269,7 +301,7 @@ colors = ControllerColors(
 
 色は `DirectProController` 生成時の引数であるため、接続中の変更ではrest送信成功後に再生成して反映する。UIプレビューは即時更新する。
 
-## 9. ボンド情報
+## 9. 保存プロファイル
 
 保存先:
 
@@ -282,10 +314,13 @@ colors = ControllerColors(
 - スロット名は `[a-z0-9][a-z0-9_-]{0,31}` に制限
 - パストラバーサルを拒否
 - Pro Controllerと将来のJoy-Conで同じファイルを共有しない
+- Bluetoothアドレスの選択方法とペアリングキーを含むswbt 0.5プロファイルとして扱う
 - 内容をProject_Demiが解釈、編集、整形しない
 - ログへ内容を出さない
 - 削除はユーザーの明示操作と確認が必要
 - 可能なOSではユーザーだけが読める権限へ設定する
+- swbt 0.4の`key_store_path`が保存したJSONとは互換性がない。0.5への更新後は未使用スロットを
+  選ぶか、旧ファイルを明示削除してから再ペアリングする。自動移行や自動上書きは行わない
 
 ## 10. コマンド
 
@@ -346,6 +381,7 @@ UIへPythonスタックトレースを直接表示しない。スタックトレ
 - `ADAPTER_NOT_FOUND`
 - `ADAPTER_OPEN_FAILED`
 - `BOND_NOT_FOUND`
+- `PAIRING_PROFILE_EXISTS`
 - `PAIRING_TIMEOUT`
 - `RECONNECT_FAILED`
 - `CONNECTION_LOST`

@@ -51,16 +51,24 @@ class RecordingGamepad:
 
 def test_saved_reconnect_and_pairing_use_distinct_public_lifecycle_routes() -> None:
     gamepads: list[RecordingGamepad] = []
-    factory_kwargs: list[dict[str, object]] = []
+    constructor_kwargs: list[dict[str, object]] = []
+    creator_kwargs: list[dict[str, object]] = []
 
     def gamepad_factory(**kwargs: object) -> RecordingGamepad:
-        factory_kwargs.append(kwargs)
+        constructor_kwargs.append(kwargs)
+        gamepad = RecordingGamepad()
+        gamepads.append(gamepad)
+        return gamepad
+
+    async def profile_creator(**kwargs: object) -> RecordingGamepad:
+        creator_kwargs.append(kwargs)
         gamepad = RecordingGamepad()
         gamepads.append(gamepad)
         return gamepad
 
     adapter = SwbtControllerAdapter(
         gamepad_factory=gamepad_factory,
+        profile_creator=profile_creator,
         adapter_lister=lambda: (),
     )
     colors = ControllerColorSettings()
@@ -75,16 +83,15 @@ def test_saved_reconnect_and_pairing_use_distinct_public_lifecycle_routes() -> N
 
     assert [gamepad.calls for gamepad in gamepads] == [
         ["open", "reconnect", "close"],
-        ["open", "connect", "close"],
+        ["close"],
     ]
     assert gamepads[0].reconnect_timeouts == [12.5]
-    assert gamepads[1].connect_options == [(20.0, True)]
     assert gamepads[0].close_neutral_values == [False]
     assert gamepads[1].close_neutral_values == [True]
-    assert [kwargs["key_store_path"] for kwargs in factory_kwargs] == [
-        "saved.json",
-        "new.json",
-    ]
+    assert constructor_kwargs[0]["profile_path"] == "saved.json"
+    assert creator_kwargs[0]["profile_path"] == "new.json"
+    assert creator_kwargs[0]["local_address"] is None
+    assert creator_kwargs[0]["pair_timeout"] == 20.0
 
 
 def test_frame_apply_and_color_recreate_preserve_saved_connection_context() -> None:
@@ -127,5 +134,41 @@ def test_frame_apply_and_color_recreate_preserve_saved_connection_context() -> N
     assert gamepads[1].calls == ["open", "reconnect", "close"]
     assert gamepads[0].reconnect_timeouts == [12.5]
     assert gamepads[1].reconnect_timeouts == [12.5]
-    assert factory_kwargs[0]["key_store_path"] == "saved.json"
-    assert factory_kwargs[1]["key_store_path"] == "saved.json"
+    assert factory_kwargs[0]["profile_path"] == "saved.json"
+    assert factory_kwargs[1]["profile_path"] == "saved.json"
+
+
+def test_pairing_retries_an_existing_profile_without_creating_it_again(
+    tmp_path: Path,
+) -> None:
+    profile_path = tmp_path / "pairing-profile.json"
+    profile_path.write_text("existing profile owned by the injected fake", encoding="utf-8")
+    gamepad = RecordingGamepad()
+    constructor_kwargs: dict[str, object] = {}
+
+    def gamepad_factory(**kwargs: object) -> RecordingGamepad:
+        constructor_kwargs.update(kwargs)
+        return gamepad
+
+    async def unexpected_profile_creator(**kwargs: object) -> RecordingGamepad:
+        del kwargs
+        raise AssertionError
+
+    adapter = SwbtControllerAdapter(
+        gamepad_factory=gamepad_factory,
+        profile_creator=unexpected_profile_creator,
+        adapter_lister=lambda: (),
+    )
+
+    asyncio.run(
+        adapter.start_pairing(
+            "usb:0",
+            profile_path,
+            20.0,
+            ControllerColorSettings(),
+        )
+    )
+
+    assert gamepad.calls == ["open", "connect"]
+    assert gamepad.connect_options == [(20.0, True)]
+    assert constructor_kwargs["profile_path"] == str(profile_path)
