@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | refactor-skipped | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | Settings menu階層はgreen。選択タブroutingは次の統合dialog cycleで確認 |
 | todo | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 色preview取消も確認 |
-| todo | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | 不正indexと未割り当て競合を含む |
+| refactor-skipped | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | `12 passed`。責務は既存editor内で完結しており追加整理なし |
 | todo | Mappingsタブはtarget指定追加と選択行削除を標準controlから実行する | new | integration | modelの行通知とbutton状態を確認 |
 | todo | Connectionタブはprofile操作と全体設定を別groupで表示し、bond slotとtimeout controlを表示しない | new / regression | integration | 利用者向け境界 |
 | todo | ConnectionのSaveは設定を保存するが接続commandを発行しない | regression | unit / integration | `Save and connect`を廃止 |
@@ -135,6 +135,8 @@
 | command | result | notes |
 |---|---|---|
 | `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_main_window_dialogs.py tests/integration/ui/test_main_window_snapshot.py -q` | passed | `6 passed`。Settings menuと既存dialog起動回帰 |
+| `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | `12 passed`。binding追加・削除、不正index、未割り当て競合 |
+| `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | editor cycleのlint |
 | TDD itemごとの対象pytest | not run | 実装前 |
 | `uv run pytest tests/unit` | not run | 実装前 |
 | `uv run pytest tests/integration` | not run | 実装前 |
