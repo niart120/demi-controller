@@ -98,6 +98,13 @@ def test_preview_layout_keeps_major_regions_inside_content_without_overlap(
         assert not bounds.intersects(layout.accel_bounds), control_id
 
 
+def test_preview_layout_reserves_readable_height_for_imu_at_minimum_window_size() -> None:
+    layout = preview_layout(800, 480)
+
+    assert layout.gyro_bounds.height >= 32.0
+    assert layout.accel_bounds.height >= 32.0
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

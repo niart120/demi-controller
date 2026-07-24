@@ -52,7 +52,7 @@
 | refactor-skipped | The left stick is above the directional pad in the controller layout | regression | unit | ui: red 2026-07-25, green 2026-07-25 |
 | refactor-skipped | The complete controller silhouette contains both colored grip regions | regression | unit | geometry guard: red and green 2026-07-25 |
 | green | Rendered grips visually match the reference's broad sloped shoulders, front-panel seam, and vertical handles | acceptance | manual | red: `unit_045-grip-union`, `unit_045-grip-visual-3`; green: `unit_045-grip-layer`,目視確認 2026-07-25 |
-| deferred | IMU indicators remain readable at 800x520 | regression | integration | self-review finding 2; next cycle |
+| refactor-skipped | IMU indicators remain readable at 800x520 | regression | unit + manual | geometry red/green 2026-07-25; visual green: `unit_045-imu-green/00-minimum-window.png` |
 | deferred | Directional-pad directions render as one connected cross | regression | unit | self-review finding 3; later cycle |
 
 ## 7. 設計メモ
@@ -84,6 +84,8 @@
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-union` | fail | グリップが細い接点から吊られた涙滴形であり、本体前面とグリップの継ぎ目も消えているため不合格 |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-visual-3` | fail | 肩と縦長比率は改善したが、グリップを本体前面より後に塗ったため色面が操作部側へ入り込んでいる |
 | `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/unit_044/scenario.py --output tmp/gui-audit/unit_045-grip-layer` | pass | 実機画像と目視比較し、グリップが背面、本体前面が手前となり、外側の肩、継ぎ目、縦長の把持部が読めることを確認 |
+| `uv run pytest tests/unit/ui/test_preview_layout.py tests/unit/ui/test_controller_preview.py -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-imu-green` | pass | 32 passed。最低ウィンドウ相当で各IMU領域33.6pxを確保 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/self_review_045/scenario.py --output tmp/gui-audit/unit_045-imu-green` | pass | 800x520のWindows Qt描画を目視し、見出し、軸ラベル、グラフが分離して読めることを確認 |
 | `uv run ruff format --check .` / `uv run ruff check .` / `uv run ty check --no-progress` | pass | 外周修正後のstatic gate |
 | `uv run pytest tests/unit -q -p no:cacheprovider --basetemp tmp/pytest-unit_045-grip-full` | pass | 308 passed |
 | `uv run pytest tests/integration` / `uv build` | not run | 残る2件の修正後、unit_045再完了時に実行する |
