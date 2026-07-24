@@ -431,11 +431,6 @@
         <translation>接続</translation>
     </message>
     <message>
-        <location filename="../ui/toolbar.py" line="97"/>
-        <source>Mouse input: ON (F5)</source>
-        <translation>マウス入力: オン (F5)</translation>
-    </message>
-    <message>
         <source>Mappings</source>
         <translation type="vanished">割り当て</translation>
     </message>
@@ -468,11 +463,6 @@
         <location filename="../ui/toolbar.py" line="95"/>
         <source>Disconnect</source>
         <translation>切断</translation>
-    </message>
-    <message>
-        <location filename="../ui/toolbar.py" line="99"/>
-        <source>Mouse input: OFF (F5)</source>
-        <translation>マウス入力: オフ (F5)</translation>
     </message>
 </context>
 <context>
