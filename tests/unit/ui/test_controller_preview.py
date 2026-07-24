@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import hypot
 
 import pytest
 from PySide6.QtCore import QRectF, Qt
@@ -308,6 +309,32 @@ def test_stick_click_is_not_drawn_as_a_separate_control_over_the_stick(
     assert "right_stick" in drawn_control_ids
     assert "left_stick_click" not in drawn_control_ids
     assert "right_stick_click" not in drawn_control_ids
+
+
+@pytest.mark.parametrize(
+    "position",
+    [
+        (-1.0, -1.0),
+        (-1.0, 1.0),
+        (1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, 0.0),
+        (1.0, 0.0),
+        (0.0, -1.0),
+        (0.0, 1.0),
+    ],
+)
+def test_stick_knob_remains_completely_inside_its_outer_ring(
+    position: tuple[float, float],
+) -> None:
+    outer_ring = QRectF(0.0, 0.0, 108.0, 108.0)
+    knob = preview_module._stick_knob_geometry(outer_ring, position)
+    center_distance = hypot(
+        knob.center().x() - outer_ring.center().x(),
+        knob.center().y() - outer_ring.center().y(),
+    )
+
+    assert center_distance + knob.width() / 2 <= outer_ring.width() / 2
 
 
 def test_control_label_size_scales_with_the_control() -> None:

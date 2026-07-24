@@ -273,12 +273,8 @@ class ControllerPreviewWidget(QWidget):
                 if control_id == "left_stick"
                 else model.right_stick_position
             )
-            radius = min(rect.width(), rect.height()) * 0.17
-            travel = min(rect.width(), rect.height()) * 0.25
-            center = rect.center()
-            knob = QPointF(center.x() + position[0] * travel, center.y() - position[1] * travel)
             painter.setBrush(QColor("#D8D8D8"))
-            painter.drawEllipse(_circle(knob, radius))
+            painter.drawEllipse(_stick_knob_geometry(rect, position))
             return
         painter.setPen(
             QPen(
@@ -487,6 +483,19 @@ class ControllerPreviewWidget(QWidget):
 
 def _circle(center: QPointF, radius: float) -> QRectF:
     return QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0)
+
+
+def _stick_knob_geometry(bounds: QRectF, position: tuple[float, float]) -> QRectF:
+    diameter = min(bounds.width(), bounds.height())
+    radius = diameter * 0.17
+    travel = diameter * 0.25
+    center = bounds.center()
+    magnitude = max(1.0, hypot(*position))
+    knob = QPointF(
+        center.x() + position[0] / magnitude * travel,
+        center.y() - position[1] / magnitude * travel,
+    )
+    return _circle(knob, radius)
 
 
 def _qrect(bounds: PreviewRect) -> QRectF:
