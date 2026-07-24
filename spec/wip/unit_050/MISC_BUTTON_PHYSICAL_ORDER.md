@@ -48,8 +48,8 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| todo | Capture appears to the left of Home while the misc controls keep a symmetric shallow V | regression | unit | 既存の逆向き期待値を修正する |
-| todo | Default, mixed-input, and minimum states show C left of H | visual | integration | `inspect-gui-states` |
+| refactor-skipped | Capture appears to the left of Home while the misc controls keep a symmetric shallow V | regression | unit | 座標交換だけで完了、構造整理は不要 |
+| refactor-skipped | Default, mixed-input, and minimum states show C left of H | visual | integration | 3状態で確認、構造整理は対象外 |
 
 ## 7. 設計メモ
 
@@ -68,8 +68,10 @@
 
 | command | result | notes |
 |---|---|---|
-| targeted pytest | not run | redから記録する |
-| `inspect-gui-states` capture | not run | 修正後に3状態を確認する |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v -q -p no:cacheprovider --basetemp tmp/pytest-unit050-misc-order-red` | red | Capture中心508.8px、Home中心451.2pxのため1 failed |
+| `uv run pytest tests/unit/ui/test_controller_preview.py::test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v -q -p no:cacheprovider --basetemp tmp/pytest-unit050-misc-order-green` | pass | 1 passed、CaptureがHomeより左 |
+| `uv run pytest tests/unit/ui/test_controller_preview.py tests/unit/ui/test_preview_layout.py -q -p no:cacheprovider --basetemp tmp/pytest-unit050-ui-formatted` | pass | 54 passed、浅いV字、等径、共通カラムを維持 |
+| `uv run python .agents/skills/inspect-gui-states/scripts/capture_gui.py --scenario tmp/gui-audit/controller-indicator-review-20260725-005724/scenario.py --output tmp/gui-audit/unit_050-final` | pass | 3状態でCが左、Hが右。複合入力と最小表示では右側Homeの押下色を確認 |
 
 ## 10. 先送り事項
 
@@ -79,5 +81,5 @@
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test Listを更新した
-- [ ] 検証結果または未実行理由を記録した
+- [x] 検証結果または未実行理由を記録した
 - [x] package / release / public APIは変更対象外であることを確認した

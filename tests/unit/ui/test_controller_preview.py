@@ -343,7 +343,7 @@ def test_misc_controls_are_smaller_circles_in_a_symmetric_shallow_v() -> None:
         )
         for control_id, bounds in misc.items()
     }
-    assert centers["minus"][0] < centers["home"][0] < centers["capture"][0] < centers["plus"][0]
+    assert centers["minus"][0] < centers["capture"][0] < centers["home"][0] < centers["plus"][0]
     assert centers["minus"][1] == pytest.approx(centers["plus"][1])
     assert centers["home"][1] == pytest.approx(centers["capture"][1])
     assert centers["minus"][1] < centers["home"][1]
