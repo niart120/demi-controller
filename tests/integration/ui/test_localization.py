@@ -11,6 +11,7 @@ from demi.ui.application import QtApplicationRunner
 from demi.ui.dialogs.colors import ControllerColorsDialog
 from demi.ui.dialogs.connection import ConnectionDialog
 from demi.ui.dialogs.mapping import MappingDialog
+from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
 from demi.ui.main_window import MainWindow
 
 
@@ -33,6 +34,12 @@ def test_default_user_interface_uses_english_source_text(
     )
     assert window.main_toolbar.connection_action.text() == "Connect"
     assert window.main_toolbar.capture_action.text() == "Start mouse"
+    assert window.main_toolbar.settings_button.text() == "Settings"
+    assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
+        "Mappings",
+        "Connection",
+        "Colors",
+    ]
     assert window.status_bar.adapter_label.text() == "Adapter: None"
     assert mapping.windowTitle() == "Key mappings"
     assert mapping.table.model().headerData(0, Qt.Orientation.Horizontal) == "Target"
@@ -102,8 +109,27 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
         on_reconnect=lambda: None,
     )
     color_picker = QColorDialog()
+    settings_dialog = SettingsDialog(
+        SettingsEditor(AppSettings.default()),
+        initial_tab=SettingsTab.MAPPINGS,
+        connected=False,
+        on_rescan=lambda: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_preview=lambda _colors: None,
+        on_delete_profile=lambda: True,
+        on_request_pairing=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
 
     assert window.main_toolbar.connection_action.text() == "接続"
+    assert window.main_toolbar.settings_button.text() == "設定"
+    assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
+        "割り当て",
+        "接続",
+        "色",
+    ]
     assert window.status_bar.adapter_label.text() == "アダプター: なし"
     assert mapping.windowTitle() == "キー割り当て"
     assert mapping.tabs.tabText(0) == "割り当て"
@@ -127,6 +153,15 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert connection.windowTitle() == "接続設定"
     assert connection.pairing_button.text() == "新規ペアリング"
     assert connection.discovery_label.text() == "USBアダプターを検索してください"
+    assert settings_dialog.windowTitle() == "設定"
+    assert [
+        settings_dialog.tabs.tabText(index) for index in range(settings_dialog.tabs.count())
+    ] == ["割り当て", "接続", "色"]
+    assert settings_dialog.mapping_page.add_binding_button.text() == "割り当てを追加"
+    assert settings_dialog.mapping_page.remove_binding_button.text() == "割り当てを削除"
+    assert settings_dialog.connection_page.profile_group.title() == ("コントローラープロファイル")
+    assert settings_dialog.connection_page.global_settings_group.title() == "全体設定"
+    assert settings_dialog.connection_page.delete_profile_button.text() == ("プロファイルを削除")
     assert colors.windowTitle() == "コントローラーカラー"
     assert {button.accessibleName() for button in colors.color_buttons.values()} == {
         "本体",
@@ -163,6 +198,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
         assert cancel_button.text() == "キャンセル"
 
     color_picker.close()
+    settings_dialog.close()
     colors.close()
     connection.close()
     mapping.close()

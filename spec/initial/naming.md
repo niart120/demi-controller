@@ -168,11 +168,10 @@ TOMLは `snake_case` とする。
 
 ```toml
 reconnect_on_start = false
-timeout_seconds = 30.0
 left_grip = "#323232"
 ```
 
-物理量を直接表す値は単位を名前へ含める。
+物理量を直接表す内部値は単位を名前へ含める。接続timeoutは利用者設定へ公開しないが、controller command境界では `timeout_seconds` とする。
 
 ```text
 timeout_seconds

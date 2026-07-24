@@ -95,11 +95,12 @@ await controller.reconnect(timeout=timeout_seconds)
 ```
 
 アプリケーション側の `ConnectSaved` コマンド名と `bond_path` fieldは、Project_Demiが所有する
-保存スロット境界として維持する。swbt公開APIへ渡すときだけ `profile_path` に写像する。
+固定接続プロファイル境界として維持する。swbt公開APIへ渡すときだけ `profile_path` に写像する。
+`timeout_seconds` は利用者設定ではなく、Project_Demi内部の30秒を渡す。
 
 #### 新規ペアリング
 
-ユーザー確認後、未使用の保存スロットでは新しいプロファイルを作成する。
+ユーザー確認後、固定接続プロファイルが存在しない場合は新しいプロファイルを作成する。
 
 ```python
 controller = await DirectProController.create_profile(
@@ -115,7 +116,7 @@ controller = await DirectProController.create_profile(
 `open()`や`connect()`を重ねて呼ばない。`local_address=None`により、アダプターが起動後に
 報告する現在のBluetoothアドレスを使い、Project_DemiからCSRの揮発領域を書き換えない。
 
-初回ペアリングの失敗後にプロファイルが残っている場合は、同じスロットから再試行できる。
+初回ペアリングの失敗後にプロファイルが残っている場合は、同じ固定パスから再試行できる。
 
 ```python
 controller = DirectProController(

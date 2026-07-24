@@ -47,8 +47,6 @@ language = "en"
 [connection]
 adapter_id = ""
 controller = "pro_controller"
-bond_slot = "default"
-timeout_seconds = 30.0
 reconnect_on_start = false
 diagnostic_level = "INFO"
 
@@ -242,8 +240,6 @@ target = "ACCEL:ZERO"
 | window.width | 800..7680 |
 | window.height | 520..4320 |
 | connection.adapter_id | 0..256文字 |
-| bond_slot | `[a-z0-9][a-z0-9_-]{0,31}` |
-| timeout_seconds | 1.0..120.0 |
 | diagnostic_level | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | 色 | `#[0-9A-Fa-f]{6}` |
 | ui.language | `en` または `ja`。項目がない schema v1 は `en` として読む |
@@ -338,19 +334,19 @@ MIGRATIONS = {
 
 将来のv2を読むv1アプリは、上書きせず「この設定は新しい版で作成された」と表示する。未知の新版を既定値で保存し直してはならない。
 
-## 8. ボンドと設定の分離
+## 8. 接続プロファイルと設定の分離
 
-`settings.toml` にはボンドファイルの内容を入れず、スロット名だけを入れる。
+`settings.toml` には接続プロファイルの内容と保存先を入れない。Pro Controllerの接続プロファイルはアプリケーションが所有する固定パスへ保存する。
 
 ```text
 settings.toml
-  bond_slot = "default"
+  connection.adapter_id = "..."
 
 resolved internally:
   <data_dir>/bonds/pro-controller/default.json
 ```
 
-設定のエクスポート機能を将来追加しても、ボンド情報は既定で含めない。
+接続と新規ペアリングで使うtimeoutは30秒の内部値とし、利用者設定へ公開しない。`bond_slot`と`timeout_seconds`を含む既存のschema v1は両keyを無視して読み込み、再保存時に除去する。設定のエクスポート機能を将来追加しても、接続プロファイルは既定で含めない。
 
 ## 9. ログ
 
@@ -377,7 +373,8 @@ DEBUGでも次をマスクする。
 - 色桁不足
 - 無効なキー名
 - 重複profile ID
-- パストラバーサルを含むbond slot
+- 旧schema v1の `bond_slot` / `timeout_seconds` を無視し、再保存時に除去すること
+- 固定接続プロファイルパス
 - 将来版schema
 - v1からv2への移行fixture
 - 書き込み途中例外で元ファイルが残ること

@@ -96,8 +96,8 @@
 | refactor-skipped | 固定接続profileの削除は確認時だけprofileファイルを削除してUI状態を更新する | new / edge | unit / integration | 取消、確認、固定path以外の維持、存在表示を確認 |
 | refactor-skipped | current codecはbond slotとtimeoutを出力せず、旧v1 keyを無視して読み込む | regression | unit | current出力から除去し、旧keyは型に依存せず無視。domainと固定pathを整理 |
 | refactor-skipped | connect、startup reconnect、pairingは固定profileパスと30秒timeoutを使う | regression | unit | 3 command経路を固定値へ統一。application境界の定数で完結 |
-| todo | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | catalog再生成を含む |
-| todo | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画 |
+| refactor-skipped | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | `153 finished`、localizationとcatalogの`3 passed` |
+| refactor-skipped | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画3状態で切れ、重なり、操作欠落なし |
 | refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
 
 ## 7. 設計メモ
@@ -139,20 +139,25 @@
 | `uv run pytest tests/unit/application/test_settings_editor.py -q` | passed | `12 passed`。binding追加・削除、不正index、未割り当て競合 |
 | `uv run ruff check src/demi/application/settings_editor.py tests/unit/application/test_settings_editor.py` | passed | editor cycleのlint |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `19 passed`。target指定追加、選択行削除、既存mapping操作 |
-| `uv run pytest tests/unit -q` | passed | `300 passed`。connection domain、codec旧設定互換、固定profile path、3 command経路を含む |
+| `uv run pytest tests/unit -q` | passed | `300 passed`。connection domain、codec旧設定互換、固定profile path、3 command経路を含むTDD途中の回帰確認 |
 | `uv run pytest tests/unit tests/integration/ui -q` | passed | `410 passed`。Connectionの区分、Save非接続、profile削除routingを含む |
 | `uv run pytest tests/unit tests/integration/ui -q` | passed | `414 passed`。統合3タブ、共有draft、初期tab、Esc取消を含む |
 | `uv run pytest tests/integration/ui/test_unified_settings_dialog.py tests/integration/ui/test_qt_runtime_events.py -q` | passed | `20 passed`。統合dialogのrefactor後回帰 |
-| TDD itemごとの対象pytest | not run | 実装前 |
-| `uv run pytest tests/unit` | not run | 実装前 |
-| `uv run pytest tests/integration` | not run | 実装前 |
-| `uv lock --check` | not run | 実装前 |
-| `uv run ruff format --check .` | not run | 実装前 |
-| `uv run ruff check .` | not run | 実装前 |
-| `uv run ty check --no-progress` | not run | 実装前 |
-| `uv build` | not run | 実装前 |
-| `git diff --check` | not run | 実装前 |
-| Windows GUI画像確認 | not run | 実装前 |
+| `.venv\Scripts\pyside6-lrelease.exe src\demi\i18n\demi_ja.ts -qm src\demi\i18n\demi_ja.qm` | passed | `153 finished`、`0 unfinished` |
+| `uv run pytest tests/integration/ui/test_localization.py tests/integration/package/test_translation_catalog.py -q` | passed | `3 passed`。英語、日本語、配布catalog |
+| `uv run python .agents\skills\inspect-gui-states\scripts\capture_gui.py --scenario tmp\gui-audit\unit041-scenario.py --output tmp\gui-audit\unit041-20260724` | passed | Windows通常描画。Mappings、Connection、Colorsの3 PNG |
+| `view_image` による `tmp/gui-audit/unit041-20260724/*.png` の原寸確認 | passed | 論理800x520。主要controlの切れ、重なり、欠落なし |
+| `uv sync --dev` | passed | 77 packages resolved、74 packages checked |
+| `uv lock --check` | passed | lock file変更なし |
+| `uv run ruff format --check .` | passed | 148 files formatted |
+| `uv run ruff check .` | passed | 全lint検査成功 |
+| `uv run ty check --no-progress` | passed | 全型検査成功 |
+| `uv run pytest tests/unit` | passed | `301 passed` |
+| `uv run pytest tests/integration` | passed | `130 passed`。controller、input、package、UIを含む |
+| `uv build` | passed | sdistとwheelを作成 |
+| `git diff --check` | passed | 空白エラーなし |
+| `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | `[TODO]`、`TBD`、`xxx`なし |
+| `rg`による廃止UI文言と部品名の残存検索 | passed | 旧schema互換とcontroller command内部値を除き残存なし |
 
 ## 10. 先送り事項
 
@@ -162,5 +167,5 @@
 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test Listを更新した
-- [ ] 検証結果または未実行理由を記録した
-- [ ] package / release / public APIに触れる場合のgateを記録した
+- [x] 検証結果または未実行理由を記録した
+- [x] package / release / public APIに触れる場合のgateを記録した
