@@ -39,7 +39,7 @@
 
 ## 2. 対象範囲
 
-- ツールバーの `Settings` 階層と3つの子action。
+- ツールバーの `Settings` 階層と4つの子action。
 - `Connection`、`Bindings`、`Mouse`、`Colors` の4タブを持つ単一設定ダイアログ。
 - ツールバーの `Settings` メニューに同名・同順序の4項目を置く。
 - 1つの設定draftをタブ間で共有する保存・取消処理。
@@ -79,8 +79,8 @@
 
 | 振る舞い | 入力・状態 | 期待結果 | 備考 |
 |---|---|---|---|
-| 設定階層 | toolbarが操作可能 | `Settings` の子に `Mappings`、`Connection`、`Colors` が順に表示される | 3 actionは独立したトップレベルに置かない |
-| 初期タブ | 各子actionを実行 | 同じ種類の設定ダイアログが開き、`Mappings`は`Bindings`、他は対応するタブが前面になる | 既に開いている場合は2つ目を開かない |
+| 設定階層 | toolbarが操作可能 | `Settings` の子に `Connection`、`Bindings`、`Mouse`、`Colors` が順に表示される | 4 actionは独立したトップレベルに置かない |
+| 初期タブ | 各子actionを実行 | 同じ種類の設定ダイアログが開き、同名のタブが前面になる | 既に開いている場合は2つ目を開かない |
 | draft共有 | 複数タブで値を変更して保存 | 全変更を1回の保存で永続化する | 取消時は全変更を破棄し、色previewも保存値へ戻す |
 | binding追加 | 分類された一覧からtargetを選択 | `KEY:UNASSIGNED`、amount `1.0`、非反転の行を末尾へ追加する | 常設のtarget選択欄で表の横幅を消費しない |
 | binding削除 | 行内の削除操作を実行 | 対象行だけを削除し、残りの順序を維持する | 不正indexではdraftを変更しない |
@@ -98,27 +98,27 @@
 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
-| refactor-done | toolbarは`Settings`階層の子に3設定actionを表示し、各actionは選択タブを指定する | new | unit / integration | 3 factoryを統合dialogの初期tab指定へ変更 |
-| refactor-done | 1つの設定ダイアログは3タブで同じdraftを共有し、保存または取消を一度だけ処理する | new | integration | 共通Save/Cancelと再接続確認を外側へ集約 |
+| refactor-done | toolbarは`Settings`階層の子に4設定actionを表示し、各actionは同名tabを指定する | new / regression | unit / integration | 4 factoryを統合dialogの初期tab指定へ変更 |
+| refactor-done | 1つの設定ダイアログは4タブで同じdraftを共有し、保存または取消を一度だけ処理する | new / regression | integration | 共通Save/Cancelと再接続確認を外側へ集約 |
 | refactor-skipped | editorは選択targetの未割り当てbindingを末尾へ追加し、指定行だけを削除する | new / edge | unit | `12 passed`。責務は既存editor内で完結しており追加整理なし |
-| refactor-skipped | Mappingsタブはtarget指定追加と選択行削除を標準controlから実行する | new | integration | `19 passed`。既存model/view境界へ行操作を追加し、別責務の抽出なし |
+| refactor-done | Bindingsタブは分類menuからtargetを追加し、反転と削除を各行から実行する | new / regression | integration | 常設comboと表外checkbox・削除buttonを除去 |
 | refactor-skipped | Connectionタブはprofile操作と全体設定を別groupで表示し、bond slotとtimeout controlを表示しない | new / regression | integration | `Controller profile`と`Global settings`へ分離し、旧controlを除去 |
 | refactor-skipped | ConnectionのSaveは設定を保存するが接続commandを発行しない | regression | unit / integration | router経由でrepository保存と`ConnectSaved`不在を確認 |
 | refactor-skipped | 固定接続profileの削除は確認時だけprofileファイルを削除してUI状態を更新する | new / edge | unit / integration | 取消、確認、固定path以外の維持、存在表示を確認 |
 | refactor-skipped | current codecはbond slotとtimeoutを出力せず、旧v1 keyを無視して読み込む | regression | unit | current出力から除去し、旧keyは型に依存せず無視。domainと固定pathを整理 |
 | refactor-skipped | connect、startup reconnect、pairingは固定profileパスと30秒timeoutを使う | regression | unit | 3 command経路を固定値へ統一。application境界の定数で完結 |
-| refactor-skipped | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | `153 finished`、localizationとcatalogの`3 passed` |
-| refactor-skipped | 800x520で統合設定ダイアログの主要操作へ到達でき、3タブの状態を画像で確認する | new | integration / manual | Windows通常描画3状態で切れ、重なり、操作欠落なし |
+| refactor-skipped | 英語と日本語で設定階層、タブ、connection区分、保存、profile削除を表示できる | regression | integration / package | `155 finished`、localizationとcatalogの`3 passed` |
+| refactor-skipped | 800x520で統合設定ダイアログの主要操作へ到達でき、4タブと追加menuを画像で確認する | new | integration / manual | Windows通常描画5状態で切れ、重なり、操作欠落なし |
 | refactor-done | 埋め込み設定面にfocusがある状態のEscは共有draft全体を1回だけ取消する | regression | integration | child取消を共有draft ownerへrouting |
 | refactor-done | Inverted列は反転可能な行だけ標準チェック状態を表示し、その場でdraftを更新する | regression | unit / integration | 表外checkboxと選択行同期を除去。Spaceと標準delegateの更新経路を使用 |
 | refactor-done | 各binding行の削除操作はその行だけを削除する | regression | unit / integration | 表外削除buttonと選択行同期を除去。Remapと同じdelegate方式を再利用 |
 | refactor-done | Settingsは`Connection`、`Bindings`、`Mouse`、`Colors`を入れ子なしで表示する | regression | integration | 既存mapping pagesを外側tabへ移し、入力待受の所有期間を共有dialogへ統合 |
 | refactor-done | toolbarのSettings menuは4タブと同じ名称・順序で各タブを開く | regression | unit / integration | 4 factoryへ分離し、`mapping_action`と`Mappings`表記を除去 |
-| todo | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換する候補を画像確認 |
+| refactor-done | binding追加は分類されたtargetを選択でき、選択後に未割り当て行を末尾へ追加する | regression | integration | 常設comboを分類付きmenuへ置換。全31 targetの重複・欠落なし |
 
 ## 7. 設計メモ
 
-- `Settings` はツールバー上の `QToolButton` と `QMenu` で階層を表す。子actionは既存の利用者向け名称を `Connection` に揃える。
+- `Settings` はツールバー上の `QToolButton` と `QMenu` で階層を表す。子actionとtabは `Connection`、`Bindings`、`Mouse`、`Colors` の同名・同順序とする。
 - 単一の設定ダイアログが4タブの `QTabWidget` と共通の `QDialogButtonBox` を所有する。`Mappings`用の入れ子タブは作らず、`Bindings`と`Mouse`を同じ階層に置く。各設定面はダイアログを閉じず、共有editorだけを更新する。
 - 反転と削除は対象行の値・操作なので表内に置く。追加は行がまだ存在しないため表外に置くが、target分類を開いたときだけ選択肢を表示する。
 - 接続プロファイルは `SettingsPaths` が返す固定ファイル1個とする。入力mappingの `InputProfile` とは別概念であり、Connectionタブでは `Controller profile` と明記する。
@@ -169,16 +169,22 @@
 | `uv run ruff format --check .` | passed | 148 files formatted |
 | `uv run ruff check .` | passed | 全lint検査成功 |
 | `uv run ty check --no-progress` | passed | 全型検査成功 |
-| `uv run pytest tests/unit` | passed | `301 passed` |
-| `uv run pytest tests/integration` | passed | `130 passed`。controller、input、package、UIを含む |
+| `uv run pytest tests/unit` | passed | `302 passed` |
+| `uv run pytest tests/integration` | passed | `131 passed`。controller、input、package、UIを含む |
 | `uv build` | passed | sdistとwheelを作成 |
 | `git diff --check` | passed | 空白エラーなし |
-| `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | `[TODO]`、`TBD`、`xxx`なし |
-| `rg`による廃止UI文言と部品名の残存検索 | passed | 旧schema互換とcontroller command内部値を除き残存なし |
+| `rg`による公開文書、作業仕様、翻訳catalogの仮テキスト検索 | passed | 仮テキスト標識なし |
+| `rg`による廃止UI文言と部品名の残存検索 | passed | 現行のSettings経路と公開文書に旧3タブ構成なし。単体利用する`MappingDialog`内部の互換tab名、翻訳catalogの`vanished`項目、不存在を確認するtest名は対象外 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py -q` | passed | `20 passed`。行内Invertedトグルと既存mapping操作 |
 | `uv run pytest tests/unit/ui/test_mapping_model.py tests/integration/ui/test_mapping_dialog.py tests/unit/ui/test_mapping_delegate.py -q` | passed | `22 passed`。行内Removeとdelegate回帰 |
 | `uv run pytest tests/integration/ui/test_unified_settings_dialog.py -q` | passed | `3 passed`。4タブの平坦化、順序、共有draft |
 | `uv run pytest tests/unit/ui/test_toolbar.py tests/integration/ui/test_unified_settings_dialog.py tests/integration/ui/test_main_window_dialogs.py tests/integration/ui/test_main_window_snapshot.py tests/integration/ui/test_qt_runtime_events.py -q` | passed | `27 passed`。4 action、同名tab routing、modal排他 |
+| `uv run pytest tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_unified_settings_dialog.py -q` | passed | `19 passed`。分類menuの全31 target、追加、行内操作、共有draft |
+| `uv run ty check --no-progress src/demi/ui/dialogs/mapping.py tests/integration/ui/test_mapping_dialog.py tests/integration/ui/test_unified_settings_dialog.py` | passed | 追加menuとQt型境界 |
+| `uv run python .agents\skills\inspect-gui-states\scripts\capture_gui.py --scenario tmp\gui-audit\unit041-scenario.py --output tmp\gui-audit\unit041-followup-menu-20260724` | passed | Windows通常描画。4タブと追加menuの5 PNG |
+| `view_image` によるfollow-up PNGの原寸確認 | passed | 800x520で列、チェック、行操作、4タブ、分類menuの切れ・重なりなし |
+| `.venv\Scripts\pyside6-lrelease.exe src\demi\i18n\demi_ja.ts -qm src\demi\i18n\demi_ja.qm` | passed | `155 finished`、`0 unfinished` |
+| `uv run pytest tests/integration/ui/test_localization.py tests/integration/package/test_translation_catalog.py -q` | passed | `3 passed`。4 action、4 tab、分類menu、行内Remove |
 
 ## 10. 先送り事項
 
