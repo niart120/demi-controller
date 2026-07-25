@@ -193,10 +193,11 @@ Qtの描画実装そのものより、表示モデルとwidget stateを確認す
 - モーダル排他
 - Mouse tabでマウスジャイロの有効、水平・垂直感度、水平・垂直反転、pitch上限を現在値から編集する
 - マウスジャイロ設定の保存がrepository、session、実行中のPublisherへ反映され、取消では編集前の値を維持する
-- キー割り当て表の行内変更操作がmouse、Enter、Spaceで同じ行を待受にし、待受行だけ入力指示と取消を表示する
+- キー割り当て表の行内変更操作がmouse、Enter、Spaceで同じ行を待受にし、待受行だけ入力指示と取消を表示する。待受後の表領域のマウスボタンは候補になり、反転、変更、削除の操作セルは通常操作を維持する
 - 分類menuでtargetを選んだ未割り当てbinding行の追加、`Inverted / Action / Conflict / Remove`の列順、Inverted列の行内トグル、ゴミ箱アイコンからの同一行削除
 - Escによる待受取消と「Escを割り当てる」を分離し、F4の理由付き拒否、F12の保存往復を確認する
-- 重複sourceの置換確認で取消時はdraft不変、置換時だけ既存行を未割り当てへ戻す
+- 重複sourceの確認で取消時はdraft不変、置換時だけ既存行を未割り当てへ戻し、両方を保持する明示選択では両行のsourceを維持する
+- Default profile の target 分類順、同一 target の隣接、診断ジャイロ Y 軸の I/K 割り当てを確認する
 - friendly表示とcanonical roleを分離し、言語変更、保存、再読込でcanonical sourceを保持する
 - Bindingsと他tabの移動で隠れた待受を残さず、Save / Cancelへkeyboardで到達できる
 - `Settings`階層と設定ダイアログが`Connection`、`Bindings`、`Mouse`、`Colors`を同じ順序で表示し、各actionが同名tabを開く

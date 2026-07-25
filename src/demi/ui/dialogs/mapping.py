@@ -12,6 +12,7 @@ from PySide6.QtCore import (
     QObject,
     QPersistentModelIndex,
     Qt,
+    QTimer,
 )
 from PySide6.QtGui import QAction, QHideEvent, QKeyEvent, QKeySequence, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import (
@@ -416,15 +417,19 @@ class MappingDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Key mappings"))
         self._mapping_model = MappingTableModel(editor, self)
+        self._mapping_model.dataChanged.connect(self._cancel_capture_after_table_edit)
         self._on_dialog_opened = on_dialog_opened
         self._on_save = on_save
         self._on_cancel = on_cancel
         self._capture_row: int | None = None
+        self._pending_mouse_source: tuple[int, str] | None = None
         self._cancel_requested = False
         self._input_filter_application: QApplication | None = None
         self._conflict_confirmation: QMessageBox | None = None
         self._binding_replacement_confirmation: QMessageBox | None = None
         self._pending_binding_replacement: tuple[int, str] | None = None
+        self._replace_existing_button: QAbstractButton | None = None
+        self._keep_both_button: QAbstractButton | None = None
 
         self.table = QTableView(self)
         self.table.setModel(self._mapping_model)
@@ -606,12 +611,14 @@ class MappingDialog(QDialog):
     def deactivate_input_handling(self) -> None:
         """Stop remapping and input handling when the owner is hidden."""
         self._capture_row = None
+        self._pending_mouse_source = None
         self._mapping_model.cancel_capture()
         self._remove_input_filter()
 
     def begin_capture_row(self, row: int) -> None:
         """Arm one explicit binding row for the next supported input event."""
         self._capture_row = row
+        self._pending_mouse_source = None
         self._mapping_model.begin_capture(row)
         self.table.selectRow(row)
 
@@ -624,10 +631,21 @@ class MappingDialog(QDialog):
     def cancel_capture(self) -> None:
         """Stop the active row remap without changing or closing the draft."""
         self._capture_row = None
+        self._pending_mouse_source = None
         self._mapping_model.cancel_capture()
 
     def _handle_tab_changed(self, index: int) -> None:
         if index != 0 and self._capture_row is not None:
+            self.cancel_capture()
+
+    def _cancel_capture_after_table_edit(
+        self,
+        first: QModelIndex,
+        last: QModelIndex,
+        _roles: list[int],
+    ) -> None:
+        """Stop remapping when an in-table checkbox edit takes precedence."""
+        if first.column() <= 2 <= last.column():
             self.cancel_capture()
 
     def assign_escape(self) -> None:
@@ -701,7 +719,7 @@ class MappingDialog(QDialog):
             QMessageBox.Icon.Warning,
             self.tr("Replace existing binding?"),
             self.tr("The input {source} is already assigned.").format(source=source),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
             self,
         )
         confirmation.setInformativeText(
@@ -712,6 +730,14 @@ class MappingDialog(QDialog):
             )
         )
         confirmation.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        self._replace_existing_button = confirmation.addButton(
+            self.tr("Replace existing"),
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        self._keep_both_button = confirmation.addButton(
+            self.tr("Keep both"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
         self._pending_binding_replacement = (row, source)
         confirmation.buttonClicked.connect(self._handle_binding_replacement)
         confirmation.finished.connect(self._clear_binding_replacement)
@@ -721,20 +747,23 @@ class MappingDialog(QDialog):
     def _handle_binding_replacement(self, button: QAbstractButton) -> None:
         confirmation = self._binding_replacement_confirmation
         pending = self._pending_binding_replacement
-        if (
-            confirmation is None
-            or pending is None
-            or confirmation.standardButton(button) != QMessageBox.StandardButton.Yes
-        ):
+        if confirmation is None or pending is None:
             return
         row, source = pending
-        self._mapping_model.replace_source(row, source)
+        if button is self._replace_existing_button:
+            self._mapping_model.replace_source(row, source)
+        elif button is self._keep_both_button:
+            self._mapping_model.update_source(row, source)
+        else:
+            return
         self._capture_row = None
         self.table.selectRow(row)
 
     def _clear_binding_replacement(self, _result: int) -> None:
         self._binding_replacement_confirmation = None
         self._pending_binding_replacement = None
+        self._replace_existing_button = None
+        self._keep_both_button = None
 
     def request_accept(self) -> None:
         """Accept immediately or ask for explicit confirmation of conflicts."""
@@ -833,11 +862,34 @@ class MappingDialog(QDialog):
                 event.accept()
                 return True
             return self._capture_source(key_source_for_event(event))
-        if isinstance(event, QMouseEvent) and event.type() is QEvent.Type.MouseButtonPress:
-            if watched is self.table.viewport():
+        if isinstance(event, QMouseEvent):
+            if event.type() is QEvent.Type.MouseButtonPress and self._capture_row is not None:
+                self._queue_mouse_source(mouse_source_for_event(event))
                 return False
-            return self._capture_source(mouse_source_for_event(event))
+            if event.type() is QEvent.Type.MouseButtonRelease and self._pending_mouse_source:
+                QTimer.singleShot(0, self._commit_pending_mouse_source)
+            if (
+                event.type() is QEvent.Type.MouseButtonPress
+                and watched is not self.table.viewport()
+            ):
+                return self._capture_source(mouse_source_for_event(event))
         return False
+
+    def _queue_mouse_source(self, source: str | None) -> None:
+        """Retain a mouse press until the target widget handles its release."""
+        row = self._capture_row
+        self._pending_mouse_source = None if row is None or source is None else (row, source)
+
+    def _commit_pending_mouse_source(self) -> None:
+        """Apply the queued mouse source only while its original row remains armed."""
+        pending = self._pending_mouse_source
+        self._pending_mouse_source = None
+        if pending is None:
+            return
+        row, source = pending
+        if self._capture_row != row or self._mapping_model.capture_row != row:
+            return
+        self._capture_source(source)
 
     def _capture_source(self, source: str | None) -> bool:
         row = self._capture_row

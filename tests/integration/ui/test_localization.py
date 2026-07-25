@@ -155,15 +155,15 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
         )
         == Qt.CheckState.Unchecked
     )
-    assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
+    assert mapping.table.model().data(mapping.table.model().index(5, 1)) == "中央マウス"
     assert (
-        mapping.table.model().data(mapping.table.model().index(4, 1), Qt.ItemDataRole.UserRole)
+        mapping.table.model().data(mapping.table.model().index(5, 1), Qt.ItemDataRole.UserRole)
         == "MOUSE:MIDDLE"
     )
-    assert mapping.table.model().data(mapping.table.model().index(4, 1)) == "中央マウス"
+    assert mapping.table.model().data(mapping.table.model().index(5, 1)) == "中央マウス"
     assert (
         mapping.table.model().data(
-            mapping.table.model().index(4, 1),
+            mapping.table.model().index(5, 1),
             Qt.ItemDataRole.UserRole,
         )
         == "MOUSE:MIDDLE"

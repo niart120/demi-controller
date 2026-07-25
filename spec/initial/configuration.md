@@ -95,7 +95,7 @@ source = "KEY:E"
 target = "BUTTON:X"
 
 [[profiles.bindings]]
-source = "MOUSE:MIDDLE"
+source = "KEY:C"
 target = "BUTTON:Y"
 
 [[profiles.bindings]]
@@ -124,11 +124,11 @@ source = "KEY:LEFT_SHIFT"
 target = "BUTTON:ZL"
 
 [[profiles.bindings]]
-source = "KEY:Z"
+source = "KEY:X"
 target = "BUTTON:MINUS"
 
 [[profiles.bindings]]
-source = "KEY:X"
+source = "KEY:Z"
 target = "BUTTON:PLUS"
 
 [[profiles.bindings]]
@@ -136,7 +136,7 @@ source = "KEY:F1"
 target = "BUTTON:HOME"
 
 [[profiles.bindings]]
-source = "KEY:T"
+source = "KEY:H"
 target = "BUTTON:RIGHT_STICK"
 
 [[profiles.bindings]]
@@ -216,12 +216,20 @@ source = "KEY:L"
 target = "GYRO:Z_NEGATIVE"
 
 [[profiles.bindings]]
+source = "KEY:U"
+target = "GYRO:X_POSITIVE"
+
+[[profiles.bindings]]
 source = "KEY:O"
 target = "GYRO:X_NEGATIVE"
 
 [[profiles.bindings]]
 source = "KEY:P"
 target = "IMU:NEUTRAL"
+
+[[profiles.bindings]]
+source = "MOUSE:MIDDLE"
+target = "BUTTON:Y"
 ```
 
 組み込みプロファイルはアプリ内の正本から生成し、ユーザー設定には編集後の完全なbinding配列を保存する。0.1.0では差分保存を採用しない。旧版の組み込み Default profile に診断targetが不足する場合、読み込み時に不足行だけをメモリ上で末尾へ補い、既存bindingと変更済みsourceを保持する。補完結果は `MIGRATED` とし、次回の明示保存で設定ファイルへ反映する。
@@ -232,7 +240,7 @@ target = "IMU:NEUTRAL"
 
 `inverted` は省略時 `false` とする。0.1.0ではボタンターゲットだけに指定できる。スティック方向または診断targetへ指定された場合は設定エラーとする。反転割り当ての有効判定は `source_active XOR inverted` とする。
 
-キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示して確認し、置換を選んだ場合だけ既存行を未割り当てへ戻す。`KEY:F5` はマウス入力切替用のため保存できず、`KEY:F4`、`KEY:F12`、`KEY:ESCAPE` は保存できる。
+キー割り当て画面は `KEY:F` や `MOUSE:MIDDLE` などのcanonical sourceを設定へ保存し、表では `F` や利用者向けのマウスボタン名を表示する。表示言語の変更で保存値を変えない。待受中の表領域では、操作列、反転列、削除列以外で次に押したマウスボタンを候補として扱う。同じsourceを別targetへ割り当てる場合は変更先と既存targetを示し、既存を置換、両方を保持、取消から選ばせる。置換を選んだ場合だけ既存行を未割り当てへ戻し、両方を保持する選択は利用者の明示確認として扱う。`KEY:F5` はマウス入力切替用のため保存できず、`KEY:F4`、`KEY:F12`、`KEY:ESCAPE` は保存できる。
 
 診断targetは `GYRO:X_POSITIVE`、`GYRO:X_NEGATIVE`、`GYRO:Y_NEGATIVE`、`GYRO:Y_POSITIVE`、`GYRO:Z_POSITIVE`、`GYRO:Z_NEGATIVE`、`IMU:NEUTRAL` とする。既定sourceは U/O/K/J/L/P だが、通常のbinding行として保存し、キー割り当て画面で変更できる。診断targetの `amount` は `1.0` 固定、`inverted` は `false` 固定とする。同じsourceがボタンまたはスティックにも割り当てられた場合は診断targetを優先する。
 

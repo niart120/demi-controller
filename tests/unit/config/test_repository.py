@@ -46,7 +46,7 @@ def test_load_migrates_missing_default_diagnostics_without_rewriting_settings_fi
     current_default = default_profile()
     legacy_bindings = (
         replace(current_default.bindings[0], source="KEY:P"),
-        *current_default.bindings[1:28],
+        *current_default.bindings[1:29],
     )
     legacy_settings = replace(
         AppSettings.default(),
@@ -58,10 +58,11 @@ def test_load_migrates_missing_default_diagnostics_without_rewriting_settings_fi
     result = repository.load()
 
     assert result.status is SettingsLoadStatus.MIGRATED
-    assert result.settings.profiles[0].bindings[:28] == legacy_bindings
-    assert [binding.target for binding in result.settings.profiles[0].bindings[28:]] == [
+    assert result.settings.profiles[0].bindings[:29] == legacy_bindings
+    assert [binding.target for binding in result.settings.profiles[0].bindings[29:]] == [
         BindingTarget.GYRO_X_POSITIVE,
         BindingTarget.GYRO_X_NEGATIVE,
+        BindingTarget.GYRO_Y_NEGATIVE,
         BindingTarget.GYRO_Y_POSITIVE,
         BindingTarget.GYRO_Z_POSITIVE,
         BindingTarget.GYRO_Z_NEGATIVE,

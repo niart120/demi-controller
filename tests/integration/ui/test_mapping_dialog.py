@@ -156,6 +156,18 @@ def test_mapping_dialog_captures_only_an_explicit_next_input_and_reserves_f5(
                 Qt.KeyboardModifier.NoModifier,
             ),
         )
+        QCoreApplication.sendEvent(
+            dialog.table,
+            QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(10.0, 10.0),
+                QPointF(10.0, 10.0),
+                Qt.MouseButton.BackButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+        qt_application.processEvents()
 
         assert editor.draft.profiles[0].bindings[1].source == "MOUSE:BUTTON_4"
         assert coordinator.publisher.state.held_mouse_buttons == set()
@@ -192,6 +204,87 @@ def test_mapping_dialog_escape_and_row_cancel_only_stop_the_active_remap(
     assert editor.draft == original
     assert dialog.mapping_model.capture_row is None
     assert dialog.mapping_model.data(dialog.mapping_model.index(0, 3)) == "Remap"
+
+
+def test_mapping_dialog_captures_a_mouse_button_from_the_table_after_remap_is_armed(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    QCoreApplication.sendEvent(
+        dialog.table.viewport(),
+        QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(10.0, 10.0),
+            QPointF(10.0, 10.0),
+            Qt.MouseButton.BackButton,
+            Qt.MouseButton.BackButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    QCoreApplication.sendEvent(
+        dialog.table.viewport(),
+        QMouseEvent(
+            QEvent.Type.MouseButtonRelease,
+            QPointF(10.0, 10.0),
+            QPointF(10.0, 10.0),
+            Qt.MouseButton.BackButton,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "MOUSE:BUTTON_4"
+    assert dialog.mapping_model.capture_row is None
+
+
+def test_mapping_dialog_keeps_an_inverted_checkbox_click_as_a_table_edit(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+    inverted_index = dialog.mapping_model.index(0, 2)
+
+    QCoreApplication.sendEvent(
+        dialog.table.viewport(),
+        QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(10.0, 10.0),
+            QPointF(10.0, 10.0),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    assert dialog.mapping_model.setData(
+        inverted_index,
+        Qt.CheckState.Checked,
+        Qt.ItemDataRole.CheckStateRole,
+    )
+    QCoreApplication.sendEvent(
+        dialog.table.viewport(),
+        QMouseEvent(
+            QEvent.Type.MouseButtonRelease,
+            QPointF(10.0, 10.0),
+            QPointF(10.0, 10.0),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:F"
+    assert editor.draft.profiles[0].bindings[0].inverted is True
+    assert dialog.mapping_model.capture_row is None
 
 
 def test_mapping_dialog_assign_escape_action_is_contextual_keyboard_reachable_and_round_trips(
@@ -296,13 +389,41 @@ def test_mapping_dialog_duplicate_assignment_names_both_targets_and_only_replace
     qt_application.processEvents()
     confirmation = dialog.binding_replacement_confirmation
     assert confirmation is not None
-    replace_button = confirmation.button(QMessageBox.StandardButton.Yes)
-    assert replace_button is not None
+    replace_button = next(
+        button for button in confirmation.buttons() if button.text() == "Replace existing"
+    )
     replace_button.click()
     qt_application.processEvents()
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
     assert editor.draft.profiles[0].bindings[1].source == "KEY:UNASSIGNED"
+
+
+def test_mapping_dialog_allows_duplicate_assignment_only_after_explicit_choice(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    original = editor.draft
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+    dialog.begin_capture_row(0)
+
+    _send_key(dialog.table, Qt.Key.Key_V)
+    qt_application.processEvents()
+
+    confirmation = dialog.binding_replacement_confirmation
+    assert confirmation is not None
+    assert editor.draft == original
+    keep_both_button = next(
+        button for button in confirmation.buttons() if button.text() == "Keep both"
+    )
+    keep_both_button.click()
+    qt_application.processEvents()
+
+    assert editor.draft.profiles[0].bindings[0].source == "KEY:V"
+    assert editor.draft.profiles[0].bindings[1].source == "KEY:V"
+    assert dialog.mapping_model.capture_row is None
 
 
 def test_mapping_dialog_requires_explicit_confirmation_for_binding_conflicts(
@@ -448,13 +569,13 @@ def test_mapping_dialog_exposes_configurable_imu_diagnostics(
     model = dialog.table.model()
     assert model is not None
 
-    assert model.rowCount() == 34
-    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "U"
-    assert model.data(model.index(33, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
-    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
+    assert model.rowCount() == 36
+    assert model.data(model.index(29, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
+    assert model.data(model.index(29, 1), Qt.ItemDataRole.DisplayRole) == "U"
+    assert model.data(model.index(35, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
+    assert model.data(model.index(35, 1), Qt.ItemDataRole.DisplayRole) == "P"
 
-    assert model.data(model.index(33, 2), Qt.ItemDataRole.CheckStateRole) is None
+    assert model.data(model.index(35, 2), Qt.ItemDataRole.CheckStateRole) is None
     assert dialog.set_source(33, "KEY:F4") is True
     assert editor.draft.profiles[0].bindings[33].source == "KEY:F4"
 
