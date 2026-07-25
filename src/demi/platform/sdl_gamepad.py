@@ -1,0 +1,128 @@
+"""SDL2 GameController adapter backed by PySDL2."""
+
+import warnings
+from types import ModuleType
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Using SDL2 binaries from pysdl2-dll.*",
+        category=UserWarning,
+    )
+    import sdl2
+
+from demi.domain.gamepad import GamepadButton, GamepadState
+from demi.input.gamepad import GamepadInputPort, apply_stick_dead_zone, normalize_trigger
+
+
+class SdlGamepadBackend(GamepadInputPort):
+    """Poll the first SDL GameController without creating SDL UI resources.
+
+    The backend initializes only SDL's GameController subsystem. A missing SDL
+    runtime, initialization failure, or absent controller is represented as a
+    neutral state so the rest of the application keeps accepting keyboard and
+    mouse input.
+    """
+
+    def __init__(self, bindings: ModuleType = sdl2) -> None:
+        """Initialize the SDL GameController subsystem when available."""
+        self._sdl = bindings
+        self._controller: object | None = None
+        self._closed = False
+        self._initialized = bindings.SDL_InitSubSystem(bindings.SDL_INIT_GAMECONTROLLER) == 0
+        if self._initialized:
+            bindings.SDL_GameControllerEventState(bindings.SDL_ENABLE)
+
+    def poll(self) -> GamepadState:
+        """Return the first connected controller state without blocking."""
+        if self._closed or not self._initialized:
+            return GamepadState.neutral()
+        self._sdl.SDL_PumpEvents()
+        self._sdl.SDL_GameControllerUpdate()
+        if self._controller is not None and not self._sdl.SDL_GameControllerGetAttached(
+            self._controller
+        ):
+            self._close_controller()
+        if self._controller is None:
+            self._controller = self._open_first_controller()
+        controller = self._controller
+        if controller is None:
+            return GamepadState.neutral()
+        return GamepadState(
+            connected=True,
+            buttons=frozenset(
+                button
+                for button, constant in _BUTTON_CONSTANTS.items()
+                if self._sdl.SDL_GameControllerGetButton(controller, getattr(self._sdl, constant))
+            ),
+            left_stick=apply_stick_dead_zone(
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_LEFTX
+                ),
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_LEFTY
+                ),
+            ),
+            right_stick=apply_stick_dead_zone(
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_RIGHTX
+                ),
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_RIGHTY
+                ),
+            ),
+            left_trigger=normalize_trigger(
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_TRIGGERLEFT
+                )
+            ),
+            right_trigger=normalize_trigger(
+                self._sdl.SDL_GameControllerGetAxis(
+                    controller, self._sdl.SDL_CONTROLLER_AXIS_TRIGGERRIGHT
+                )
+            ),
+        )
+
+    def close(self) -> None:
+        """Close the selected controller and SDL GameController subsystem once."""
+        if self._closed:
+            return
+        self._closed = True
+        self._close_controller()
+        if self._initialized:
+            self._sdl.SDL_QuitSubSystem(self._sdl.SDL_INIT_GAMECONTROLLER)
+            self._initialized = False
+
+    def _open_first_controller(self) -> object | None:
+        for device_index in range(self._sdl.SDL_NumJoysticks()):
+            if not self._sdl.SDL_IsGameController(device_index):
+                continue
+            controller = self._sdl.SDL_GameControllerOpen(device_index)
+            if controller is not None:
+                return controller
+        return None
+
+    def _close_controller(self) -> None:
+        controller = self._controller
+        if controller is not None:
+            self._sdl.SDL_GameControllerClose(controller)
+            self._controller = None
+
+
+_BUTTON_CONSTANTS = {
+    GamepadButton.SOUTH: "SDL_CONTROLLER_BUTTON_A",
+    GamepadButton.EAST: "SDL_CONTROLLER_BUTTON_B",
+    GamepadButton.WEST: "SDL_CONTROLLER_BUTTON_X",
+    GamepadButton.NORTH: "SDL_CONTROLLER_BUTTON_Y",
+    GamepadButton.DPAD_UP: "SDL_CONTROLLER_BUTTON_DPAD_UP",
+    GamepadButton.DPAD_DOWN: "SDL_CONTROLLER_BUTTON_DPAD_DOWN",
+    GamepadButton.DPAD_LEFT: "SDL_CONTROLLER_BUTTON_DPAD_LEFT",
+    GamepadButton.DPAD_RIGHT: "SDL_CONTROLLER_BUTTON_DPAD_RIGHT",
+    GamepadButton.LEFT_SHOULDER: "SDL_CONTROLLER_BUTTON_LEFTSHOULDER",
+    GamepadButton.RIGHT_SHOULDER: "SDL_CONTROLLER_BUTTON_RIGHTSHOULDER",
+    GamepadButton.LEFT_STICK: "SDL_CONTROLLER_BUTTON_LEFTSTICK",
+    GamepadButton.RIGHT_STICK: "SDL_CONTROLLER_BUTTON_RIGHTSTICK",
+    GamepadButton.BACK: "SDL_CONTROLLER_BUTTON_BACK",
+    GamepadButton.START: "SDL_CONTROLLER_BUTTON_START",
+    GamepadButton.GUIDE: "SDL_CONTROLLER_BUTTON_GUIDE",
+}

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from math import isfinite
 
 from .errors import DomainValueError
+from .gamepad import GamepadState
 
 _KEY_SYMBOL_PATTERN = re.compile(r"[A-Z0-9_]+")
 _MOUSE_BUTTON_PATTERN = re.compile(r"(?:LEFT|MIDDLE|RIGHT|BUTTON_[0-9]+)")
@@ -83,6 +84,7 @@ class PhysicalInputState:
     held_mouse_buttons: set[MouseButtonSource] = field(default_factory=set)
     accumulated_dx: float = 0.0
     accumulated_dy: float = 0.0
+    gamepad: GamepadState = field(default_factory=GamepadState.neutral)
     revision: int = 0
 
     def press_key(self, symbol: str, modifiers: frozenset[str] = frozenset()) -> None:
@@ -137,15 +139,32 @@ class PhysicalInputState:
             source.canonical == canonical_source for source in self.held_mouse_buttons
         )
 
+    def replace_gamepad(self, state: GamepadState) -> None:
+        """Replace the current normalized gamepad state."""
+        if not isinstance(state, GamepadState):
+            raise DomainValueError
+        if self.gamepad != state:
+            self.gamepad = state
+            self.revision += 1
+
+    def clear_gamepad(self) -> None:
+        """Replace a gamepad snapshot with the explicit neutral state."""
+        self.replace_gamepad(GamepadState.neutral())
+
     def clear(self) -> None:
         """Clear held sources and pending relative movement."""
         changed = bool(
-            self.held_keys or self.held_mouse_buttons or self.accumulated_dx or self.accumulated_dy
+            self.held_keys
+            or self.held_mouse_buttons
+            or self.accumulated_dx
+            or self.accumulated_dy
+            or self.gamepad != GamepadState.neutral()
         )
         self.held_keys.clear()
         self.held_mouse_buttons.clear()
         self.accumulated_dx = 0.0
         self.accumulated_dy = 0.0
+        self.gamepad = GamepadState.neutral()
         if changed:
             self.revision += 1
 

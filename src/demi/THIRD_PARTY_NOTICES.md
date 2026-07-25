@@ -19,6 +19,8 @@ GUI 実行時には `PySide6` を使用する。`PySide6` をインストール�
 
 ## その他の実行時依存
 
-`platformdirs`、`swbt-python`、`tomli-w` と、それらが解決する依存は、インストール済み配布物のメタデータとライセンスファイルを確認する。`uv.lock` は解決した版の記録であり、ライセンスの代替資料ではない。
+`PySDL2` と `pysdl2-dll` は SDL GameController 入力に使用する。`pysdl2-dll` は SDL2 共有ライブラリーと同梱ライブラリーを提供する。適用するライセンスと通知は、インストール済みの `pysdl2-dll` 配布物に含まれる `*.dist-info/licenses/` と SDL の配布資料で確認する。
+
+`platformdirs`、`swbt-python`、`tomli-w` と、それらが解決する依存も、インストール済み配布物のメタデータとライセンスファイルを確認する。`uv.lock` は解決した版の記録であり、ライセンスの代替資料ではない。
 
 この文書は third-party notice の到達経路を示す技術記録であり、法的適合の結論ではない。単体配布物に必要な Qt plugin、実行バイナリー、通知の同梱確認は milestone 7 の対象である。

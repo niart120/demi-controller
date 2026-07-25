@@ -14,6 +14,8 @@ WORK_DIR = ROOT / "build" / "pyinstaller"
 RUNTIME_PACKAGES = (
     "demi-controller",
     "platformdirs",
+    "pysdl2",
+    "pysdl2-dll",
     "swbt-python",
     "tomli-w",
     "bumble",
@@ -65,6 +67,10 @@ def _run_pyinstaller() -> None:
         "swbt",
         "--collect-all",
         "bumble",
+        "--collect-all",
+        "sdl2",
+        "--collect-all",
+        "sdl2dll",
         str(ROOT / "packaging" / "launcher.py"),
     ]
     subprocess.run(command, cwd=ROOT, check=True)

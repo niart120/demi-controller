@@ -4,6 +4,7 @@ from math import cos, radians, sin
 import pytest
 
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
+from demi.domain.gamepad import GamepadButton, GamepadState
 from demi.domain.mapping import Binding, BindingTarget, InputProfile, default_profile
 from demi.domain.settings import MouseSettings
 from demi.input.mouse_rotation_mapper import (
@@ -595,3 +596,33 @@ def test_publisher_reconfigures_input_settings_and_resets_held_state() -> None:
     assert frame.buttons == frozenset()
     assert frame.gyro_rate == GyroRate(0.0, 0.0, 0.0)
     assert frame.accel_g == AccelG(0.0, 0.0, 1.0)
+
+
+def test_publisher_unions_gamepad_buttons_and_combines_sticks_with_key_mappings() -> None:
+    profile = InputProfile(
+        id="combined",
+        name="combined",
+        builtin=False,
+        bindings=(
+            Binding(source="KEY:F", target=BindingTarget.BUTTON_A),
+            Binding(source="KEY:D", target=BindingTarget.LEFT_STICK_RIGHT, amount=0.5),
+        ),
+    )
+    publisher = InputPublisher(clock=FakeClock(), sink=FakeSink(), profile=profile)
+    publisher.state.press_key("F")
+    publisher.state.press_key("D")
+    publisher.state.replace_gamepad(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.SOUTH}),
+            left_stick=StickVector(-0.75, 0.25),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        )
+    )
+
+    frame = publisher.publish(capture_active=True, capture_epoch=1)
+
+    assert frame.buttons == frozenset({LogicalButton.A, LogicalButton.B})
+    assert frame.left_stick == StickVector(-0.25, 0.25)

@@ -707,10 +707,28 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
         relative_pointer_capture = (
             window if isinstance(window, RelativePointerCapturePort) else None
         )
+        try:
+            from demi.platform.sdl_gamepad import SdlGamepadBackend  # noqa: PLC0415
+
+            sdl_gamepad_input = SdlGamepadBackend()
+            if sys.platform == "win32":
+                from demi.input.gamepad import PreferredGamepadBackend  # noqa: PLC0415
+                from demi.platform.windows_xinput import WindowsXInputBackend  # noqa: PLC0415
+
+                gamepad_input = PreferredGamepadBackend(
+                    preferred=WindowsXInputBackend(),
+                    fallback=sdl_gamepad_input,
+                )
+            else:
+                gamepad_input = sdl_gamepad_input
+        except (ImportError, OSError, RuntimeError):
+            gamepad_input = None
+
         coordinator = CaptureCoordinator(
             publisher=publisher,
             pointer_capture=window,
             relative_pointer_capture=relative_pointer_capture,
+            gamepad_input=gamepad_input,
         )
         if isinstance(window, InputCaptureSetupPort):
             window.configure_input(publisher=publisher, coordinator=coordinator)

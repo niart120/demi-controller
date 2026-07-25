@@ -1,6 +1,6 @@
 """Pure mapping operations from physical state to domain controls."""
 
-from math import hypot, isfinite
+from math import isfinite
 from typing import Literal
 
 from demi.domain.controller import GyroRate, LogicalButton, StickVector
@@ -14,6 +14,7 @@ from demi.domain.mapping import (
 )
 from demi.domain.physical_input import PhysicalInputState
 
+from .gamepad import combine_sticks, standard_gamepad_buttons
 from .rotation_intent import RotationIntent
 
 DIAGNOSTIC_GYRO_RADIANS_PER_SECOND = 1.0
@@ -136,7 +137,7 @@ def aggregate_buttons(
             state.is_source_active(binding.source) ^ binding.inverted
         ):
             buttons.add(logical_button_for_target(binding.target))
-    return frozenset(buttons)
+    return frozenset(buttons | standard_gamepad_buttons(state.gamepad))
 
 
 def synthesize_stick(
@@ -186,13 +187,9 @@ def synthesize_stick(
         elif direction == "UP":
             y_positive = max(y_positive, binding.amount)
 
-    x = x_positive - x_negative
-    y = y_positive - y_negative
-    length = hypot(x, y)
-    if circular_limit and length > 1.0:
-        x /= length
-        y /= length
-    return StickVector(x=x, y=y)
+    mapped = StickVector(x_positive - x_negative, y_positive - y_negative)
+    gamepad_stick = state.gamepad.left_stick if stick == "left" else state.gamepad.right_stick
+    return combine_sticks(mapped, gamepad_stick, circular_limit=circular_limit)
 
 
 def _diagnostic_sources(profile: InputProfile) -> frozenset[str]:
