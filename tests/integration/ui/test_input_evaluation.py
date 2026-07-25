@@ -69,9 +69,11 @@ def test_precise_evaluation_timer_fans_out_the_same_frame_to_runtime_and_preview
 
     assert window.input_evaluation_interval_ms == 8
     assert window.input_evaluation_timer_type is Qt.TimerType.PreciseTimer
+    window.set_input_evaluation_interval(16)
+    assert window.input_evaluation_interval_ms == 16
     assert coordinator.start_capture() is True
     runtime.frames.clear()
-    clock.now_ns += 8_000_000
+    clock.now_ns += 16_000_000
     timer = window.findChild(QTimer)
     assert timer is not None
     assert timer.isActive() is True

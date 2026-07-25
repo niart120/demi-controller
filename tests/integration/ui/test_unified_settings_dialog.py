@@ -35,7 +35,7 @@ def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
     assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
         "Connection",
         "Bindings",
-        "Mouse",
+        "Input",
         "Colors",
     ]
     assert dialog.current_tab is SettingsTab.CONNECTION
@@ -54,12 +54,16 @@ def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
     )
     add_button_a.trigger()
     assert dialog.colors_page.set_color("body", "#ABCDEF")
+    dialog.mapping_page.input_rate_combo.setCurrentIndex(
+        dialog.mapping_page.input_rate_combo.findData(16)
+    )
 
     dialog.tabs.setCurrentIndex(SettingsTab.BINDINGS)
     assert editor.draft.connection.adapter_id == "usb:0"
     assert editor.draft.connection.reconnect_on_start is False
     assert editor.draft.profiles[0].bindings[-1].target is BindingTarget.BUTTON_A
     assert editor.draft.controller_colors.body == "#ABCDEF"
+    assert editor.draft.input.evaluation_interval_ms == 16
 
     save_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Save)
     assert save_button is not None
@@ -70,6 +74,7 @@ def test_settings_dialog_shares_one_draft_across_four_flat_tabs_and_saves_once(
     assert saved[0].connection.reconnect_on_start is True
     assert saved[0].profiles[0].bindings[-1].target is BindingTarget.BUTTON_A
     assert saved[0].controller_colors.body == "#ABCDEF"
+    assert saved[0].input.evaluation_interval_ms == 16
     assert dialog.result() == int(QDialog.DialogCode.Accepted)
 
 

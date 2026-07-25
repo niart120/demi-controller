@@ -140,6 +140,14 @@ class InputCaptureSetupPort(Protocol):
         """Connect a publisher and coordinator after application assembly."""
 
 
+@runtime_checkable
+class InputEvaluationRatePort(Protocol):
+    """Optional UI boundary that applies a saved input evaluation interval."""
+
+    def set_input_evaluation_interval(self, interval_ms: int) -> None:
+        """Apply one validated interval to the active input timer."""
+
+
 class GuiPort(Protocol):
     """GUI loop started after application assembly succeeds."""
 
@@ -193,6 +201,7 @@ class ApplicationSession:
         coordinator: CaptureCoordinator,
         loaded: SettingsLoadResult | None = None,
         publisher: InputPublisher | None = None,
+        set_input_evaluation_interval: Callable[[int], None] | None = None,
         reconfigure_diagnostic_logging: Callable[[DiagnosticLevel], None] | None = None,
         log_controller_error: Callable[[ControllerErrorCategory], None] | None = None,
     ) -> None:
@@ -206,6 +215,8 @@ class ApplicationSession:
             coordinator: Main-thread capture lifecycle owner.
             loaded: Optional load result used for a safe recovery notice.
             publisher: Live input publisher updated after settings saves.
+            set_input_evaluation_interval: Optional callback that applies a
+                saved input interval to the GUI timer.
             reconfigure_diagnostic_logging: Optional callback that applies a
                 saved diagnostic logging threshold.
             log_controller_error: Optional safe category-only error logger.
@@ -216,6 +227,7 @@ class ApplicationSession:
         self._runtime = runtime
         self._coordinator = coordinator
         self._publisher = publisher if publisher is not None else coordinator.publisher
+        self._set_input_evaluation_interval = set_input_evaluation_interval
         self._reconfigure_diagnostic_logging = reconfigure_diagnostic_logging
         self._log_controller_error = log_controller_error
         self._dialogs = DialogManager()
@@ -504,6 +516,8 @@ class ApplicationSession:
             circular_limit=settings.input.circular_stick_limit,
             evaluation_interval_ms=settings.input.evaluation_interval_ms,
         )
+        if self._set_input_evaluation_interval is not None:
+            self._set_input_evaluation_interval(settings.input.evaluation_interval_ms)
 
     def _start_saved_reconnect_once(self) -> None:
         if not self._startup_reconnect_pending:
@@ -721,6 +735,11 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             coordinator=coordinator,
             loaded=loaded,
             publisher=publisher,
+            set_input_evaluation_interval=(
+                window.set_input_evaluation_interval
+                if isinstance(window, InputEvaluationRatePort)
+                else None
+            ),
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )

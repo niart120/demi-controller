@@ -623,6 +623,7 @@ def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
     )
     runtime = FakeRuntime()
     coordinator = make_coordinator(runtime)
+    applied_intervals: list[int] = []
     session = ApplicationSession(
         settings=settings,
         paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
@@ -630,6 +631,7 @@ def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
         runtime=runtime,
         coordinator=coordinator,
         publisher=coordinator.publisher,
+        set_input_evaluation_interval=applied_intervals.append,
     )
 
     assert session.open_settings(DialogKind.MAPPING) is True
@@ -644,6 +646,7 @@ def test_session_applies_saved_settings_to_the_live_input_publisher() -> None:
     assert session.settings.input.mouse.invert_x is True
     assert session.settings.input.mouse.invert_y is True
     assert coordinator.publisher.evaluation_interval_ms == 16
+    assert applied_intervals == [16, 16]
     assert coordinator.start_capture() is True
     coordinator.publisher.state.add_mouse_motion(12, 0)
 

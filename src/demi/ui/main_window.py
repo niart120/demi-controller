@@ -306,6 +306,15 @@ class MainWindow(QMainWindow):
         """Return the Qt timer type selected for scheduled input evaluation."""
         return self._input_evaluation_timer.timerType()
 
+    def set_input_evaluation_interval(self, interval_ms: int) -> None:
+        """Apply a saved input evaluation interval to the active timer.
+
+        Args:
+            interval_ms: Validated interval in milliseconds.
+        """
+        self._input_evaluation_interval_ms = interval_ms
+        self._input_evaluation_timer.setInterval(interval_ms)
+
     @property
     def last_frame(self) -> ControllerFrame | None:
         """Return the latest evaluated frame received by the preview boundary."""

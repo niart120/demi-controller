@@ -38,7 +38,7 @@ def test_default_user_interface_uses_english_source_text(
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
         "Connection",
         "Bindings",
-        "Mouse",
+        "Input",
         "Colors",
     ]
     assert window.status_bar.adapter_label.text() == "Adapter: None"
@@ -52,6 +52,8 @@ def test_default_user_interface_uses_english_source_text(
         == Qt.CheckState.Unchecked
     )
     assert mapping.mouse_gyro_group.title() == "Mouse gyro settings"
+    assert mapping.input_rate_group.title() == "Input rate"
+    assert mapping.input_rate_combo.currentText() == "125 Hz (8 ms)"
     assert [action.text() for action in mapping.add_binding_menu.actions()] == [
         "Buttons",
         "Left stick",
@@ -141,7 +143,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert [action.text() for action in window.main_toolbar.settings_menu.actions()] == [
         "接続",
         "割り当て",
-        "マウス",
+        "入力",
         "色",
     ]
     assert window.status_bar.adapter_label.text() == "アダプター: なし"
@@ -176,7 +178,7 @@ def test_japanese_language_installs_app_and_qt_translators_before_widgets(
     assert settings_dialog.windowTitle() == "設定"
     assert [
         settings_dialog.tabs.tabText(index) for index in range(settings_dialog.tabs.count())
-    ] == ["接続", "割り当て", "マウス", "色"]
+    ] == ["接続", "割り当て", "入力", "色"]
     assert settings_dialog.mapping_page.add_binding_button.text() == "割り当てを追加"
     assert [
         action.text() for action in settings_dialog.mapping_page.add_binding_menu.actions()
