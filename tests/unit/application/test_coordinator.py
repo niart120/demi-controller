@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.state import AppState
-from demi.domain.controller import ControllerFrame
+from demi.domain.controller import ControllerFrame, StickVector
+from demi.domain.gamepad import GamepadButton, GamepadState
 from demi.input.publisher import InputPublisher
 
 
@@ -40,6 +41,24 @@ class FakeWindow:
         if enabled and self.fail_on_enable:
             raise OSError
         self.exclusive_calls.append(enabled)
+
+
+@dataclass
+class FakeGamepadInput:
+    """Gamepad port with an observable poll and shutdown boundary."""
+
+    state: GamepadState = field(default_factory=GamepadState.neutral)
+    poll_count: int = 0
+    close_count: int = 0
+
+    def poll(self) -> GamepadState:
+        """Return the configured fake snapshot."""
+        self.poll_count += 1
+        return self.state
+
+    def close(self) -> None:
+        """Record backend shutdown."""
+        self.close_count += 1
 
 
 def make_coordinator(window: FakeWindow) -> tuple[CaptureCoordinator, FakeSink]:
@@ -99,3 +118,31 @@ def test_configuration_transition_neutralizes_capture_without_auto_recapture() -
     assert coordinator.is_captured is False
     assert window.exclusive_calls == [True, False]
     assert len(sink.frames) == 2
+
+
+def test_evaluation_tick_polls_gamepad_and_shutdown_closes_it() -> None:
+    window = FakeWindow()
+    sink = FakeSink()
+    gamepad = FakeGamepadInput(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.SOUTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        )
+    )
+    coordinator = CaptureCoordinator(
+        publisher=InputPublisher(clock=FakeClock(), sink=sink),
+        pointer_capture=window,
+        gamepad_input=gamepad,
+    )
+
+    frame = coordinator.evaluate()
+    coordinator.begin_shutdown()
+    coordinator.begin_shutdown()
+
+    assert gamepad.poll_count == 1
+    assert frame.buttons
+    assert gamepad.close_count == 1

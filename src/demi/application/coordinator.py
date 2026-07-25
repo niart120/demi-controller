@@ -6,6 +6,8 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from demi.domain.controller import ControllerFrame
+from demi.domain.gamepad import GamepadState
+from demi.input.gamepad import GamepadInputPort
 from demi.input.publisher import InputPublisher
 
 from .state import AppState
@@ -49,12 +51,14 @@ class CaptureCoordinator:
         publisher: InputPublisher,
         pointer_capture: PointerCapturePort,
         relative_pointer_capture: RelativePointerCapturePort | None = None,
+        gamepad_input: GamepadInputPort | None = None,
         on_capture_failure: CaptureFailureReporter | None = None,
     ) -> None:
         """Initialize a coordinator in the focused idle state."""
         self._publisher = publisher
         self._pointer_capture = pointer_capture
         self._relative_pointer_capture = relative_pointer_capture
+        self._gamepad_input = gamepad_input
         self._on_capture_failure = on_capture_failure
         self._app_state = AppState.IDLE
         self._capture_epoch = 0
@@ -149,6 +153,7 @@ class CaptureCoordinator:
 
     def evaluate(self) -> ControllerFrame:
         """Publish the current capture state at one scheduled clock tick."""
+        self._poll_gamepad()
         return self._publish_frame(
             capture_active=self.operational_input_active,
             pointer_capture_active=self.is_captured,
@@ -256,6 +261,7 @@ class CaptureCoordinator:
         with suppress(OSError, RuntimeError):
             self._pointer_capture.set_pointer_capture(False)
         self._publisher.state.clear()
+        self._close_gamepad()
         return self._publish_frame(capture_active=False)
 
     def finish_shutdown(self) -> None:
@@ -288,6 +294,21 @@ class CaptureCoordinator:
         if relative_pointer_capture is not None:
             with suppress(OSError, RuntimeError):
                 relative_pointer_capture.stop_relative_pointer_capture()
+
+    def _poll_gamepad(self) -> None:
+        gamepad_input = self._gamepad_input
+        if gamepad_input is None:
+            return
+        try:
+            self._publisher.state.replace_gamepad(gamepad_input.poll())
+        except (OSError, RuntimeError):
+            self._publisher.state.replace_gamepad(GamepadState.neutral())
+
+    def _close_gamepad(self) -> None:
+        gamepad_input = self._gamepad_input
+        if gamepad_input is not None:
+            with suppress(OSError, RuntimeError):
+                gamepad_input.close()
 
     def _report_capture_failure(self, failure: CaptureFailure) -> None:
         self._capture_failure = failure

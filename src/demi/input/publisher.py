@@ -177,7 +177,10 @@ class InputPublisher:
             evaluation_state = self._state
             if not mouse_active:
                 dx, dy = 0.0, 0.0
-                evaluation_state = PhysicalInputState(held_keys=set(self._state.held_keys))
+                evaluation_state = PhysicalInputState(
+                    held_keys=set(self._state.held_keys),
+                    gamepad=self._state.gamepad,
+                )
             if mouse_active and dt_seconds > 0.0:
                 dx, dy = self._mouse_motion_resampler.resample(dx, dy, dt_seconds)
             buttons = aggregate_buttons(self._profile, evaluation_state, capture_active=True)

@@ -5,7 +5,8 @@ from PySide6.QtCore import Qt, QTimer
 from demi.app import WindowSpec
 from demi.application.coordinator import CaptureCoordinator
 from demi.application.frame_fanout import ControllerFrameFanout
-from demi.domain.controller import ControllerFrame
+from demi.domain.controller import ControllerFrame, LogicalButton, StickVector
+from demi.domain.gamepad import GamepadButton, GamepadState
 from demi.input.publisher import InputPublisher
 from demi.platform.windows_raw_input import RawInputDevice, WindowsRawInputBackend
 from demi.ui.main_window import MainWindow
@@ -45,6 +46,30 @@ class FakeRawInputRegistrar:
         self.devices.append(device)
 
 
+@dataclass
+class FakeGamepadInput:
+    """Supply one gamepad snapshot at the shared evaluation boundary."""
+
+    poll_count: int = 0
+    close_count: int = 0
+
+    def poll(self) -> GamepadState:
+        """Return a pressed standard-layout south button."""
+        self.poll_count += 1
+        return GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.SOUTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        )
+
+    def close(self) -> None:
+        """Record lifecycle shutdown."""
+        self.close_count += 1
+
+
 def test_precise_evaluation_timer_fans_out_the_same_frame_to_runtime_and_preview(
     qt_application: object,
 ) -> None:
@@ -56,10 +81,12 @@ def test_precise_evaluation_timer_fans_out_the_same_frame_to_runtime_and_preview
         clock=clock,
         sink=ControllerFrameFanout(runtime=runtime, preview=window),
     )
+    gamepad = FakeGamepadInput()
     coordinator = CaptureCoordinator(
         publisher=publisher,
         pointer_capture=window,
         relative_pointer_capture=window,
+        gamepad_input=gamepad,
     )
     window.configure_input(
         publisher=publisher,
@@ -85,3 +112,6 @@ def test_precise_evaluation_timer_fans_out_the_same_frame_to_runtime_and_preview
     assert window.last_frame is frame
     assert runtime.frames[0] is window.last_frame
     coordinator.begin_shutdown()
+    assert gamepad.poll_count == 1
+    assert LogicalButton.B in frame.buttons
+    assert gamepad.close_count == 1

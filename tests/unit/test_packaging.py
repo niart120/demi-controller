@@ -23,6 +23,22 @@ def test_package_builder_and_license_inventory_do_not_reference_pyglet() -> None
     assert "pyglet" not in (root / "packaging" / "LICENSES.md").read_text(encoding="utf-8").lower()
 
 
+def test_gamepad_runtime_dependencies_are_collected_and_noticed() -> None:
+    root = Path(__file__).parents[2]
+
+    metadata = (root / "pyproject.toml").read_text(encoding="utf-8").lower()
+    builder = (root / "packaging" / "build.py").read_text(encoding="utf-8").lower()
+    inventory = (root / "packaging" / "LICENSES.md").read_text(encoding="utf-8").lower()
+    notices = (root / "src" / "demi" / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8").lower()
+
+    assert "pysdl2" in metadata
+    assert "pysdl2-dll" in metadata
+    assert '"sdl2"' in builder
+    assert '"sdl2dll"' in builder
+    assert "pysdl2-dll" in inventory
+    assert "pysdl2-dll" in notices
+
+
 def test_legacy_package_workflow_is_removed_until_qt_packaging() -> None:
     workflow = Path(__file__).parents[2] / ".github" / "workflows" / "package.yml"
 
