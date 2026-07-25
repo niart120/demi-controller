@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -480,6 +481,32 @@ class MappingDialog(QDialog):
         self.add_binding_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.add_binding_button.setMenu(self.add_binding_menu)
         mouse_settings = editor.draft.input.mouse
+        self.input_rate_group = QGroupBox(self.tr("Input rate"), self)
+        input_rate_form = QFormLayout(self.input_rate_group)
+        self.input_rate_combo = QComboBox(self.input_rate_group)
+        current_interval_ms = editor.draft.input.evaluation_interval_ms
+        interval_options = (4, 8, 16)
+        if current_interval_ms not in interval_options:
+            interval_options = tuple(sorted((*interval_options, current_interval_ms)))
+        for interval_ms in interval_options:
+            self.input_rate_combo.addItem(
+                self.tr("{rate} Hz ({interval} ms)").format(
+                    rate=_format_rate_hz(interval_ms),
+                    interval=interval_ms,
+                ),
+                interval_ms,
+            )
+        current_interval_index = self.input_rate_combo.findData(current_interval_ms)
+        if current_interval_index < 0:
+            raise RuntimeError
+        self.input_rate_combo.setCurrentIndex(current_interval_index)
+        self.input_rate_combo.setToolTip(
+            self.tr(
+                "Sets how often keyboard and mouse state is evaluated. "
+                "Bluetooth sends may be coalesced."
+            )
+        )
+        input_rate_form.addRow(self.tr("Rate"), self.input_rate_combo)
         self.mouse_gyro_group = QGroupBox(self.tr("Mouse gyro settings"), self)
         mouse_gyro_form = QFormLayout(self.mouse_gyro_group)
         self.mouse_gyro_enabled_checkbox = QCheckBox(self.tr("Enabled"), self.mouse_gyro_group)
@@ -527,6 +554,7 @@ class MappingDialog(QDialog):
         bindings_layout.addWidget(self.table)
         self.mouse_page = QWidget(self)
         mouse_layout = QVBoxLayout(self.mouse_page)
+        mouse_layout.addWidget(self.input_rate_group)
         mouse_layout.addWidget(self.mouse_gyro_group)
         mouse_layout.addStretch()
         self.tabs = QTabWidget(self)
@@ -542,7 +570,8 @@ class MappingDialog(QDialog):
 
         QWidget.setTabOrder(self.add_binding_button, self.table)
         QWidget.setTabOrder(self.table, self.restore_button)
-        QWidget.setTabOrder(self.restore_button, self.mouse_gyro_enabled_checkbox)
+        QWidget.setTabOrder(self.restore_button, self.input_rate_combo)
+        QWidget.setTabOrder(self.input_rate_combo, self.mouse_gyro_enabled_checkbox)
         QWidget.setTabOrder(
             self.mouse_gyro_enabled_checkbox,
             self.horizontal_sensitivity_spinbox,
@@ -563,6 +592,11 @@ class MappingDialog(QDialog):
         self.button_box.rejected.connect(self.request_reject)
         self.mouse_gyro_enabled_checkbox.toggled.connect(
             lambda enabled: editor.update_mouse(gyro_enabled=enabled)
+        )
+        self.input_rate_combo.currentIndexChanged.connect(
+            lambda index: editor.update_input(
+                evaluation_interval_ms=int(self.input_rate_combo.itemData(index))
+            )
         )
         self.horizontal_sensitivity_spinbox.valueChanged.connect(
             lambda value: editor.update_mouse(horizontal_sensitivity=value)
@@ -964,6 +998,14 @@ def _friendly_source(source: str) -> str:
         "MOUSE:BUTTON_5": "Forward mouse",
     }.get(source, source.removeprefix("MOUSE:").replace("_", " ").title())
     return translate("MappingTableModel", mouse_name)
+
+
+def _format_rate_hz(interval_ms: int) -> str:
+    """Format an input evaluation rate without unnecessary decimal places."""
+    rate_hz = 1_000 / interval_ms
+    if rate_hz.is_integer():
+        return str(int(rate_hz))
+    return f"{rate_hz:.1f}"
 
 
 def _sensitivity_spinbox(parent: QWidget, value: float) -> QDoubleSpinBox:

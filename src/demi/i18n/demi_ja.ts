@@ -446,8 +446,8 @@
     </message>
     <message>
         <location filename="../ui/toolbar.py" line="47"/>
-        <source>Mouse</source>
-        <translation>マウス</translation>
+        <source>Input</source>
+        <translation>入力</translation>
     </message>
     <message>
         <location filename="../ui/toolbar.py" line="48"/>
@@ -489,6 +489,26 @@
     <message>
         <source>Remove binding</source>
         <translation type="vanished">割り当てを削除</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="483"/>
+        <source>Input rate</source>
+        <translation>入力更新レート</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="486"/>
+        <source>{rate} Hz ({interval} ms)</source>
+        <translation>{rate} Hz（{interval} ms）</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="499"/>
+        <source>Sets how often keyboard and mouse state is evaluated. Bluetooth sends may be coalesced.</source>
+        <translation>キーボードとマウスの状態を評価する頻度を設定します。Bluetooth送信は集約されることがあります。</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="502"/>
+        <source>Rate</source>
+        <translation>レート</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/mapping.py" line="472"/>
@@ -732,8 +752,8 @@
     </message>
     <message>
         <location filename="../ui/dialogs/settings.py" line="128"/>
-        <source>Mouse</source>
-        <translation>マウス</translation>
+        <source>Input</source>
+        <translation>入力</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/settings.py" line="129"/>

@@ -122,7 +122,7 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget(self)
         self.tabs.addTab(self.connection_page, self.tr("Connection"))
         self.tabs.addTab(bindings_page, self.tr("Bindings"))
-        self.tabs.addTab(mouse_page, self.tr("Mouse"))
+        self.tabs.addTab(mouse_page, self.tr("Input"))
         self.tabs.addTab(self.colors_page, self.tr("Colors"))
         self.tabs.setCurrentIndex(int(initial_tab))
         self.tabs.currentChanged.connect(self._handle_tab_changed)

@@ -42,7 +42,7 @@ class MainToolBar(QToolBar):
         self.connection_action = QAction(self.tr("Connect"), self)
         self.connection_settings_action = QAction(self.tr("Connection"), self)
         self.bindings_action = QAction(self.tr("Bindings"), self)
-        self.mouse_action = QAction(self.tr("Mouse"), self)
+        self.mouse_action = QAction(self.tr("Input"), self)
         self.colors_action = QAction(self.tr("Colors"), self)
         self.settings_menu = QMenu(self)
         self.settings_menu.addActions(

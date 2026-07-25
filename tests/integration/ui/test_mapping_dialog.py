@@ -643,6 +643,7 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     settings = replace(
         AppSettings.default(),
         input=InputSettings(
+            evaluation_interval_ms=16,
             mouse=MouseSettings(
                 gyro_enabled=False,
                 horizontal_sensitivity=2.5,
@@ -650,7 +651,7 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
                 invert_x=True,
                 invert_y=True,
                 pitch_limit_degrees=60.0,
-            )
+            ),
         ),
     )
     editor = SettingsEditor(settings)
@@ -659,6 +660,16 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
     qt_application.processEvents()
 
     assert dialog.mouse_gyro_group.title() == "Mouse gyro settings"
+    assert dialog.input_rate_group.title() == "Input rate"
+    assert dialog.input_rate_combo.currentData() == 16
+    assert [
+        dialog.input_rate_combo.itemData(index) for index in range(dialog.input_rate_combo.count())
+    ] == [4, 8, 16]
+    assert dialog.input_rate_combo.toolTip() == (
+        "Sets how often keyboard and mouse state is evaluated. Bluetooth sends may be coalesced."
+    )
+    dialog.input_rate_combo.setCurrentIndex(dialog.input_rate_combo.findData(8))
+    assert editor.draft.input.evaluation_interval_ms == 8
     assert not dialog.mouse_gyro_enabled_checkbox.isChecked()
     assert dialog.horizontal_sensitivity_spinbox.value() == 2.5
     assert dialog.vertical_sensitivity_spinbox.value() == 1.5
@@ -688,6 +699,23 @@ def test_mapping_dialog_exposes_and_edits_mouse_gyro_settings(
         invert_y=False,
         pitch_limit_degrees=45.0,
     )
+
+    dialog.close()
+    qt_application.processEvents()
+
+
+def test_mapping_dialog_keeps_a_saved_non_preset_input_rate_selectable(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(
+        replace(AppSettings.default(), input=InputSettings(evaluation_interval_ms=5))
+    )
+    dialog = MappingDialog(editor)
+    dialog.show()
+    qt_application.processEvents()
+
+    assert dialog.input_rate_combo.currentData() == 5
+    assert dialog.input_rate_combo.currentText() == "200 Hz (5 ms)"
 
     dialog.close()
     qt_application.processEvents()

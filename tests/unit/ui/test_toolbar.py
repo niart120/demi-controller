@@ -37,7 +37,7 @@ def test_toolbar_actions_follow_application_connection_capture_dialog_and_shutdo
     assert [action.text() for action in toolbar.settings_menu.actions()] == [
         "Connection",
         "Bindings",
-        "Mouse",
+        "Input",
         "Colors",
     ]
     assert not hasattr(toolbar, "mapping_action")
