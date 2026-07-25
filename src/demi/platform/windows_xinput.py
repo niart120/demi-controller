@@ -92,7 +92,8 @@ class _XInputState(ctypes.Structure):
 
 class _CtypesXInputReader:
     def __init__(self) -> None:
-        self._get_state = ctypes.WinDLL("xinput1_4.dll").XInputGetState
+        windows_dll = getattr(ctypes, "WinDLL")
+        self._get_state = windows_dll("xinput1_4.dll").XInputGetState
         self._get_state.argtypes = [ctypes.c_uint, ctypes.POINTER(_XInputState)]
         self._get_state.restype = ctypes.c_uint
 
