@@ -12,7 +12,7 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     editor.update_binding(1, source="KEY:F")
     model = MappingTableModel(editor)
 
-    assert model.rowCount() == 34
+    assert model.rowCount() == 36
     assert model.columnCount() == 6
     assert [
         model.headerData(column, Qt.Orientation.Horizontal) for column in range(model.columnCount())
@@ -21,14 +21,16 @@ def test_mapping_model_exposes_bindings_conflicts_and_draft_edits(qt_application
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "F"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.UserRole) == "KEY:F"
     assert model.data(model.index(0, 1), Qt.ItemDataRole.ToolTipRole) == "KEY:F"
-    assert model.data(model.index(4, 1), Qt.ItemDataRole.DisplayRole) == "Middle mouse"
+    assert model.data(model.index(4, 1), Qt.ItemDataRole.DisplayRole) == "C"
     assert model.data(model.index(0, 2), Qt.ItemDataRole.DisplayRole) is None
     assert model.data(model.index(0, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
     assert model.data(model.index(1, 4), Qt.ItemDataRole.DisplayRole) == "Duplicate: KEY:F"
-    assert model.data(model.index(28, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
-    assert model.data(model.index(28, 1), Qt.ItemDataRole.DisplayRole) == "U"
-    assert model.data(model.index(33, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
-    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
+    assert model.data(model.index(5, 0), Qt.ItemDataRole.DisplayRole) == "BUTTON:Y"
+    assert model.data(model.index(5, 1), Qt.ItemDataRole.DisplayRole) == "Middle mouse"
+    assert model.data(model.index(29, 0), Qt.ItemDataRole.DisplayRole) == "GYRO:X_POSITIVE"
+    assert model.data(model.index(29, 1), Qt.ItemDataRole.DisplayRole) == "U"
+    assert model.data(model.index(35, 0), Qt.ItemDataRole.DisplayRole) == "IMU:NEUTRAL"
+    assert model.data(model.index(35, 1), Qt.ItemDataRole.DisplayRole) == "P"
     model.update_source(0, "KEY:1")
 
     assert editor.draft.profiles[0].bindings[0].source == "KEY:1"
@@ -55,7 +57,7 @@ def test_mapping_model_exposes_remove_as_an_icon_with_a_text_tooltip(
     model.restore_default_profile()
 
     assert model.data(model.index(0, 1), Qt.ItemDataRole.DisplayRole) == "F"
-    assert model.data(model.index(33, 1), Qt.ItemDataRole.DisplayRole) == "P"
+    assert model.data(model.index(35, 1), Qt.ItemDataRole.DisplayRole) == "P"
 
 
 def test_mapping_model_changes_only_the_armed_row_to_instruction_and_cancel(
@@ -101,7 +103,7 @@ def test_mapping_model_toggles_inverted_in_the_table_only_for_button_targets(
     editor = SettingsEditor(AppSettings.default())
     model = MappingTableModel(editor)
     button_inverted = model.index(0, 2)
-    diagnostic_inverted = model.index(28, 2)
+    diagnostic_inverted = model.index(29, 2)
 
     assert model.data(button_inverted, Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Unchecked
     assert model.flags(button_inverted) & Qt.ItemFlag.ItemIsUserCheckable
