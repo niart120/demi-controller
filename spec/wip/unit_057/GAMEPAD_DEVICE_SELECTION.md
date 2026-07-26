@@ -60,7 +60,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 |---|---|---|---|---|
 | refactor-skipped | 接続中 SDL 機器を名前・GUID・instance ID で列挙し、device index を公開しない | new | unit | platform / input boundary。red: `GamepadDevice` が未定義。green: `test_backend_lists_connected_devices_without_exposing_device_indexes` |
 | refactor-done | 保存済み GUID が一意に一致するとその機器だけを poll し、未接続または重複では自動選択へ戻る | new | unit | platform。red: 明示 GUID でも index 0 を開いた。green: 一意一致は選択、未接続・重複は index 0 の自動選択。fixture 重複を `_install_devices` へ整理 |
-| todo | 選択中機器の切断 tick はゲームパッド状態を中立へ戻す | regression | unit | platform / coordinator |
+| refactor-skipped | 選択中機器の切断 tick はゲームパッド状態を中立へ戻す | regression | unit | platform / coordinator。red: 切断 tick に即時再オープンして connected を返した。green: 切断 tick は neutral、次 tick から再探索 |
 | todo | GUID または自動選択を設定 codec が往復し、device index を受理・出力しない | new | unit | domain / config |
 | todo | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application |
 | todo | 設定画面が機器一覧、自動選択、現在選択を表示し、保存後に選択を反映する | new | integration | UI |

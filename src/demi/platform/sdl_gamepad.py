@@ -50,6 +50,7 @@ class SdlGamepadBackend(GamepadInputPort, GamepadSelectionPort):
             self._controller
         ):
             self._close_controller()
+            return GamepadState.neutral()
         if self._controller is None:
             self._controller = self._open_first_controller()
         controller = self._controller

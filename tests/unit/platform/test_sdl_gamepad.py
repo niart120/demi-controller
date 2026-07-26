@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from demi.domain.gamepad import GamepadButton, GamepadDevice
+from demi.domain.gamepad import GamepadButton, GamepadDevice, GamepadState
 from demi.platform import sdl_gamepad
 from demi.platform.sdl_gamepad import SdlGamepadBackend
 
@@ -89,7 +89,7 @@ def _install_devices(
     monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceInstanceID", lambda index: devices[index][2])
 
 
-def test_backend_opens_first_controller_and_reopens_after_disconnect(
+def test_backend_returns_neutral_on_disconnect_then_reopens_on_the_next_tick(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = FakeSdlCalls(pressed={sdl2.SDL_CONTROLLER_BUTTON_A})
@@ -99,10 +99,13 @@ def test_backend_opens_first_controller_and_reopens_after_disconnect(
     first = backend.poll()
     calls.attached = False
     second = backend.poll()
+    calls.attached = True
+    third = backend.poll()
 
     assert first.connected is True
     assert GamepadButton.SOUTH in first.buttons
-    assert second.connected is True
+    assert second == GamepadState.neutral()
+    assert third.connected is True
     assert calls.open_count == 2
     assert calls.close_count == 1
 
