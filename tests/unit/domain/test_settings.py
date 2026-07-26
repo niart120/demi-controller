@@ -38,6 +38,7 @@ def test_default_settings_match_the_initial_configuration() -> None:
     )
     assert settings.input.evaluation_interval_ms == 8
     assert settings.input.circular_stick_limit is False
+    assert settings.input.gamepad_persistent_id is None
     assert settings.input.mouse == MouseSettings(
         gyro_enabled=True,
         horizontal_sensitivity=1.0,

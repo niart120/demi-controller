@@ -128,12 +128,19 @@ class InputSettings:
 
     evaluation_interval_ms: int = 8
     circular_stick_limit: bool = False
+    gamepad_persistent_id: str | None = None
     mouse: MouseSettings = field(default_factory=MouseSettings)
 
     def __post_init__(self) -> None:
         """Validate evaluation interval and nested mouse settings."""
         _require_integer_range(self.evaluation_interval_ms, 4, 32)
         if not isinstance(self.circular_stick_limit, bool):
+            raise DomainValueError
+        if self.gamepad_persistent_id is not None and (
+            not isinstance(self.gamepad_persistent_id, str)
+            or not self.gamepad_persistent_id
+            or len(self.gamepad_persistent_id) > 256
+        ):
             raise DomainValueError
         if not isinstance(self.mouse, MouseSettings):
             raise DomainValueError
