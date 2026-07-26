@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
 from demi.domain.controller import LogicalButton, StickVector
-from demi.domain.gamepad import GamepadButton, GamepadState
+from demi.domain.gamepad import GamepadButton, GamepadDevice, GamepadState
 from demi.input.gamepad import (
     PreferredGamepadBackend,
     apply_stick_dead_zone,
@@ -18,6 +18,8 @@ class FakeGamepadBackend:
 
     state: GamepadState
     closed: bool = False
+    devices: tuple[GamepadDevice, ...] = ()
+    selected_ids: list[str | None] = field(default_factory=list)
 
     def poll(self) -> GamepadState:
         """Return the configured state."""
@@ -26,6 +28,14 @@ class FakeGamepadBackend:
     def close(self) -> None:
         """Record shutdown."""
         self.closed = True
+
+    def connected_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return configured selectable devices."""
+        return self.devices
+
+    def select_device(self, persistent_id: str | None) -> None:
+        """Record the selected saved ID."""
+        self.selected_ids.append(persistent_id)
 
 
 def test_stick_dead_zone_rescales_and_inverts_sdl_y_axis() -> None:
@@ -107,3 +117,34 @@ def test_preferred_backend_stays_selected_until_it_disconnects() -> None:
     fallback.state = GamepadState.neutral()
 
     assert backend.poll() == preferred.state
+
+
+def test_explicit_gamepad_selection_bypasses_a_connected_preferred_backend() -> None:
+    preferred = FakeGamepadBackend(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.NORTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        )
+    )
+    fallback = FakeGamepadBackend(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.SOUTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        ),
+        devices=(GamepadDevice("Selected", "guid-selected", 7),),
+    )
+    backend = PreferredGamepadBackend(preferred=preferred, fallback=fallback)
+
+    backend.select_device("guid-selected")
+
+    assert backend.connected_devices() == fallback.devices
+    assert backend.poll() == fallback.state
+    assert fallback.selected_ids == ["guid-selected"]
