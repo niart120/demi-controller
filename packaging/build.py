@@ -67,7 +67,7 @@ def _run_pyside6_deploy() -> None:
 def _nuitka_environment() -> dict[str, str]:
     """Return a build environment with a writable cache and Qt dependency reader."""
     environment = os.environ | {"NUITKA_CACHE_DIR": str(NUITKA_CACHE_DIR)}
-    if os.name == "nt":
+    if _is_windows():
         dumpbin = _find_dumpbin()
         if dumpbin is None:
             raise RuntimeError(
@@ -76,6 +76,11 @@ def _nuitka_environment() -> dict[str, str]:
             )
         environment["PATH"] = str(dumpbin.parent) + os.pathsep + environment["PATH"]
     return environment
+
+
+def _is_windows() -> bool:
+    """Return whether the builder runs on Windows."""
+    return os.name == "nt"
 
 
 def _find_dumpbin() -> Path | None:
@@ -96,7 +101,7 @@ def _find_dumpbin() -> Path | None:
 
 
 def _write_mutable_deploy_config(destination: Path) -> None:
-    if os.name == "nt":
+    if _is_windows():
         _sdl2_dll_directory()
     config = DEPLOY_CONFIG.read_text(encoding="utf-8")
     config = config.replace("project_dir = packaging", f"project_dir = {ROOT / 'packaging'}")

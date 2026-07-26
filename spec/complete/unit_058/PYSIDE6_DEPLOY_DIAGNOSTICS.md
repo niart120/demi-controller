@@ -92,6 +92,12 @@ warning を、設定と依存解析の根拠を明示して解消する。
 | `uv run ty check --no-progress` | pass | All checks passed |
 | `uv run pytest tests/unit` | not run | 既存 `tmp/pytest` の ACL により 341 passed 後の 18 setup error。変更に起因しない一時ディレクトリ失敗。 |
 | `uv run pytest tests/unit -p no:cacheprovider --basetemp .tmp_pytest_058_full` | pass | 359 passed |
+| CI run 30198577459 | failed | Linux/macOS で Windows 模擬 test が `os.name` を変更し、`pathlib` が `WindowsPath` を生成して失敗。Windows 2 job は pass。 |
+| `uv run pytest tests/unit/test_packaging.py -q -p no:cacheprovider --basetemp .tmp_pytest_058_ci_fix_package_retry` | pass | `_is_windows()` を差し替える test に修正後、12 passed |
+| `uv run pytest tests/unit -p no:cacheprovider --basetemp .tmp_pytest_058_ci_fix_full_retry` | pass | CI 修正後に 359 passed |
+| `uv run ruff format --check .` | pass | CI 修正後に 154 files already formatted |
+| `uv run ruff check .` | pass | CI 修正後に All checks passed |
+| `uv run ty check --no-progress` | pass | CI 修正後に All checks passed |
 | `uv build` | pass | sandbox の PyPI 接続制限後、許可済み環境で sdist と wheel を生成 |
 | `uv run twine check --strict dist/*.whl dist/*.tar.gz` | pass | wheel と sdist を確認。`dist/*` は standalone directory も含むため不適切。 |
 | `uv run pytest tests/integration` | not applicable | package build 設定のみの変更で、integration の対象振る舞いを変更しない。 |

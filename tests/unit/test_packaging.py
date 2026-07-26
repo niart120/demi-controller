@@ -119,7 +119,7 @@ def test_mutable_deploy_config_checks_sdl2_only_for_windows(
 ) -> None:
     build = _load_build_module()
     checked: list[None] = []
-    monkeypatch.setattr(build.os, "name", "nt")
+    monkeypatch.setattr(build, "_is_windows", lambda: True)
     monkeypatch.setattr(build, "_sdl2_dll_directory", lambda: checked.append(None))
 
     build._write_mutable_deploy_config(tmp_path / "pysidedeploy.spec")
@@ -155,7 +155,7 @@ def test_windows_package_builder_adds_visual_studio_dumpbin_to_deploy_path(
     )
     dumpbin.parent.mkdir(parents=True)
     dumpbin.touch()
-    monkeypatch.setattr(build.os, "name", "nt")
+    monkeypatch.setattr(build, "_is_windows", lambda: True)
     monkeypatch.setattr(build.shutil, "which", lambda _executable: None)
     monkeypatch.setenv("ProgramFiles", str(tmp_path))
 
