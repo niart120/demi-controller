@@ -70,7 +70,8 @@ def _nuitka_environment() -> dict[str, str]:
 
 
 def _write_mutable_deploy_config(destination: Path) -> None:
-    _sdl2_dll_directory()
+    if os.name == "nt":
+        _sdl2_dll_directory()
     config = DEPLOY_CONFIG.read_text(encoding="utf-8")
     config = config.replace("project_dir = packaging", f"project_dir = {ROOT / 'packaging'}")
     config = config.replace(

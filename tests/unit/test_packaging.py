@@ -93,17 +93,28 @@ def test_mutable_deploy_config_collects_installed_sdl2_dlls(tmp_path: Path) -> N
 
     build._write_mutable_deploy_config(config_path)
 
-    sdl2_dll_dir = build._sdl2_dll_directory()
     config = config_path.read_text(encoding="utf-8")
     package_config = (
         Path(__file__).parents[2] / "packaging" / "nuitka-package.config.yml"
     ).read_text(encoding="utf-8")
-    assert sdl2_dll_dir.joinpath("SDL2.dll").is_file()
     assert f"--user-package-configuration-file={build.NUITKA_PACKAGE_CONFIG.as_posix()}" in config
     assert "--include-distribution-metadata=swbt-python" in config
     assert "--include-module=libusb_package" in config
     assert "module-name: 'sdl2dll'" in package_config
     assert 'os.path.join(get_module_directory("sdl2dll"), "dll", "SDL2.dll")' in package_config
+
+
+def test_mutable_deploy_config_checks_sdl2_only_for_windows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    build = _load_build_module()
+    checked: list[None] = []
+    monkeypatch.setattr(build.os, "name", "nt")
+    monkeypatch.setattr(build, "_sdl2_dll_directory", lambda: checked.append(None))
+
+    build._write_mutable_deploy_config(tmp_path / "pysidedeploy.spec")
+
+    assert checked == [None]
 
 
 def test_package_builder_uses_a_workspace_scoped_nuitka_cache() -> None:

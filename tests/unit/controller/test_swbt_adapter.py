@@ -67,7 +67,8 @@ def test_bundled_libusb_is_registered_from_its_absolute_package_path(
 
     monkeypatch.setitem(sys.modules, "usb1", fake_usb1)
     monkeypatch.setitem(sys.modules, "libusb_package", fake_libusb_package)
-    monkeypatch.setattr(swbt_adapter_module.ctypes, "WinDLL", load_dll)
+    monkeypatch.setattr(swbt_adapter_module, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(swbt_adapter_module.ctypes, "WinDLL", load_dll, raising=False)
 
     swbt_adapter_module._configure_bundled_libusb()
 
