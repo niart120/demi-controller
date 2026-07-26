@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox
 
 from demi.application.presentation import AdapterOption
 from demi.application.settings_editor import SettingsEditor
+from demi.domain.gamepad import GamepadDevice
 from demi.domain.mapping import BindingTarget
 from demi.domain.settings import AppSettings
 from demi.ui.dialogs.settings import SettingsDialog, SettingsTab
@@ -108,6 +109,38 @@ def test_settings_dialog_cancel_discards_once_and_restores_the_saved_color_previ
     assert cancellations == ["cancel"]
     assert previews[-1] == original.controller_colors
     assert dialog.result() == int(QDialog.DialogCode.Rejected)
+
+
+def test_settings_dialog_lists_gamepads_and_edits_the_shared_draft(
+    qt_application: QApplication,
+) -> None:
+    editor = SettingsEditor(AppSettings.default())
+    dialog = SettingsDialog(
+        editor,
+        initial_tab=SettingsTab.MOUSE,
+        connected=False,
+        gamepad_devices=(GamepadDevice("Controller A", "guid-a", 1),),
+        on_rescan=lambda: None,
+        on_save=lambda: True,
+        on_cancel=lambda: True,
+        on_preview=lambda _colors: None,
+        on_delete_profile=lambda: True,
+        on_request_pairing=lambda: True,
+        on_defer_reconnect=lambda: None,
+        on_reconnect=lambda: None,
+    )
+    dialog.show()
+    qt_application.processEvents()
+
+    gamepad_combo = dialog.mapping_page.gamepad_combo
+    assert [gamepad_combo.itemText(index) for index in range(gamepad_combo.count())] == [
+        "Automatic selection",
+        "Controller A",
+    ]
+
+    gamepad_combo.setCurrentIndex(1)
+
+    assert editor.draft.input.gamepad_persistent_id == "guid-a"
 
 
 def test_settings_dialog_escape_from_an_embedded_page_cancels_the_whole_draft_once(

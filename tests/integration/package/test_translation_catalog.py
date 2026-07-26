@@ -10,4 +10,6 @@ def test_compiled_japanese_catalog_translates_controller_status_text() -> None:
     assert translator.load(str(catalog))
     assert translator.translate("ControllerPreviewWidget", "Mouse input") == "マウス入力"
     assert translator.translate("ControllerPreviewWidget", "On") == "有効"
+    assert translator.translate("MappingDialog", "Gamepad selection") == "ゲームパッド選択"
+    assert translator.translate("MappingDialog", "Automatic selection") == "自動選択"
     assert translator.translate("ControllerPreviewWidget", "Off") == "無効"

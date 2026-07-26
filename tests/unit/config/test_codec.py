@@ -155,6 +155,28 @@ def test_codec_round_trips_independent_mouse_axis_inversions() -> None:
     assert restored == settings
 
 
+def test_codec_round_trips_gamepad_guid_or_automatic_selection_without_device_index() -> None:
+    settings = replace(
+        AppSettings.default(),
+        input=InputSettings(gamepad_persistent_id="030000005e0400008e02000014010000"),
+    )
+
+    encoded = encode_settings(settings)
+    restored = decode_settings(encoded)
+    input_settings = cast("dict[str, object]", encoded["input"])
+
+    assert input_settings["gamepad_persistent_id"] == "030000005e0400008e02000014010000"
+    assert "device_index" not in input_settings
+    assert restored == settings
+
+    input_settings.pop("gamepad_persistent_id")
+    assert decode_settings(encoded).input.gamepad_persistent_id is None
+
+    input_settings["device_index"] = 1
+    with pytest.raises(ConfigurationError):
+        decode_settings(encoded)
+
+
 def test_codec_preserves_custom_colors_and_inverted_binding() -> None:
     profile = InputProfile(
         id="custom",

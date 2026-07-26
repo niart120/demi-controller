@@ -45,6 +45,12 @@ def _require_string(value: object) -> str:
     return value
 
 
+def _require_optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return _require_string(value)
+
+
 def _require_bool(value: object) -> bool:
     if not isinstance(value, bool):
         raise ConfigurationError
@@ -128,6 +134,24 @@ def _decode_profile(raw: object) -> InputProfile:
         raise ConfigurationError from None
 
 
+def _encode_input_settings(settings: InputSettings) -> dict[str, object]:
+    encoded: dict[str, object] = {
+        "evaluation_interval_ms": settings.evaluation_interval_ms,
+        "circular_stick_limit": settings.circular_stick_limit,
+        "mouse": {
+            "gyro_enabled": settings.mouse.gyro_enabled,
+            "horizontal_sensitivity": settings.mouse.horizontal_sensitivity,
+            "vertical_sensitivity": settings.mouse.vertical_sensitivity,
+            "invert_x": settings.mouse.invert_x,
+            "invert_y": settings.mouse.invert_y,
+            "pitch_limit_degrees": settings.mouse.pitch_limit_degrees,
+        },
+    }
+    if settings.gamepad_persistent_id is not None:
+        encoded["gamepad_persistent_id"] = settings.gamepad_persistent_id
+    return encoded
+
+
 def encode_settings(settings: AppSettings) -> dict[str, object]:
     """Convert validated settings into a TOML-compatible mapping.
 
@@ -160,18 +184,7 @@ def encode_settings(settings: AppSettings) -> dict[str, object]:
                 "right_grip": settings.controller_colors.right_grip,
             }
         },
-        "input": {
-            "evaluation_interval_ms": settings.input.evaluation_interval_ms,
-            "circular_stick_limit": settings.input.circular_stick_limit,
-            "mouse": {
-                "gyro_enabled": settings.input.mouse.gyro_enabled,
-                "horizontal_sensitivity": settings.input.mouse.horizontal_sensitivity,
-                "vertical_sensitivity": settings.input.mouse.vertical_sensitivity,
-                "invert_x": settings.input.mouse.invert_x,
-                "invert_y": settings.input.mouse.invert_y,
-                "pitch_limit_degrees": settings.input.mouse.pitch_limit_degrees,
-            },
-        },
+        "input": _encode_input_settings(settings.input),
         "local_actions": {
             "toggle_capture": list(settings.local_actions.toggle_capture),
             "quit": list(settings.local_actions.quit),
@@ -256,7 +269,9 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
     _check_keys(colors, frozenset({"body", "buttons", "left_grip", "right_grip"}))
     input_settings = _require_table(raw["input"])
     _check_keys(
-        input_settings, frozenset({"evaluation_interval_ms", "circular_stick_limit", "mouse"})
+        input_settings,
+        frozenset({"evaluation_interval_ms", "circular_stick_limit", "mouse"}),
+        frozenset({"gamepad_persistent_id"}),
     )
     mouse = _require_table(input_settings["mouse"])
     _check_keys(
@@ -304,6 +319,9 @@ def decode_settings(raw: Mapping[str, object]) -> AppSettings:
             input=InputSettings(
                 evaluation_interval_ms=_require_int(input_settings["evaluation_interval_ms"]),
                 circular_stick_limit=_require_bool(input_settings["circular_stick_limit"]),
+                gamepad_persistent_id=_require_optional_string(
+                    input_settings.get("gamepad_persistent_id")
+                ),
                 mouse=MouseSettings(
                     gyro_enabled=_require_bool(mouse["gyro_enabled"]),
                     horizontal_sensitivity=_require_float(mouse["horizontal_sensitivity"]),

@@ -1,6 +1,7 @@
 """SDL2 GameController adapter backed by PySDL2."""
 
 import warnings
+from ctypes import create_string_buffer
 from types import ModuleType
 
 with warnings.catch_warnings():
@@ -11,11 +12,16 @@ with warnings.catch_warnings():
     )
     import sdl2
 
-from demi.domain.gamepad import GamepadButton, GamepadState
-from demi.input.gamepad import GamepadInputPort, apply_stick_dead_zone, normalize_trigger
+from demi.domain.gamepad import GamepadButton, GamepadDevice, GamepadState
+from demi.input.gamepad import (
+    GamepadInputPort,
+    GamepadSelectionPort,
+    apply_stick_dead_zone,
+    normalize_trigger,
+)
 
 
-class SdlGamepadBackend(GamepadInputPort):
+class SdlGamepadBackend(GamepadInputPort, GamepadSelectionPort):
     """Poll the first SDL GameController without creating SDL UI resources.
 
     The backend initializes only SDL's GameController subsystem. A missing SDL
@@ -28,6 +34,7 @@ class SdlGamepadBackend(GamepadInputPort):
         """Initialize the SDL GameController subsystem when available."""
         self._sdl = bindings
         self._controller: object | None = None
+        self._selected_persistent_id: str | None = None
         self._closed = False
         self._initialized = bindings.SDL_InitSubSystem(bindings.SDL_INIT_GAMECONTROLLER) == 0
         if self._initialized:
@@ -43,6 +50,7 @@ class SdlGamepadBackend(GamepadInputPort):
             self._controller
         ):
             self._close_controller()
+            return GamepadState.neutral()
         if self._controller is None:
             self._controller = self._open_first_controller()
         controller = self._controller
@@ -83,6 +91,29 @@ class SdlGamepadBackend(GamepadInputPort):
             ),
         )
 
+    def connected_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return connected SDL GameControllers without device indexes."""
+        if self._closed or not self._initialized:
+            return ()
+        return tuple(
+            device
+            for device_index in range(self._sdl.SDL_NumJoysticks())
+            if (device := self._device_at(device_index)) is not None
+        )
+
+    def select_device(self, persistent_id: str | None) -> None:
+        """Select one saved GUID or return to automatic selection.
+
+        A selection change closes the current SDL handle so the next poll
+        opens only the newly selected device.
+        """
+        if persistent_id is not None and (not isinstance(persistent_id, str) or not persistent_id):
+            raise ValueError
+        if persistent_id == self._selected_persistent_id:
+            return
+        self._selected_persistent_id = persistent_id
+        self._close_controller()
+
     def close(self) -> None:
         """Close the selected controller and SDL GameController subsystem once."""
         if self._closed:
@@ -94,13 +125,40 @@ class SdlGamepadBackend(GamepadInputPort):
             self._initialized = False
 
     def _open_first_controller(self) -> object | None:
-        for device_index in range(self._sdl.SDL_NumJoysticks()):
-            if not self._sdl.SDL_IsGameController(device_index):
-                continue
-            controller = self._sdl.SDL_GameControllerOpen(device_index)
-            if controller is not None:
-                return controller
-        return None
+        devices = tuple(
+            (device_index, device)
+            for device_index in range(self._sdl.SDL_NumJoysticks())
+            if (device := self._device_at(device_index)) is not None
+        )
+        selected_persistent_id = self._selected_persistent_id
+        if selected_persistent_id is not None:
+            matching_indexes = [
+                device_index
+                for device_index, device in devices
+                if device.persistent_id == selected_persistent_id
+            ]
+            if len(matching_indexes) == 1:
+                return self._sdl.SDL_GameControllerOpen(matching_indexes[0])
+        return self._sdl.SDL_GameControllerOpen(devices[0][0]) if devices else None
+
+    def _device_at(self, device_index: int) -> GamepadDevice | None:
+        if not self._sdl.SDL_IsGameController(device_index):
+            return None
+        raw_name = self._sdl.SDL_GameControllerNameForIndex(device_index)
+        name = raw_name.decode(errors="replace") if raw_name is not None else "Unknown controller"
+        buffer = create_string_buffer(33)
+        self._sdl.SDL_JoystickGetGUIDString(
+            self._sdl.SDL_JoystickGetDeviceGUID(device_index), buffer, len(buffer)
+        )
+        persistent_id = buffer.value.decode()
+        instance_id = self._sdl.SDL_JoystickGetDeviceInstanceID(device_index)
+        if not persistent_id or instance_id < 0:
+            return None
+        return GamepadDevice(
+            name=name,
+            persistent_id=persistent_id,
+            instance_id=instance_id,
+        )
 
     def _close_controller(self) -> None:
         controller = self._controller

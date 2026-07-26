@@ -1,10 +1,10 @@
 """Gamepad input port and pure standard-layout conversion."""
 
 from math import hypot
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from demi.domain.controller import LogicalButton, StickVector
-from demi.domain.gamepad import GamepadButton, GamepadState
+from demi.domain.gamepad import GamepadButton, GamepadDevice, GamepadState
 
 STICK_DEAD_ZONE = 0.15
 TRIGGER_BUTTON_THRESHOLD = 0.5
@@ -21,7 +21,18 @@ class GamepadInputPort(Protocol):
         """Release backend resources; repeated calls must be harmless."""
 
 
-class PreferredGamepadBackend:
+@runtime_checkable
+class GamepadSelectionPort(Protocol):
+    """Enumerate and select a gamepad without leaking SDL details."""
+
+    def connected_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return the currently connected selectable gamepads."""
+
+    def select_device(self, persistent_id: str | None) -> None:
+        """Select one persistent ID, or ``None`` for automatic selection."""
+
+
+class PreferredGamepadBackend(GamepadSelectionPort):
     """Use a preferred gamepad backend until it disconnects.
 
     The selected backend remains stable for one connection session. This keeps
@@ -33,9 +44,21 @@ class PreferredGamepadBackend:
         self._preferred = preferred
         self._fallback = fallback
         self._active: GamepadInputPort | None = None
+        self._selected_persistent_id: str | None = None
 
     def poll(self) -> GamepadState:
         """Return the selected backend state, selecting on connection."""
+        selected_persistent_id = self._selected_persistent_id
+        fallback = self._fallback
+        if selected_persistent_id is not None and isinstance(fallback, GamepadSelectionPort):
+            matches = sum(
+                device.persistent_id == selected_persistent_id
+                for device in fallback.connected_devices()
+            )
+            if matches == 1:
+                self._active = fallback
+                return fallback.poll()
+            self._active = None
         active = self._active
         if active is not None:
             state = active.poll()
@@ -46,10 +69,26 @@ class PreferredGamepadBackend:
         if preferred_state.connected:
             self._active = self._preferred
             return preferred_state
-        fallback_state = self._fallback.poll()
+        fallback_state = fallback.poll()
         if fallback_state.connected:
-            self._active = self._fallback
+            self._active = fallback
         return fallback_state
+
+    def connected_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return the SDL fallback devices that can be selected persistently."""
+        fallback = self._fallback
+        if not isinstance(fallback, GamepadSelectionPort):
+            return ()
+        return fallback.connected_devices()
+
+    def select_device(self, persistent_id: str | None) -> None:
+        """Select an SDL fallback device or restore automatic preference."""
+        fallback = self._fallback
+        if not isinstance(fallback, GamepadSelectionPort):
+            return
+        fallback.select_device(persistent_id)
+        self._selected_persistent_id = persistent_id
+        self._active = None
 
     def close(self) -> None:
         """Close both candidates regardless of the currently selected backend."""

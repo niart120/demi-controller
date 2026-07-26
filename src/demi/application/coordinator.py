@@ -6,8 +6,8 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from demi.domain.controller import ControllerFrame
-from demi.domain.gamepad import GamepadState
-from demi.input.gamepad import GamepadInputPort
+from demi.domain.gamepad import GamepadDevice, GamepadState
+from demi.input.gamepad import GamepadInputPort, GamepadSelectionPort
 from demi.input.publisher import InputPublisher
 
 from .state import AppState
@@ -85,6 +85,19 @@ class CaptureCoordinator:
     def publisher(self) -> InputPublisher:
         """Return the input publisher owned by the coordinator."""
         return self._publisher
+
+    def gamepad_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return gamepads that the current input backend can select."""
+        gamepad_input = self._gamepad_input
+        if not isinstance(gamepad_input, GamepadSelectionPort):
+            return ()
+        return gamepad_input.connected_devices()
+
+    def select_gamepad_device(self, persistent_id: str | None) -> None:
+        """Apply a saved gamepad GUID or automatic selection to the backend."""
+        gamepad_input = self._gamepad_input
+        if isinstance(gamepad_input, GamepadSelectionPort):
+            gamepad_input.select_device(persistent_id)
 
     @property
     def is_captured(self) -> bool:

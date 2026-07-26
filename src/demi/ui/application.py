@@ -283,6 +283,7 @@ class QtApplicationEventRouter:
             editor,
             initial_tab=initial_tab,
             connected=connected,
+            gamepad_devices=() if session is None else session.gamepad_devices(),
             on_rescan=self._rescan_adapters,
             on_save=self._save_settings,
             on_cancel=self._cancel_settings,

@@ -224,6 +224,7 @@ class SettingsEditor:
             input=InputSettings(
                 evaluation_interval_ms=current_input.evaluation_interval_ms,
                 circular_stick_limit=current_input.circular_stick_limit,
+                gamepad_persistent_id=current_input.gamepad_persistent_id,
                 mouse=mouse,
             ),
         )
@@ -254,6 +255,25 @@ class SettingsEditor:
                     if circular_stick_limit is None
                     else circular_stick_limit
                 ),
+                gamepad_persistent_id=current.gamepad_persistent_id,
+                mouse=current.mouse,
+            ),
+        )
+
+    def update_gamepad_selection(self, persistent_id: str | None) -> None:
+        """Replace the saved gamepad GUID or select automatically.
+
+        Args:
+            persistent_id: SDL GUID to save, or ``None`` for automatic
+                selection.
+        """
+        current = self._draft.input
+        self._draft = replace(
+            self._draft,
+            input=InputSettings(
+                evaluation_interval_ms=current.evaluation_interval_ms,
+                circular_stick_limit=current.circular_stick_limit,
+                gamepad_persistent_id=persistent_id,
                 mouse=current.mouse,
             ),
         )
