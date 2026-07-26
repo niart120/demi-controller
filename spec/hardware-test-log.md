@@ -85,3 +85,24 @@ This record is not a gyro acceptance result. Project_Demi reached the saved-bond
 | observed limitations | Direct送信のDEBUGログは、F→Aの送信完了とframe集約を記録するが、送信時間とIMU slotごとの時系列を記録しない。ジャイロのカクつきとframe集約の因果関係は未確認であり、#45 で追跡する |
 
 `ac37dfc`以降のDEBUGログで、送信済みボタン状態とframe集約区間を採取した。#45 では同じ操作列に送信時間とIMU時系列の記録を加え、実機操作感と対応付ける。
+
+## Unit 060 Python 3.13 / swbt-python 0.6実機確認 — 2026-07-27 JST
+
+この記録は、#45で追跡した125 Hz回転時の周期的なカクつきについて、
+Python 3.13とswbt-python 0.6へ更新したProject_Demiを通して再確認した結果である。
+接続・切断・保存済み再接続を含む包括的な受入試験ではない。
+
+| item | value |
+|---|---|
+| Project_Demi implementation reference | `57104d8` |
+| execution status | 125 Hz回転の目視確認: passed |
+| date, time, timezone | 2026-07-27 JST。実行時刻は記録されていない |
+| Python / swbt-python / Bumble | Python 3.13.5 / swbt-python 0.6.0 / Bumble 0.0.233 |
+| PySide6 / Qt | PySide6 6.11.1 / Qt 6.11.1 |
+| operating system | Windows 11 10.0.26200 |
+| USB adapter, VID/PID, driver, adapter identifier | この確認では再採取していない |
+| target device and firmware | この確認では再採取していない |
+| pairing or reconnect flow | この確認では手順を記録していない |
+| exact test cases | 隔離worktreeから`uv run demi`を起動し、125 Hzで回転を実機目視 |
+| result | 回転は滑らかで、#45で観測した周期的なカクつきは見えなかった |
+| observed limitations | 目視確認であり、厳密な125 Hz送信保証や遅延計測ではない。Python 3.14、接続経路、機器情報はこの確認の対象外 |

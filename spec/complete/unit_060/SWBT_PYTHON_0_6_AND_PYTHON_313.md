@@ -109,11 +109,12 @@ swbt-python 0.6.0は送信実装で時計を差し替えていない。Project_D
 | `uv run --python 3.14 pytest -p no:cacheprovider --basetemp tmp/pytest-integration-314 tests/integration -q` | pass | Python 3.14.6、134件pass |
 | `uv run --python 3.14 python packaging/verify_distribution.py` | pass | Python 3.14.6で配布物検証成功 |
 | `uv run --python 3.13 python -c "import time,sys; print(sys.version.split()[0], time.get_clock_info('monotonic'))"` | pass | Python 3.13.5、QueryPerformanceCounter、resolution `1e-07` |
+| `uv run demi`から125 Hz回転を実機観測 | pass | Python 3.13.5 / swbt-python 0.6.0で周期的なカクつきは見えず、回転が滑らかになった |
 | `git diff --check` | pass | whitespace errorなし |
 
 ## 10. 先送り事項
 
-- Python 3.13 / swbt-python 0.6.0での保存済み再接続と8 msジャイロ実機確認は未実行。schema v1 profileを削除して再ペアリングしてから、#45で別途記録する。
+- Python 3.13 / swbt-python 0.6.0で125 Hz回転が滑らかになったことを実機確認した。保存済み再接続を含む接続経路の詳細は、この確認では採取していない。
 - Python 3.14のSwitch実機確認は上流でも未実行であり、本unitでは行わない。
 
 ## 11. チェックリスト
