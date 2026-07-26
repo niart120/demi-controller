@@ -5,6 +5,7 @@ from threading import Event, Thread, get_ident
 from time import monotonic
 
 import pytest
+from swbt import AdapterDiscoveryError
 
 from demi.application.state import ConnectionState
 from demi.controller.adapter import ControllerAdapterError
@@ -615,6 +616,43 @@ def test_runtime_returns_to_ready_and_accepts_retry_after_discovery_error() -> N
     assert events.ready.wait(timeout=1.0)
     assert adapter.discover_calls == 2
     runtime.close()
+
+
+def test_runtime_emits_allowlisted_usb_discovery_diagnostics() -> None:
+    root_error = AdapterDiscoveryError(
+        "libusb enumeration failed for usb:private",
+        platform="Windows",
+        backend="bumble-usb",
+        libusb_available=False,
+        bumble_version="0.0.test",
+    )
+    wrapped_error = ControllerAdapterError(ControllerErrorCategory.ADAPTER_OPEN_FAILED)
+    wrapped_error.__cause__ = root_error
+    adapter = FakeAdapter(discover_error=wrapped_error)
+    events = EventRecorder()
+    runtime = ControllerRuntime(
+        adapter_factory=lambda: adapter,
+        event_sink=events,
+        clock=FakeClock(),
+    )
+    runtime.start()
+    assert events.ready.wait(timeout=1.0)
+    events.ready.clear()
+    try:
+        runtime.post(DiscoverAdapters())
+
+        assert events.error.wait(timeout=1.0)
+        error = next(event for event in events.events if isinstance(event, ControllerError))
+        assert error.diagnostic_context == (
+            ("cause_type", "AdapterDiscoveryError"),
+            ("backend", "bumble-usb"),
+            ("platform", "Windows"),
+            ("libusb_available", "false"),
+            ("bumble_version", "0.0.test"),
+        )
+        assert "usb:private" not in repr(error.diagnostic_context)
+    finally:
+        runtime.close()
 
 
 def test_runtime_returns_to_connected_after_discovery_while_connected() -> None:

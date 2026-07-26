@@ -74,12 +74,13 @@ class WatchdogNeutralized:
 
 @dataclass(frozen=True, slots=True)
 class ControllerError:
-    """Report a classified, user-safe controller failure."""
+    """Report a classified failure with safe local diagnostic context."""
 
     category: ControllerErrorCategory
     summary: str
     retryable: bool
     diagnostic_id: str
+    diagnostic_context: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

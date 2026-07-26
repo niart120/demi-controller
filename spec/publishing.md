@@ -2,7 +2,8 @@
 
 ## Scope
 
-`demi-controller` を PyPI / TestPyPI に公開するための runbook。
+`demi-controller` を PyPI / TestPyPI に公開するための runbook。Windows standalone artifact は
+PySide6 Deploy が呼び出す Nuitka で生成する。
 
 ## Preconditions
 
@@ -26,6 +27,9 @@ uv run python packaging/smoke.py
 uv run twine check --strict dist/*
 git diff --check
 ```
+
+`packaging/smoke.py` は `demi.exe --version` に加え、Windows artifact が `qwindows.dll` と
+`sdl2dll/dll/SDL2.dll` を持ち、Qt plugin family が `platforms` だけであることを確認する。
 
 ## Stop Conditions
 

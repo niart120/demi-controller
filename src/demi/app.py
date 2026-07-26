@@ -203,7 +203,7 @@ class ApplicationSession:
         publisher: InputPublisher | None = None,
         set_input_evaluation_interval: Callable[[int], None] | None = None,
         reconfigure_diagnostic_logging: Callable[[DiagnosticLevel], None] | None = None,
-        log_controller_error: Callable[[ControllerErrorCategory], None] | None = None,
+        log_controller_error: Callable[[ControllerError], None] | None = None,
     ) -> None:
         """Create a main-thread session before the worker starts.
 
@@ -219,7 +219,7 @@ class ApplicationSession:
                 saved input interval to the GUI timer.
             reconfigure_diagnostic_logging: Optional callback that applies a
                 saved diagnostic logging threshold.
-            log_controller_error: Optional safe category-only error logger.
+            log_controller_error: Optional safe local diagnostic logger.
         """
         self._settings = settings
         self._paths = paths
@@ -315,7 +315,7 @@ class ApplicationSession:
             self._presentation.set_connection(ConnectionState.ERROR)
             self._presentation.set_error(_safe_error_message(event.category))
             if self._log_controller_error is not None:
-                self._log_controller_error(event.category)
+                self._log_controller_error(event)
         elif isinstance(event, WatchdogNeutralized):
             if (
                 self._coordinator.is_captured
@@ -666,10 +666,10 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
             nonlocal logger
             logger = selected_dependencies.logger_configurer(paths, level)
 
-        def log_controller_error(category: ControllerErrorCategory) -> None:
-            """Record a safe controller error category without worker details."""
+        def log_controller_error(error: ControllerError) -> None:
+            """Record allowlisted worker diagnostics without exception text."""
             if logger is not None:
-                logger.error("Controller error: %s", category.value)
+                _log_controller_error(logger, error)
 
         if settings.connection.diagnostic_level is not DiagnosticLevel.INFO:
             reconfigure_diagnostic_logging(settings.connection.diagnostic_level)
@@ -979,3 +979,14 @@ def _safe_error_message(category: ControllerErrorCategory) -> str:
         ControllerErrorCategory.UNEXPECTED: "Unexpected controller error",
     }
     return messages[category]
+
+
+def _log_controller_error(logger: logging.Logger, error: ControllerError) -> None:
+    """Log the allowlisted diagnostic fields without exposing event summary text."""
+    context = " ".join(f"{key}={value}" for key, value in error.diagnostic_context)
+    logger.error(
+        "Controller error: %s diagnostic_id=%s %s",
+        error.category.value,
+        error.diagnostic_id,
+        context,
+    )

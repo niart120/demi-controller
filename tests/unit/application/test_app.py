@@ -734,12 +734,12 @@ def test_session_deletes_only_the_fixed_controller_profile(tmp_path: Path) -> No
     assert session.delete_controller_profile() is True
 
 
-def test_session_reconfigures_diagnostic_logging_and_logs_only_error_category() -> None:
+def test_session_reconfigures_diagnostic_logging_and_logs_safe_error_event() -> None:
     settings = AppSettings.default()
     runtime = FakeRuntime()
     coordinator = make_coordinator(runtime)
     configured_levels: list[DiagnosticLevel] = []
-    logged_categories: list[ControllerErrorCategory] = []
+    logged_errors: list[ControllerError] = []
     session = ApplicationSession(
         settings=settings,
         paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
@@ -747,24 +747,51 @@ def test_session_reconfigures_diagnostic_logging_and_logs_only_error_category() 
         runtime=runtime,
         coordinator=coordinator,
         reconfigure_diagnostic_logging=configured_levels.append,
-        log_controller_error=logged_categories.append,
+        log_controller_error=logged_errors.append,
     )
 
     assert session.open_settings(DialogKind.CONNECTION) is True
     assert session.settings_modal.editor is not None
     session.settings_modal.editor.update_connection(diagnostic_level=DiagnosticLevel.ERROR)
     assert session.save_settings() is True
-    session.handle_runtime_event(
-        ControllerError(
-            category=ControllerErrorCategory.RECONNECT_FAILED,
-            summary="bond=/private/secret.json",
-            retryable=True,
-            diagnostic_id="runtime-0001",
-        )
+    error = ControllerError(
+        category=ControllerErrorCategory.RECONNECT_FAILED,
+        summary="bond=/private/secret.json",
+        retryable=True,
+        diagnostic_id="runtime-0001",
+        diagnostic_context=(("cause_type", "ConnectionFailedError"),),
     )
+    session.handle_runtime_event(error)
 
     assert configured_levels == [DiagnosticLevel.ERROR]
-    assert logged_categories == [ControllerErrorCategory.RECONNECT_FAILED]
+    assert logged_errors == [error]
+
+
+def test_controller_error_log_omits_user_visible_summary(tmp_path: Path) -> None:
+    paths = SettingsPaths(tmp_path / "config", tmp_path / "data", tmp_path / "log")
+    logger = app_module.configure_logging(paths, DiagnosticLevel.INFO)
+    error = ControllerError(
+        category=ControllerErrorCategory.ADAPTER_OPEN_FAILED,
+        summary="bond=C:/private/default.json",
+        retryable=True,
+        diagnostic_id="runtime-0007",
+        diagnostic_context=(
+            ("cause_type", "AdapterDiscoveryError"),
+            ("libusb_available", "false"),
+        ),
+    )
+    try:
+        app_module._log_controller_error(logger, error)
+    finally:
+        for handler in tuple(logger.handlers):
+            handler.close()
+
+    log_text = (paths.log_dir / "project-demi.log").read_text(encoding="utf-8")
+    assert "ADAPTER_OPEN_FAILED" in log_text
+    assert "runtime-0007" in log_text
+    assert "cause_type=AdapterDiscoveryError" in log_text
+    assert "libusb_available=false" in log_text
+    assert "bond=C:/private/default.json" not in log_text
 
 
 def make_coordinator(runtime: FakeRuntime) -> CaptureCoordinator:

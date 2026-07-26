@@ -1,79 +1,107 @@
-"""Build a standalone Project_Demi artifact with PyInstaller."""
+"""Build a standalone Project_Demi artifact with PySide6 Deploy and Nuitka."""
 
 import os
 import platform
 import shutil
 import subprocess
-import sys
 from importlib.metadata import Distribution, PackageNotFoundError, distribution, version
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "dist" / "standalone"
-WORK_DIR = ROOT / "build" / "pyinstaller"
+BUILD_DIR = ROOT / "build" / "pyside6-deploy"
+NUITKA_CACHE_DIR = ROOT / "build" / "nuitka-cache"
+DEPLOY_CONFIG = ROOT / "pysidedeploy.spec"
+NUITKA_PACKAGE_CONFIG = ROOT / "packaging" / "nuitka-package.config.yml"
 RUNTIME_PACKAGES = (
     "demi-controller",
     "platformdirs",
+    "libusb1",
+    "libusb-package",
     "pysdl2",
     "pysdl2-dll",
     "swbt-python",
     "tomli-w",
     "bumble",
+    "pyside6-essentials",
+    "shiboken6",
 )
+SDL2_DLL_PACKAGE_PATH = Path("sdl2dll") / "dll"
 
 
 def main() -> None:
     """Build the executable and write version, build, and license metadata."""
     _reset_output_dirs()
-    _run_pyinstaller()
+    _run_pyside6_deploy()
+    _rename_launcher_executable()
     _write_version()
     _write_build_info()
     _write_licenses()
-    artifact = OUTPUT_DIR / ("demi.exe" if os.name == "nt" else "demi")
+    artifact = _artifact_path()
     if not artifact.is_file():
-        raise RuntimeError(f"PyInstaller did not create {artifact}")
+        raise RuntimeError(f"PySide6 Deploy did not create {artifact}")
     print(f"Built {artifact.relative_to(ROOT)}")
 
 
 def _reset_output_dirs() -> None:
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
-    if WORK_DIR.exists():
-        shutil.rmtree(WORK_DIR)
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
     OUTPUT_DIR.mkdir(parents=True)
+    BUILD_DIR.mkdir(parents=True)
 
 
-def _run_pyinstaller() -> None:
+def _run_pyside6_deploy() -> None:
+    mutable_config = BUILD_DIR / DEPLOY_CONFIG.name
+    _write_mutable_deploy_config(mutable_config)
     command = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
-        "--clean",
-        "--noconfirm",
-        "--onefile",
-        "--name",
-        "demi",
-        "--paths",
-        str(ROOT / "src"),
-        "--distpath",
-        str(OUTPUT_DIR),
-        "--workpath",
-        str(WORK_DIR),
-        "--specpath",
-        str(WORK_DIR),
-        "--collect-submodules",
-        "demi",
-        "--collect-all",
-        "swbt",
-        "--collect-all",
-        "bumble",
-        "--collect-all",
-        "sdl2",
-        "--collect-all",
-        "sdl2dll",
-        str(ROOT / "packaging" / "launcher.py"),
+        "pyside6-deploy",
+        "--force",
+        "--config-file",
+        str(mutable_config),
     ]
-    subprocess.run(command, cwd=ROOT, check=True)
+    subprocess.run(command, cwd=ROOT, check=True, env=_nuitka_environment())
+
+
+def _nuitka_environment() -> dict[str, str]:
+    """Return a build environment with a writable Nuitka cache location."""
+    return os.environ | {"NUITKA_CACHE_DIR": str(NUITKA_CACHE_DIR)}
+
+
+def _write_mutable_deploy_config(destination: Path) -> None:
+    _sdl2_dll_directory()
+    config = DEPLOY_CONFIG.read_text(encoding="utf-8")
+    config = config.replace("project_dir = packaging", f"project_dir = {ROOT / 'packaging'}")
+    config = config.replace(
+        "input_file = packaging/launcher.py", f"input_file = {ROOT / 'packaging' / 'launcher.py'}"
+    )
+    config = config.replace(
+        "extra_args = ",
+        "extra_args = --include-distribution-metadata=swbt-python --include-module=libusb_package "
+        f"--user-package-configuration-file={NUITKA_PACKAGE_CONFIG.as_posix()} ",
+    )
+    destination.write_text(config, encoding="utf-8", newline="\n")
+
+
+def _sdl2_dll_directory() -> Path:
+    path = _load_distribution("pysdl2-dll").locate_file(SDL2_DLL_PACKAGE_PATH)
+    if not path.is_dir() or not (path / "SDL2.dll").is_file():
+        raise RuntimeError(f"pysdl2-dll does not provide SDL2.dll: {path}")
+    return path
+
+
+def _artifact_path() -> Path:
+    executable = "demi.exe" if os.name == "nt" else "demi"
+    return OUTPUT_DIR / "demi.dist" / executable
+
+
+def _rename_launcher_executable() -> None:
+    launcher_name = "launcher.exe" if os.name == "nt" else "launcher"
+    launcher = OUTPUT_DIR / "demi.dist" / launcher_name
+    if not launcher.is_file():
+        raise RuntimeError(f"PySide6 Deploy did not create {launcher}")
+    launcher.replace(_artifact_path())
 
 
 def _write_version() -> None:
@@ -89,7 +117,8 @@ def _write_build_info() -> None:
         f"distribution=demi-controller {version('demi-controller')}",
         f"os={platform.system()} {platform.release()}",
         f"python={platform.python_version()}",
-        f"pyinstaller={version('pyinstaller')}",
+        f"nuitka={version('nuitka')}",
+        f"pyside6-essentials={version('pyside6-essentials')}",
     )
     (OUTPUT_DIR / "BUILD_INFO.txt").write_text(
         "\n".join(lines) + "\n",
