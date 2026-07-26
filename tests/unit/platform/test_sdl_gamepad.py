@@ -8,6 +8,8 @@ from demi.platform.sdl_gamepad import SdlGamepadBackend
 
 sdl2 = sdl_gamepad.sdl2
 
+type DeviceFixture = tuple[str, str, int]
+
 
 @dataclass
 class FakeSdlCalls:
@@ -28,6 +30,16 @@ def _install_sdl_functions(monkeypatch: pytest.MonkeyPatch, calls: FakeSdlCalls)
     monkeypatch.setattr(sdl2, "SDL_GameControllerUpdate", lambda: None)
     monkeypatch.setattr(sdl2, "SDL_NumJoysticks", lambda: calls.joystick_count)
     monkeypatch.setattr(sdl2, "SDL_IsGameController", lambda _index: True)
+    monkeypatch.setattr(
+        sdl2, "SDL_GameControllerNameForIndex", lambda index: f"Controller {index}".encode()
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceGUID", lambda index: f"guid-{index}")
+    monkeypatch.setattr(
+        sdl2,
+        "SDL_JoystickGetGUIDString",
+        lambda guid, buffer, _size: setattr(buffer, "value", guid.encode()),
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceInstanceID", lambda index: index)
 
     def open_controller(_index: int) -> object:
         """Return one fake controller and count each open."""
@@ -52,6 +64,29 @@ def _install_sdl_functions(monkeypatch: pytest.MonkeyPatch, calls: FakeSdlCalls)
     monkeypatch.setattr(sdl2, "SDL_GameControllerGetButton", button)
     monkeypatch.setattr(sdl2, "SDL_GameControllerGetAxis", lambda _controller, _axis: 0)
     monkeypatch.setattr(sdl2, "SDL_QuitSubSystem", lambda _flags: None)
+
+
+def _install_devices(
+    monkeypatch: pytest.MonkeyPatch,
+    devices: tuple[DeviceFixture, ...],
+    *,
+    opened: list[int] | None = None,
+) -> None:
+    _install_sdl_functions(monkeypatch, FakeSdlCalls(joystick_count=len(devices)))
+    if opened is not None:
+        monkeypatch.setattr(
+            sdl2, "SDL_GameControllerOpen", lambda index: opened.append(index) or index
+        )
+    monkeypatch.setattr(
+        sdl2, "SDL_GameControllerNameForIndex", lambda index: devices[index][0].encode()
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceGUID", lambda index: devices[index][1])
+    monkeypatch.setattr(
+        sdl2,
+        "SDL_JoystickGetGUIDString",
+        lambda guid, buffer, _size: setattr(buffer, "value", guid.encode()),
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceInstanceID", lambda index: devices[index][2])
 
 
 def test_backend_opens_first_controller_and_reopens_after_disconnect(
@@ -88,17 +123,7 @@ def test_backend_lists_connected_devices_without_exposing_device_indexes(
         ("Second controller", "guid-second", 72),
     )
 
-    _install_sdl_functions(monkeypatch, FakeSdlCalls(joystick_count=len(devices)))
-    monkeypatch.setattr(
-        sdl2, "SDL_GameControllerNameForIndex", lambda index: devices[index][0].encode()
-    )
-    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceGUID", lambda index: devices[index][1])
-    monkeypatch.setattr(
-        sdl2,
-        "SDL_JoystickGetGUIDString",
-        lambda guid, buffer, _size: setattr(buffer, "value", guid.encode()),
-    )
-    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceInstanceID", lambda index: devices[index][2])
+    _install_devices(monkeypatch, devices)
     backend = SdlGamepadBackend()
 
     listed = backend.connected_devices()
@@ -108,3 +133,51 @@ def test_backend_lists_connected_devices_without_exposing_device_indexes(
         GamepadDevice(name="Second controller", persistent_id="guid-second", instance_id=72),
     )
     assert all("index" not in device.__dataclass_fields__ for device in listed)
+
+
+def test_backend_opens_the_uniquely_selected_persistent_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    devices = (
+        ("First controller", "guid-first", 41),
+        ("Second controller", "guid-second", 72),
+    )
+    opened: list[int] = []
+
+    _install_devices(monkeypatch, devices, opened=opened)
+    monkeypatch.setattr(sdl2, "SDL_GameControllerGetAttached", lambda _controller: True)
+    backend = SdlGamepadBackend()
+
+    backend.select_device("guid-second")
+
+    assert backend.poll().connected is True
+    assert opened == [1]
+
+
+@pytest.mark.parametrize(
+    ("persistent_id", "devices"),
+    [
+        ("missing", (("First controller", "guid-first", 41),)),
+        (
+            "shared",
+            (
+                ("First controller", "shared", 41),
+                ("Second controller", "shared", 72),
+            ),
+        ),
+    ],
+)
+def test_backend_falls_back_to_automatic_selection_when_saved_id_is_not_unique_or_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    persistent_id: str,
+    devices: tuple[DeviceFixture, ...],
+) -> None:
+    opened: list[int] = []
+
+    _install_devices(monkeypatch, devices, opened=opened)
+    backend = SdlGamepadBackend()
+
+    backend.select_device(persistent_id)
+
+    assert backend.poll().connected is True
+    assert opened == [0]

@@ -59,7 +59,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | status | item | type | layer | notes |
 |---|---|---|---|---|
 | refactor-skipped | 接続中 SDL 機器を名前・GUID・instance ID で列挙し、device index を公開しない | new | unit | platform / input boundary。red: `GamepadDevice` が未定義。green: `test_backend_lists_connected_devices_without_exposing_device_indexes` |
-| todo | 保存済み GUID が一意に一致するとその機器だけを poll し、未接続または重複では自動選択へ戻る | new | unit | platform |
+| refactor-done | 保存済み GUID が一意に一致するとその機器だけを poll し、未接続または重複では自動選択へ戻る | new | unit | platform。red: 明示 GUID でも index 0 を開いた。green: 一意一致は選択、未接続・重複は index 0 の自動選択。fixture 重複を `_install_devices` へ整理 |
 | todo | 選択中機器の切断 tick はゲームパッド状態を中立へ戻す | regression | unit | platform / coordinator |
 | todo | GUID または自動選択を設定 codec が往復し、device index を受理・出力しない | new | unit | domain / config |
 | todo | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application |
@@ -97,7 +97,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | `gh api repos/niart120/demi-controller/issues/55` | passed | 2026-07-26 に issue の受入条件を取得 |
 | `gh api repos/niart120/demi-controller/issues/54` | passed | 2026-07-26 に前提範囲と対象外を照合 |
 | `uv run python -c "...PySDL2 API..."` | passed | 名前、joystick、GUID の各 API がインストール済み binding に存在 |
-| `uv run pytest tests/unit/platform/test_sdl_gamepad.py -q -p no:cacheprovider` | passed | 3 passed。列挙境界の red / green を確認 |
+| `uv run pytest tests/unit/platform/test_sdl_gamepad.py -q -p no:cacheprovider` | passed | 6 passed。列挙と保存 GUID 選択の red / green、fixture refactor を確認 |
 | 標準 gate | not run | 実装前 |
 | SDL 実機の複数台・切断確認 | not run | 対象機器を接続後に別途実施 |
 
