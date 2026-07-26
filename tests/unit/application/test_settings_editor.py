@@ -151,6 +151,18 @@ def test_editor_updates_input_settings_without_changing_mouse_settings() -> None
     assert input_settings.mouse == existing_mouse
 
 
+def test_editor_updates_gamepad_selection_without_dropping_other_input_settings() -> None:
+    editor = SettingsEditor(AppSettings.default())
+    editor.update_input(evaluation_interval_ms=16, circular_stick_limit=True)
+
+    editor.update_gamepad_selection("030000005e0400008e02000014010000")
+
+    input_settings = editor.draft.input
+    assert input_settings.gamepad_persistent_id == "030000005e0400008e02000014010000"
+    assert input_settings.evaluation_interval_ms == 16
+    assert input_settings.circular_stick_limit is True
+
+
 def test_editor_rejects_invalid_input_settings_without_replacing_the_draft() -> None:
     editor = SettingsEditor(AppSettings.default())
     original_input = editor.draft.input
