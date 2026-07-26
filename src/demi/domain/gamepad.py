@@ -28,6 +28,33 @@ class GamepadButton(StrEnum):
     GUIDE = "guide"
 
 
+@dataclass(frozen=True, slots=True)
+class GamepadDevice:
+    """One connected gamepad identified without an SDL device index.
+
+    ``persistent_id`` is the SDL GUID that may be stored in application
+    settings. ``instance_id`` is valid only while this connection remains
+    present and must not be persisted.
+    """
+
+    name: str
+    persistent_id: str
+    instance_id: int
+
+    def __post_init__(self) -> None:
+        """Validate a device identity returned by an input backend."""
+        if not isinstance(self.name, str) or not self.name:
+            raise DomainValueError
+        if not isinstance(self.persistent_id, str) or not self.persistent_id:
+            raise DomainValueError
+        if (
+            isinstance(self.instance_id, bool)
+            or not isinstance(self.instance_id, int)
+            or self.instance_id < 0
+        ):
+            raise DomainValueError
+
+
 def _require_trigger(value: float) -> None:
     if (
         isinstance(value, bool)

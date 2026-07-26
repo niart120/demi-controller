@@ -4,7 +4,7 @@ from math import hypot
 from typing import Protocol
 
 from demi.domain.controller import LogicalButton, StickVector
-from demi.domain.gamepad import GamepadButton, GamepadState
+from demi.domain.gamepad import GamepadButton, GamepadDevice, GamepadState
 
 STICK_DEAD_ZONE = 0.15
 TRIGGER_BUTTON_THRESHOLD = 0.5
@@ -19,6 +19,16 @@ class GamepadInputPort(Protocol):
 
     def close(self) -> None:
         """Release backend resources; repeated calls must be harmless."""
+
+
+class GamepadSelectionPort(Protocol):
+    """Enumerate and select a gamepad without leaking SDL details."""
+
+    def connected_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return the currently connected selectable gamepads."""
+
+    def select_device(self, persistent_id: str | None) -> None:
+        """Select one persistent ID, or ``None`` for automatic selection."""
 
 
 class PreferredGamepadBackend:

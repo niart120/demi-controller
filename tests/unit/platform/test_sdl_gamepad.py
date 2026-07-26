@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from demi.domain.gamepad import GamepadButton
+from demi.domain.gamepad import GamepadButton, GamepadDevice
 from demi.platform import sdl_gamepad
 from demi.platform.sdl_gamepad import SdlGamepadBackend
 
@@ -78,3 +78,33 @@ def test_backend_returns_neutral_when_initialization_fails(monkeypatch: pytest.M
     backend = SdlGamepadBackend()
 
     assert backend.poll().connected is False
+
+
+def test_backend_lists_connected_devices_without_exposing_device_indexes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    devices = (
+        ("First controller", "guid-first", 41),
+        ("Second controller", "guid-second", 72),
+    )
+
+    _install_sdl_functions(monkeypatch, FakeSdlCalls(joystick_count=len(devices)))
+    monkeypatch.setattr(
+        sdl2, "SDL_GameControllerNameForIndex", lambda index: devices[index][0].encode()
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceGUID", lambda index: devices[index][1])
+    monkeypatch.setattr(
+        sdl2,
+        "SDL_JoystickGetGUIDString",
+        lambda guid, buffer, _size: setattr(buffer, "value", guid.encode()),
+    )
+    monkeypatch.setattr(sdl2, "SDL_JoystickGetDeviceInstanceID", lambda index: devices[index][2])
+    backend = SdlGamepadBackend()
+
+    listed = backend.connected_devices()
+
+    assert listed == (
+        GamepadDevice(name="First controller", persistent_id="guid-first", instance_id=41),
+        GamepadDevice(name="Second controller", persistent_id="guid-second", instance_id=72),
+    )
+    assert all("index" not in device.__dataclass_fields__ for device in listed)
