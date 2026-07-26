@@ -148,3 +148,33 @@ def test_explicit_gamepad_selection_bypasses_a_connected_preferred_backend() -> 
     assert backend.connected_devices() == fallback.devices
     assert backend.poll() == fallback.state
     assert fallback.selected_ids == ["guid-selected"]
+
+
+def test_missing_saved_gamepad_selection_restores_automatic_backend_preference() -> None:
+    preferred = FakeGamepadBackend(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.NORTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        )
+    )
+    fallback = FakeGamepadBackend(
+        GamepadState(
+            connected=True,
+            buttons=frozenset({GamepadButton.SOUTH}),
+            left_stick=StickVector(0.0, 0.0),
+            right_stick=StickVector(0.0, 0.0),
+            left_trigger=0.0,
+            right_trigger=0.0,
+        ),
+        devices=(GamepadDevice("Other", "guid-other", 8),),
+    )
+    backend = PreferredGamepadBackend(preferred=preferred, fallback=fallback)
+
+    backend.select_device("guid-missing")
+
+    assert backend.poll() == preferred.state
+    assert fallback.selected_ids == ["guid-missing"]

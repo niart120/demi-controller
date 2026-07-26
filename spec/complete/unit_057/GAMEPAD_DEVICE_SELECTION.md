@@ -65,7 +65,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | refactor-skipped | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application。red: session に live 適用 callback がない。green: 起動時と保存後だけ callback が GUID を受け取り、draft 更新時は呼ばない |
 | refactor-skipped | 設定画面が機器一覧、自動選択、現在選択を表示し、保存後に選択を反映する | new | integration | UI。`SettingsDialog` の入力タブが SDL 機器と自動選択を表示し、combo 操作は共有 draft を更新する |
 | refactor-skipped | 日本語翻訳カタログが追加した設定画面の文言を持つ | new | integration | package。`demi_ja.ts` の4文言を更新し、`demi_ja.qm` を再コンパイル |
-| refactor-skipped | Windows の XInput 優先経路でも明示選択が別機器の入力で覆われない | regression | integration | application。`PreferredGamepadBackend` の unit test で、明示 SDL 選択が接続済み優先 backend を迂回することを確認 |
+| refactor-skipped | Windows の XInput 優先経路でも明示選択が別機器の入力で覆われない | regression | application | `PreferredGamepadBackend` の unit test で、一意な SDL GUID は接続済み優先 backend を迂回し、未接続 GUID は自動選択へ戻ることを確認 |
 
 ## 7. 設計メモ
 
@@ -101,7 +101,16 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | `uv run pytest tests/unit/domain/test_settings.py tests/unit/config/test_codec.py -q -p no:cacheprovider` | passed | 25 passed。GUID codec の red / green を確認 |
 | `uv run pytest tests/unit/application/test_application_session.py -q -p no:cacheprovider` | passed | 3 passed。draft と保存後の live 適用境界を確認 |
 | `uv run pytest tests/integration/ui/test_unified_settings_dialog.py tests/integration/package/test_translation_catalog.py -q -p no:cacheprovider` | passed | 5 passed。設定 UI と翻訳カタログを確認 |
-| 標準 gate | not run | 実装前 |
+| `uv sync --dev` | passed | 開発依存を同期 |
+| `uv lock --check` | passed | lockfile は更新不要 |
+| `uv run ruff format --check .` | passed | 154 files already formatted |
+| `uv run ruff check .` | passed | static lint |
+| `uv run ty check --no-progress` | passed | 型境界を確認 |
+| `uv run pytest tests/unit -q -p no:cacheprovider` | passed | 357 passed |
+| `uv run pytest tests/integration -q -p no:cacheprovider` | passed | 134 passed |
+| `uv build --offline` | passed | sdist と wheel を作成 |
+| `git diff --check` | passed | 空白エラーなし |
+| docs review | passed | work unit と翻訳カタログに仮テキスト、会話依存語、未検証の誤記がないことを確認 |
 | SDL 実機の複数台・切断確認 | not run | 対象機器を接続後に別途実施 |
 
 ## 10. 先送り事項
@@ -114,4 +123,4 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 - [x] 対象範囲と対象外を確認した
 - [x] TDD Test List を更新した
 - [x] 検証結果または未実行理由を記録した
-- [ ] package / release / public API に触れる場合の gate を記録した
+- [x] package / release / public API に触れる場合の gate を記録した

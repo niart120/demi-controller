@@ -48,8 +48,17 @@ class PreferredGamepadBackend(GamepadSelectionPort):
 
     def poll(self) -> GamepadState:
         """Return the selected backend state, selecting on connection."""
-        if self._selected_persistent_id is not None:
-            return self._fallback.poll()
+        selected_persistent_id = self._selected_persistent_id
+        fallback = self._fallback
+        if selected_persistent_id is not None and isinstance(fallback, GamepadSelectionPort):
+            matches = sum(
+                device.persistent_id == selected_persistent_id
+                for device in fallback.connected_devices()
+            )
+            if matches == 1:
+                self._active = fallback
+                return fallback.poll()
+            self._active = None
         active = self._active
         if active is not None:
             state = active.poll()
@@ -60,9 +69,9 @@ class PreferredGamepadBackend(GamepadSelectionPort):
         if preferred_state.connected:
             self._active = self._preferred
             return preferred_state
-        fallback_state = self._fallback.poll()
+        fallback_state = fallback.poll()
         if fallback_state.connected:
-            self._active = self._fallback
+            self._active = fallback
         return fallback_state
 
     def connected_devices(self) -> tuple[GamepadDevice, ...]:
