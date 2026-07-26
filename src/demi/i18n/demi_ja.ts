@@ -710,6 +710,26 @@
         <source>Forward mouse</source>
         <translation>進むマウス</translation>
     </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="543"/>
+        <source>Gamepad selection</source>
+        <translation>ゲームパッド選択</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="546"/>
+        <source>Automatic selection</source>
+        <translation>自動選択</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="554"/>
+        <source>Saved controller is not connected</source>
+        <translation>保存済みコントローラーは接続されていません</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/mapping.py" line="555"/>
+        <source>Controller</source>
+        <translation>コントローラー</translation>
+    </message>
 </context>
 <context>
     <name>PairingConfirmationDialog</name>

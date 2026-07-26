@@ -63,9 +63,9 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | refactor-skipped | 選択中機器の切断 tick はゲームパッド状態を中立へ戻す | regression | unit | platform / coordinator。red: 切断 tick に即時再オープンして connected を返した。green: 切断 tick は neutral、次 tick から再探索 |
 | refactor-done | GUID または自動選択を設定 codec が往復し、device index を受理・出力しない | new | unit | domain / config。red: `InputSettings` が GUID を受け取れない。green: GUID は TOML に保存、`None` はキー省略で自動選択。`None` を TOML に出さない encode helper へ整理 |
 | refactor-skipped | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application。red: session に live 適用 callback がない。green: 起動時と保存後だけ callback が GUID を受け取り、draft 更新時は呼ばない |
-| todo | 設定画面が機器一覧、自動選択、現在選択を表示し、保存後に選択を反映する | new | integration | UI |
-| todo | 日本語翻訳カタログが追加した設定画面の文言を持つ | new | integration | package |
-| todo | Windows の XInput 優先経路でも明示選択が別機器の入力で覆われない | regression | integration | application |
+| refactor-skipped | 設定画面が機器一覧、自動選択、現在選択を表示し、保存後に選択を反映する | new | integration | UI。`SettingsDialog` の入力タブが SDL 機器と自動選択を表示し、combo 操作は共有 draft を更新する |
+| refactor-skipped | 日本語翻訳カタログが追加した設定画面の文言を持つ | new | integration | package。`demi_ja.ts` の4文言を更新し、`demi_ja.qm` を再コンパイル |
+| refactor-skipped | Windows の XInput 優先経路でも明示選択が別機器の入力で覆われない | regression | integration | application。`PreferredGamepadBackend` の unit test で、明示 SDL 選択が接続済み優先 backend を迂回することを確認 |
 
 ## 7. 設計メモ
 
@@ -100,6 +100,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | `uv run pytest tests/unit/platform/test_sdl_gamepad.py -q -p no:cacheprovider` | passed | 6 passed。列挙と保存 GUID 選択の red / green、fixture refactor を確認 |
 | `uv run pytest tests/unit/domain/test_settings.py tests/unit/config/test_codec.py -q -p no:cacheprovider` | passed | 25 passed。GUID codec の red / green を確認 |
 | `uv run pytest tests/unit/application/test_application_session.py -q -p no:cacheprovider` | passed | 3 passed。draft と保存後の live 適用境界を確認 |
+| `uv run pytest tests/integration/ui/test_unified_settings_dialog.py tests/integration/package/test_translation_catalog.py -q -p no:cacheprovider` | passed | 5 passed。設定 UI と翻訳カタログを確認 |
 | 標準 gate | not run | 実装前 |
 | SDL 実機の複数台・切断確認 | not run | 対象機器を接続後に別途実施 |
 

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from demi.application.settings_editor import SettingsEditor
+from demi.domain.gamepad import GamepadDevice
 from demi.domain.settings import ControllerColorSettings
 
 from .colors import ControllerColorsDialog
@@ -46,6 +47,7 @@ class SettingsDialog(QDialog):
         *,
         initial_tab: SettingsTab,
         connected: bool,
+        gamepad_devices: tuple[GamepadDevice, ...] = (),
         on_rescan: Action,
         on_save: BooleanAction,
         on_cancel: BooleanAction,
@@ -63,6 +65,7 @@ class SettingsDialog(QDialog):
             editor: Application-owned settings draft shared by every tab.
             initial_tab: Tab requested by the toolbar entry point.
             connected: Whether a color change needs a reconnect choice.
+            gamepad_devices: Connected SDL gamepads available for selection.
             on_rescan: Requests asynchronous USB adapter discovery.
             on_save: Persists the complete shared draft.
             on_cancel: Discards the complete shared draft.
@@ -90,6 +93,7 @@ class SettingsDialog(QDialog):
 
         self.mapping_page = MappingDialog(
             editor,
+            gamepad_devices=gamepad_devices,
             on_dialog_opened=on_dialog_opened,
             on_cancel=self._cancel_from_page,
             parent=self,

@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     )
     from demi.controller.watchdog import WatchdogClock
     from demi.domain.controller import ControllerFrame
+    from demi.domain.gamepad import GamepadDevice
     from demi.domain.mapping import InputProfile
     from demi.domain.settings import AppSettings, WindowSettings
     from demi.ui.application import QtApplicationRunner
@@ -251,6 +252,10 @@ class ApplicationSession:
     def settings(self) -> AppSettings:
         """Return the current validated settings snapshot."""
         return self._settings
+
+    def gamepad_devices(self) -> tuple[GamepadDevice, ...]:
+        """Return currently connected gamepads available for selection."""
+        return self._coordinator.gamepad_devices()
 
     @property
     def dialogs(self) -> DialogManager:

@@ -48,6 +48,7 @@ from demi.application.settings_editor import (
     SettingsEditor,
 )
 from demi.domain.errors import DomainValueError
+from demi.domain.gamepad import GamepadDevice
 from demi.domain.mapping import Binding, BindingTarget, is_button_target
 from demi.input.qt_adapter import key_source_for_event, mouse_source_for_event
 
@@ -400,6 +401,7 @@ class MappingDialog(QDialog):
         self,
         editor: SettingsEditor,
         *,
+        gamepad_devices: tuple[GamepadDevice, ...] = (),
         on_dialog_opened: CaptureTransition | None = None,
         on_save: SettingsAction | None = None,
         on_cancel: SettingsAction | None = None,
@@ -409,6 +411,7 @@ class MappingDialog(QDialog):
 
         Args:
             editor: Application-owned immutable settings draft editor.
+            gamepad_devices: Connected SDL gamepads available for selection.
             on_dialog_opened: Neutralizes controller capture before the dialog
                 accepts any input.
             on_save: Saves the application-owned draft and reports success.
@@ -537,6 +540,20 @@ class MappingDialog(QDialog):
         mouse_gyro_form.addRow(self.invert_x_checkbox)
         mouse_gyro_form.addRow(self.invert_y_checkbox)
         mouse_gyro_form.addRow(self.tr("Pitch limit"), self.pitch_limit_spinbox)
+        self.gamepad_group = QGroupBox(self.tr("Gamepad selection"), self)
+        gamepad_form = QFormLayout(self.gamepad_group)
+        self.gamepad_combo = QComboBox(self.gamepad_group)
+        self.gamepad_combo.addItem(self.tr("Automatic selection"), None)
+        for device in gamepad_devices:
+            self.gamepad_combo.addItem(device.name, device.persistent_id)
+        selected_gamepad_id = editor.draft.input.gamepad_persistent_id
+        selected_gamepad_index = self.gamepad_combo.findData(selected_gamepad_id)
+        self.gamepad_combo.setCurrentIndex(max(selected_gamepad_index, 0))
+        self.gamepad_status_label = QLabel("", self.gamepad_group)
+        if selected_gamepad_id is not None and selected_gamepad_index < 0:
+            self.gamepad_status_label.setText(self.tr("Saved controller is not connected"))
+        gamepad_form.addRow(self.tr("Controller"), self.gamepad_combo)
+        gamepad_form.addRow(self.gamepad_status_label)
         self.save_error_label = QLabel("", self)
         self.restore_button = QPushButton(self.tr("Restore defaults"), self)
         self.button_box = QDialogButtonBox(
@@ -556,6 +573,7 @@ class MappingDialog(QDialog):
         mouse_layout = QVBoxLayout(self.mouse_page)
         mouse_layout.addWidget(self.input_rate_group)
         mouse_layout.addWidget(self.mouse_gyro_group)
+        mouse_layout.addWidget(self.gamepad_group)
         mouse_layout.addStretch()
         self.tabs = QTabWidget(self)
         self.tabs.addTab(self.bindings_page, self.tr("Bindings"))
@@ -612,6 +630,9 @@ class MappingDialog(QDialog):
         )
         self.pitch_limit_spinbox.valueChanged.connect(
             lambda value: editor.update_mouse(pitch_limit_degrees=value)
+        )
+        self.gamepad_combo.currentIndexChanged.connect(
+            lambda index: editor.update_gamepad_selection(self.gamepad_combo.itemData(index))
         )
 
     @property
