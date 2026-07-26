@@ -202,6 +202,7 @@ class ApplicationSession:
         loaded: SettingsLoadResult | None = None,
         publisher: InputPublisher | None = None,
         set_input_evaluation_interval: Callable[[int], None] | None = None,
+        set_gamepad_selection: Callable[[str | None], None] | None = None,
         reconfigure_diagnostic_logging: Callable[[DiagnosticLevel], None] | None = None,
         log_controller_error: Callable[[ControllerError], None] | None = None,
     ) -> None:
@@ -217,6 +218,8 @@ class ApplicationSession:
             publisher: Live input publisher updated after settings saves.
             set_input_evaluation_interval: Optional callback that applies a
                 saved input interval to the GUI timer.
+            set_gamepad_selection: Optional callback that applies a saved SDL
+                gamepad GUID or automatic selection to the input backend.
             reconfigure_diagnostic_logging: Optional callback that applies a
                 saved diagnostic logging threshold.
             log_controller_error: Optional safe local diagnostic logger.
@@ -228,6 +231,7 @@ class ApplicationSession:
         self._coordinator = coordinator
         self._publisher = publisher if publisher is not None else coordinator.publisher
         self._set_input_evaluation_interval = set_input_evaluation_interval
+        self._set_gamepad_selection = set_gamepad_selection
         self._reconfigure_diagnostic_logging = reconfigure_diagnostic_logging
         self._log_controller_error = log_controller_error
         self._dialogs = DialogManager()
@@ -518,6 +522,8 @@ class ApplicationSession:
         )
         if self._set_input_evaluation_interval is not None:
             self._set_input_evaluation_interval(settings.input.evaluation_interval_ms)
+        if self._set_gamepad_selection is not None:
+            self._set_gamepad_selection(settings.input.gamepad_persistent_id)
 
     def _start_saved_reconnect_once(self) -> None:
         if not self._startup_reconnect_pending:
@@ -758,6 +764,7 @@ def run_application(dependencies: ApplicationDependencies | None = None) -> int:
                 if isinstance(window, InputEvaluationRatePort)
                 else None
             ),
+            set_gamepad_selection=coordinator.select_gamepad_device,
             reconfigure_diagnostic_logging=reconfigure_diagnostic_logging,
             log_controller_error=log_controller_error,
         )

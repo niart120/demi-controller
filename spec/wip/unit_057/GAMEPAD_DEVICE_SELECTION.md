@@ -62,7 +62,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | refactor-done | 保存済み GUID が一意に一致するとその機器だけを poll し、未接続または重複では自動選択へ戻る | new | unit | platform。red: 明示 GUID でも index 0 を開いた。green: 一意一致は選択、未接続・重複は index 0 の自動選択。fixture 重複を `_install_devices` へ整理 |
 | refactor-skipped | 選択中機器の切断 tick はゲームパッド状態を中立へ戻す | regression | unit | platform / coordinator。red: 切断 tick に即時再オープンして connected を返した。green: 切断 tick は neutral、次 tick から再探索 |
 | refactor-done | GUID または自動選択を設定 codec が往復し、device index を受理・出力しない | new | unit | domain / config。red: `InputSettings` が GUID を受け取れない。green: GUID は TOML に保存、`None` はキー省略で自動選択。`None` を TOML に出さない encode helper へ整理 |
-| todo | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application |
+| refactor-skipped | draft editor の選択は保存時だけ live backend へ適用され、取消は変更しない | new | unit | application。red: session に live 適用 callback がない。green: 起動時と保存後だけ callback が GUID を受け取り、draft 更新時は呼ばない |
 | todo | 設定画面が機器一覧、自動選択、現在選択を表示し、保存後に選択を反映する | new | integration | UI |
 | todo | 日本語翻訳カタログが追加した設定画面の文言を持つ | new | integration | package |
 | todo | Windows の XInput 優先経路でも明示選択が別機器の入力で覆われない | regression | integration | application |
@@ -99,6 +99,7 @@ SDL GameController 対応機器を設定画面で一覧表示し、利用する 
 | `uv run python -c "...PySDL2 API..."` | passed | 名前、joystick、GUID の各 API がインストール済み binding に存在 |
 | `uv run pytest tests/unit/platform/test_sdl_gamepad.py -q -p no:cacheprovider` | passed | 6 passed。列挙と保存 GUID 選択の red / green、fixture refactor を確認 |
 | `uv run pytest tests/unit/domain/test_settings.py tests/unit/config/test_codec.py -q -p no:cacheprovider` | passed | 25 passed。GUID codec の red / green を確認 |
+| `uv run pytest tests/unit/application/test_application_session.py -q -p no:cacheprovider` | passed | 3 passed。draft と保存後の live 適用境界を確認 |
 | 標準 gate | not run | 実装前 |
 | SDL 実機の複数台・切断確認 | not run | 対象機器を接続後に別途実施 |
 

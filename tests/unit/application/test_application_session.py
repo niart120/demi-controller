@@ -3,6 +3,7 @@ from pathlib import Path
 
 from demi.app import ApplicationSession
 from demi.application.coordinator import CaptureCoordinator
+from demi.application.dialogs import DialogKind
 from demi.application.presentation import AdapterOption
 from demi.application.state import AppState, ConnectionState
 from demi.application.ui_state import ApplicationUiSnapshot
@@ -142,3 +143,25 @@ def test_session_returns_a_framework_independent_ui_snapshot() -> None:
         error=None,
         color_reconnect_pending=False,
     )
+
+
+def test_session_applies_gamepad_selection_only_after_saving_its_draft() -> None:
+    publisher = InputPublisher(clock=FakeClock(), sink=FakeSink())
+    selections: list[str | None] = []
+    session = ApplicationSession(
+        runtime=FakeRuntime(),
+        coordinator=CaptureCoordinator(publisher=publisher, pointer_capture=FakeWindow()),
+        repository=FakeRepository(),
+        paths=SettingsPaths(Path("config"), Path("data"), Path("log")),
+        settings=AppSettings.default(),
+        set_gamepad_selection=selections.append,
+    )
+
+    assert session.open_settings(DialogKind.SETTINGS)
+    editor = session.settings_modal.editor
+    assert editor is not None
+    editor.update_gamepad_selection("guid-selected")
+
+    assert selections == [None]
+    assert session.save_settings()
+    assert selections == [None, "guid-selected"]
