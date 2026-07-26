@@ -65,8 +65,34 @@ def _run_pyside6_deploy() -> None:
 
 
 def _nuitka_environment() -> dict[str, str]:
-    """Return a build environment with a writable Nuitka cache location."""
-    return os.environ | {"NUITKA_CACHE_DIR": str(NUITKA_CACHE_DIR)}
+    """Return a build environment with a writable cache and Qt dependency reader."""
+    environment = os.environ | {"NUITKA_CACHE_DIR": str(NUITKA_CACHE_DIR)}
+    if os.name == "nt":
+        dumpbin = _find_dumpbin()
+        if dumpbin is None:
+            raise RuntimeError(
+                "Windows Qt dependency analysis requires dumpbin.exe from "
+                "Visual Studio Build Tools."
+            )
+        environment["PATH"] = str(dumpbin.parent) + os.pathsep + environment["PATH"]
+    return environment
+
+
+def _find_dumpbin() -> Path | None:
+    configured = shutil.which("dumpbin")
+    if configured:
+        return Path(configured)
+
+    candidates: list[Path] = []
+    for variable in ("ProgramFiles", "ProgramFiles(x86)"):
+        directory = os.environ.get(variable)
+        if directory:
+            candidates.extend(
+                Path(directory)
+                .joinpath("Microsoft Visual Studio")
+                .glob("*/**/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe")
+            )
+    return max(candidates, default=None)
 
 
 def _write_mutable_deploy_config(destination: Path) -> None:

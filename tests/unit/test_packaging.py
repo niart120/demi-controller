@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 from types import ModuleType
 
@@ -55,6 +56,15 @@ def test_package_builder_uses_pyside6_deploy_with_minimal_qt_runtime() -> None:
     assert "plugins = platforms" in deploy_config
     assert "--include-qt-plugins=platforms" in deploy_config
     assert "--noinclude-qt-plugins=imageformats" in deploy_config
+
+
+def test_deploy_config_uses_a_versioned_project_file_for_the_launcher() -> None:
+    root = Path(__file__).parents[2]
+    deploy_config = (root / "pysidedeploy.spec").read_text(encoding="utf-8")
+    project_file = root / "packaging" / "demi.pyproject"
+
+    assert "project_file = demi.pyproject" in deploy_config
+    assert json.loads(project_file.read_text(encoding="utf-8")) == {"files": ["launcher.py"]}
 
 
 def test_package_builder_and_license_inventory_do_not_reference_pyglet() -> None:
@@ -123,6 +133,35 @@ def test_package_builder_uses_a_workspace_scoped_nuitka_cache() -> None:
     environment = build._nuitka_environment()
 
     assert environment["NUITKA_CACHE_DIR"] == str(build.ROOT / "build" / "nuitka-cache")
+
+
+def test_windows_package_builder_adds_visual_studio_dumpbin_to_deploy_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    build = _load_build_module()
+    dumpbin = (
+        tmp_path
+        / "Microsoft Visual Studio"
+        / "18"
+        / "Community"
+        / "VC"
+        / "Tools"
+        / "MSVC"
+        / "14.50"
+        / "bin"
+        / "Hostx64"
+        / "x64"
+        / "dumpbin.exe"
+    )
+    dumpbin.parent.mkdir(parents=True)
+    dumpbin.touch()
+    monkeypatch.setattr(build.os, "name", "nt")
+    monkeypatch.setattr(build.shutil, "which", lambda _executable: None)
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+
+    environment = build._nuitka_environment()
+
+    assert environment["PATH"].split(build.os.pathsep)[0] == str(dumpbin.parent)
 
 
 def test_windows_smoke_requires_sdl2_runtime(

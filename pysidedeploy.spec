@@ -3,7 +3,7 @@ title = demi
 project_dir = packaging
 input_file = packaging/launcher.py
 exec_directory = dist/standalone
-project_file =
+project_file = demi.pyproject
 icon =
 
 [python]
