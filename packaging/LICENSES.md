@@ -9,7 +9,10 @@
 
 ## PySide6 と Qt
 
-`PySide6` は GUI の直接依存であり、`PySide6_Essentials`、`PySide6_Addons`、`shiboken6` を解決する。Essentials と Addons は Qt の実行バイナリーを含む。
+`PySide6` は GUI の直接依存であり、`PySide6_Essentials`、`PySide6_Addons`、`shiboken6` を
+解決する。`PySide6_Essentials` 単体では `PySide6` package root を提供しないため、直接依存を
+置き換えない。Nuitka の Windows standalone artifact は Core、Gui、Widgets とそれらの runtime
+dependency、Qt platform plugin だけを同梱する。
 
 - source / wheel 共通の案内: `demi/THIRD_PARTY_NOTICES.md`
 - 公式の third-party notices: [Qt for Python licenses](https://doc.qt.io/qtforpython-6/licenses.html)
@@ -20,7 +23,7 @@
 
 ## その他の実行時依存
 
-`platformdirs`、`PySDL2`、`pysdl2-dll`、`swbt-python`、`tomli-w` と解決済みの依存については、インストール済み配布物のメタデータとライセンスファイルを確認する。`pysdl2-dll` は SDL2 共有ライブラリーと同梱ライブラリーの license files を含むため、単体配布ではそれらを収集する。`uv.lock` は版の再現性を担保する記録であり、ライセンス本文の代替ではない。
+`platformdirs`、`libusb1`、`libusb-package`、`PySDL2`、`pysdl2-dll`、`swbt-python`、`tomli-w` と解決済みの依存については、インストール済み配布物のメタデータとライセンスファイルを確認する。`pysdl2-dll` は SDL2 共有ライブラリーと同梱ライブラリーの license files を含むため、単体配布ではそれらを収集する。`uv.lock` は版の再現性を担保する記録であり、ライセンス本文の代替ではない。
 
 ## 単体配布
 

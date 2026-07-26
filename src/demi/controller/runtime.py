@@ -610,6 +610,21 @@ class ControllerRuntime:
                     ControllerErrorCategory.CONNECTION_LOST,
                 },
                 diagnostic_id=f"runtime-{self._diagnostic_counter:04d}",
+                diagnostic_context=_diagnostic_context(error),
             )
         )
-        del error
+
+
+def _diagnostic_context(error: Exception) -> tuple[tuple[str, str], ...]:
+    """Return allowlisted diagnostics without exposing exception text."""
+    root_error = error
+    while isinstance(root_error.__cause__, Exception):
+        root_error = root_error.__cause__
+    context: list[tuple[str, str]] = [("cause_type", type(root_error).__name__)]
+    for attribute in ("backend", "platform", "libusb_available", "bumble_version"):
+        value = getattr(root_error, attribute, None)
+        if isinstance(value, bool):
+            context.append((attribute, str(value).lower()))
+        elif isinstance(value, str):
+            context.append((attribute, value))
+    return tuple(context)

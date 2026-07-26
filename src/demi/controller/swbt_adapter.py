@@ -1,6 +1,8 @@
 """swbt-python public API adapter for the controller runtime."""
 
+import ctypes
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import NoReturn, Protocol
@@ -116,6 +118,7 @@ class SwbtControllerAdapter(ControllerAdapter):
     async def discover_adapters(self) -> tuple[AdapterDescriptor, ...]:
         """List USB Bluetooth candidates without opening a controller."""
         try:
+            _configure_bundled_libusb()
             return tuple(self._descriptor(info) for info in self._adapter_lister())
         except Exception as error:  # noqa: BLE001
             _raise_adapter_failure(error, ControllerErrorCategory.ADAPTER_OPEN_FAILED)
@@ -330,6 +333,27 @@ def _hex_color(value: str) -> int:
 
 def _path_exists(path: Path) -> bool:
     return path.exists()
+
+
+def _configure_bundled_libusb() -> None:
+    """Register the packaged libusb DLL before Windows USB discovery."""
+    if os.name != "nt":
+        return
+    import usb1  # noqa: PLC0415 - Windows USB discovery alone needs libusb.
+
+    dll_path = Path(usb1.__file__).parent / "libusb-1.0.dll"
+    dll = ctypes.WinDLL(str(dll_path), use_errno=True, use_last_error=True)
+    usb1.loadLibrary(dll)
+    _configure_bumble_libusb_package(dll_path)
+
+
+def _configure_bumble_libusb_package(dll_path: Path) -> None:
+    """Make Bumble use the bundled libusb instead of package resources."""
+    try:
+        import libusb_package  # noqa: PLC0415 - optional Bumble USB helper.
+    except ImportError:
+        return
+    libusb_package.__dict__["get_library_path"] = lambda: dll_path
 
 
 def _raise_adapter_failure(

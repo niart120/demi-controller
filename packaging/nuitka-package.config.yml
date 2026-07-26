@@ -1,0 +1,8 @@
+- module-name: 'sdl2dll'
+  dlls:
+    - from_sources:
+        source_paths:
+          - 'os.path.join(get_module_directory("sdl2dll"), "dll", "SDL2.dll")'
+        dest_names:
+          - 'dll/SDL2.dll'
+      when: 'win32'

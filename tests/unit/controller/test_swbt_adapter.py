@@ -1,11 +1,14 @@
 import asyncio
 import logging
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from swbt import AdapterInfo, Button, ControllerColors, IMUFrame, InputState, Stick
 
+import demi.controller.swbt_adapter as swbt_adapter_module
 from demi.controller.events import AdapterDescriptor
 from demi.controller.swbt_adapter import SwbtControllerAdapter
 from demi.domain.controller import AccelG, ControllerFrame, GyroRate, LogicalButton, StickVector
@@ -41,6 +44,37 @@ class RecordingGamepad:
     async def close(self, *, neutral: bool = True) -> None:
         """Close the fake gamepad."""
         del neutral
+
+
+def test_bundled_libusb_is_registered_from_its_absolute_package_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dll_path = tmp_path / "usb1" / "libusb-1.0.dll"
+    dll_path.parent.mkdir()
+    dll_path.touch()
+    loaded_dlls: list[object] = []
+    loaded_paths: list[tuple[str, bool, bool]] = []
+    fake_usb1 = SimpleNamespace(
+        __file__=str(dll_path.parent / "__init__.py"),
+        loadLibrary=loaded_dlls.append,
+    )
+    fake_libusb_package = SimpleNamespace(get_library_path=lambda: None)
+    fake_dll = object()
+
+    def load_dll(path: str, *, use_errno: bool, use_last_error: bool) -> object:
+        loaded_paths.append((path, use_errno, use_last_error))
+        return fake_dll
+
+    monkeypatch.setitem(sys.modules, "usb1", fake_usb1)
+    monkeypatch.setitem(sys.modules, "libusb_package", fake_libusb_package)
+    monkeypatch.setattr(swbt_adapter_module, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(swbt_adapter_module.ctypes, "WinDLL", load_dll, raising=False)
+
+    swbt_adapter_module._configure_bundled_libusb()
+
+    assert loaded_paths == [(str(dll_path), True, True)]
+    assert loaded_dlls == [fake_dll]
+    assert fake_libusb_package.get_library_path() == dll_path
 
 
 def test_controller_frame_is_converted_to_one_public_input_state(

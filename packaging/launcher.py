@@ -1,4 +1,4 @@
-"""PyInstaller entry point for the canonical Project_Demi CLI."""
+"""Standalone builder entry point for the canonical Project_Demi CLI."""
 
 from demi.cli import main
 

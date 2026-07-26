@@ -8,7 +8,10 @@ Project_Demi 自体はリポジトリー直下の `LICENSE` に記載した MIT 
 
 ## PySide6 と Qt
 
-GUI 実行時には `PySide6` を使用する。`PySide6` をインストールすると、`PySide6_Essentials`、`PySide6_Addons`、`shiboken6` も解決される。Essentials と Addons は Qt の実行バイナリーを含む。
+GUI 実行時には `PySide6` を使用する。これは `PySide6_Essentials`、`PySide6_Addons`、`shiboken6`
+を解決する。`PySide6_Essentials` 単体では `PySide6` package root を提供しないため、直接依存を
+置き換えない。Nuitka の Windows standalone artifact は Core、Gui、Widgets とそれらの runtime
+dependency、Qt platform plugin だけを同梱する。
 
 適用するライセンス選択と必要な通知は、実際に配布する PySide6 / Qt の版と利用形態で確認する。次の公式資料を参照する。
 
@@ -21,6 +24,6 @@ GUI 実行時には `PySide6` を使用する。`PySide6` をインストール�
 
 `PySDL2` と `pysdl2-dll` は SDL GameController 入力に使用する。`pysdl2-dll` は SDL2 共有ライブラリーと同梱ライブラリーを提供する。適用するライセンスと通知は、インストール済みの `pysdl2-dll` 配布物に含まれる `*.dist-info/licenses/` と SDL の配布資料で確認する。
 
-`platformdirs`、`swbt-python`、`tomli-w` と、それらが解決する依存も、インストール済み配布物のメタデータとライセンスファイルを確認する。`uv.lock` は解決した版の記録であり、ライセンスの代替資料ではない。
+`platformdirs`、`libusb1`、`libusb-package`、`swbt-python`、`tomli-w` と、それらが解決する依存も、インストール済み配布物のメタデータとライセンスファイルを確認する。`uv.lock` は解決した版の記録であり、ライセンスの代替資料ではない。
 
 この文書は third-party notice の到達経路を示す技術記録であり、法的適合の結論ではない。単体配布物に必要な Qt plugin、実行バイナリー、通知の同梱確認は milestone 7 の対象である。
