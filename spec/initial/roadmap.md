@@ -9,7 +9,7 @@
 - `agentic-python-project-template` から `Project_Demi` を生成
 - 配布名 `project-demi`
 - パッケージ `demi`
-- Python 3.12
+- Python 3.13
 - uv、ruff、ty、pytest
 - `spec/initial/` の配置
 - CIの最小実行

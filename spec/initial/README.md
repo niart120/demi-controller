@@ -19,7 +19,7 @@ Project_Demiは、PCのキーボードとマウスを仮想Pro Controller入力�
 | プロジェクト名 | `Project_Demi` |
 | ルートパッケージ | `demi` |
 | GUI・描画・入力 | PySide6 / Qt Widgets |
-| Bluetooth HID | swbt-python 0.5系 |
+| Bluetooth HID | swbt-python 0.6系 |
 | 初期コントローラー | Pro Controller |
 | 初期主対象OS | Windows 11 |
 | 移植対象 | macOS、Linux |
@@ -167,7 +167,8 @@ ApplicationPresenter
 
 | 区分 | 内容 |
 |---|---|
-| 外部事実 | swbt-python 0.5.1はPython 3.12以上を要求する |
+| 外部事実 | swbt-python 0.6.0はPython 3.13以上を要求する |
+| 外部事実 | swbt-python 0.6.0はschema v1の保存済み接続プロファイルを読み込まず、schema v2での再ペアリングを要求する |
 | 外部事実 | swbt-pythonはDirectProController、DirectSwitchGamepad、InputState、ControllerColors、アダプター列挙APIを公開する |
 | 外部事実 | 実機接続にはBumbleが直接利用する専用USB Bluetoothアダプターが必要である |
 | プロジェクト判断 | GUIはPySide6のQt Widgets、key/mouse event、Qt event loopを使う |

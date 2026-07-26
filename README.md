@@ -4,7 +4,7 @@ A desktop application that converts PC keyboard and mouse inputs into virtual Pr
 
 ## 起動
 
-Python 3.12 以上と `uv` を用意して、開発環境から GUI を起動する。
+Python 3.13 以上と `uv` を用意して、開発環境から GUI を起動する。
 
 ```powershell
 uv sync --dev
@@ -12,6 +12,8 @@ uv run demi
 ```
 
 `uv run python -m demi` と `uv run project-demi` も同じ PySide6 / Qt Widgets GUI を起動する。GUIはコントローラー入力のプレビュー、フォーカス中のキーボード / マウス入力捕捉、キー割り当て・接続・色の設定ダイアログ、接続と新規ペアリングの操作を提供する。入力捕捉は明示操作で開始し、`F12` またはフォーカス喪失で解除される。
+
+swbt-python 0.5.2 以前で作成したschema v1の保存済み接続プロファイルは、0.6系では読み込めない。設定画面で既存プロファイルを削除し、対象機器と再ペアリングする。Project_Demiはプロファイルを自動変換または上書きしない。
 
 メインウィンドウの最小サイズは `800 x 520` である。コントローラープレビューは中央の `8:5` 領域へ収まり、横長では左右、縦長では上下が背景余白になる。画面比を変えてもフェイスボタン、十字キー、スティックは円形を保つ。
 

@@ -84,7 +84,7 @@ PyInstaller 固有の pyglet 参照は依存撤去時に削除する。ただし
 - 現行実装の UI 描画、イベントループ、時計、入力捕捉、キー・マウス定数は pyglet に依存している。
 - ツールバー、状態バー、設定モーダルは座標と当たり判定を含む独自実装である。
 - domain、controller、config、主要な input mapping は pyglet 具象型を持たない。
-- CI は Windows、macOS、Linux と Python 3.12、3.13 の組合せを持つ。
+- CI は Windows、macOS、Linux と Python 3.13、3.14 の組合せを持つ。
 - PyInstaller の standalone build は現行 pyglet 構成を前提とし、UI 再設計完了後に PySide6 構成で再検証する。
 
 ### 7.2 未検証

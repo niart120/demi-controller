@@ -9,14 +9,15 @@ authors = [
 maintainers = [
     { name = "niart120" },
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -25,7 +26,7 @@ dependencies = [
     "pysdl2>=0.9.17",
     "pysdl2-dll>=2.32.10",
     "pyside6>=6.11,<6.12",
-    "swbt-python>=0.5.1,<0.6.0",
+    "swbt-python>=0.6.0,<0.7.0",
     "tomli-w>=1.2.0",
 ]
 
@@ -66,7 +67,7 @@ source-include = [
 line-length = 100
 required-version = ">=0.15.16"
 src = ["src", "tests"]
-target-version = "py312"
+target-version = "py313"
 force-exclude = true
 extend-exclude = [
     ".uv-cache",
@@ -129,7 +130,7 @@ strict = true
 known-first-party = ["demi"]
 
 [tool.ty.environment]
-python-version = "3.12"
+python-version = "3.13"
 root = ["./src"]
 
 [tool.ty.src]
