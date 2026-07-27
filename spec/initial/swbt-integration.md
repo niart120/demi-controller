@@ -2,9 +2,15 @@
 
 ## 1. 対象契約
 
-0.1.0は `swbt-python>=0.5.1,<0.6.0` を対象とする。Project_Demiは周期送信型を使わず、
+0.1.0は `swbt-python>=0.6.0,<0.7.0` を対象とする。Project_Demiは周期送信型を使わず、
 入力レポートをBumbleの送信キューへ受理させるまでawaitできるDirect公開型だけに依存する。
 HCIの送信完了や対象機器への反映は、このawaitの完了条件に含めない。主に次の公開要素を使う。
+
+swbt-python 0.6.0はPython 3.13以上を要求する。Windows / Python 3.12.10ではmonotonic
+clockの分解能が15.625 msとなり、8 ms Direct入力で周期的なカクつきが観測された。
+同じ構成のPython 3.13.5では100 ns分解能となり、8 ms入力が滑らかに見えた。
+この実機観測はOS負荷を含む厳密な8 ms / 125 Hzを保証しない。Project_Demiは時計を
+独自実装へ差し替えず、Python 3.13以上の標準clockを使う。
 
 ```python
 from swbt import (
@@ -137,7 +143,7 @@ swbt 0.4のkey-store JSONや壊れたプロファイルは、`open()`時の検�
 
 ### 3.3 接続直後
 
-swbt-python 0.5.1 の `create_profile()`、`connect()`、`reconnect()` は、HID link 接続だけでは
+swbt-python 0.6.0 の `create_profile()`、`connect()`、`reconnect()` は、HID link 接続だけでは
 復帰せず、初期subcommand応答とplayer割り当てが完了したprotocol-ready状態まで待つ。
 Project_Demiは、この公開APIが正常復帰した後、入力受付開始前に次を行う。
 
@@ -315,13 +321,14 @@ colors = ControllerColors(
 - スロット名は `[a-z0-9][a-z0-9_-]{0,31}` に制限
 - パストラバーサルを拒否
 - Pro Controllerと将来のJoy-Conで同じファイルを共有しない
-- Bluetoothアドレスの選択方法とペアリングキーを含むswbt 0.5プロファイルとして扱う
+- Bluetoothアドレスの選択方法とペアリングキーを含むswbt 0.6 schema v2プロファイルとして扱う
 - 内容をProject_Demiが解釈、編集、整形しない
 - ログへ内容を出さない
 - 削除はユーザーの明示操作と確認が必要
 - 可能なOSではユーザーだけが読める権限へ設定する
-- swbt 0.4の`key_store_path`が保存したJSONとは互換性がない。0.5への更新後は未使用スロットを
-  選ぶか、旧ファイルを明示削除してから再ペアリングする。自動移行や自動上書きは行わない
+- swbt 0.4の`key_store_path`が保存したJSONと、swbt-python 0.5.2以前のschema v1
+  プロファイルには互換性がない。0.6への更新後は旧ファイルを明示削除してから
+  再ペアリングする。自動移行や自動上書きは行わない
 
 ## 10. コマンド
 

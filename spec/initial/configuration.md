@@ -331,7 +331,7 @@ domain.settings
   immutable validated settings
 ```
 
-`tomli_w` は書き込みだけに使う。読み込みはPython 3.12標準の `tomllib` を使う。
+`tomli_w` は書き込みだけに使う。読み込みはPython 3.13標準の `tomllib` を使う。
 
 ## 7. 移行
 

@@ -371,7 +371,7 @@ fixtureには入力列、設定、期待する `ControllerFrame` だけを記録
 
 ## 10. CI
 
-- Python 3.12と3.13
+- Python 3.13と3.14
 - Windows、macOS、Linux
 - unit/integrationをOS行列で実行
 - UI試験は仮想表示またはOSランナーで安定する範囲だけ

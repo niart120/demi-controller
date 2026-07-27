@@ -9,7 +9,7 @@
 
 ## プロジェクト概要
 
-`demi-controller` は Python `>=3.12` を前提にしたパッケージである。
+`demi-controller` は Python `>=3.13` を前提にしたパッケージである。
 
 | 種別 | 値 |
 |---|---|
@@ -64,8 +64,8 @@
 - Python スクリプトは `python ...` ではなく `uv run python ...` で実行する。
 - 依存追加は `uv add <package>`、開発依存は `uv add --dev <package>` を使う。
 - パッケージメタデータや依存を変更したら `uv lock` を実行し、`uv.lock` を commit する。
-- 型注釈は Python 3.12+ の構文を使う。
-- 標準ライブラリで表現できる型を優先し、`3.12` 前提では `typing_extensions` などの互換用パッケージは原則不要。
+- 型注釈は Python 3.13+ の構文を使う。
+- 標準ライブラリで表現できる型を優先し、`3.13` 前提では `typing_extensions` などの互換用パッケージは原則不要。
 - 実行時に不要な型だけの import は `if TYPE_CHECKING:` に置く。
 - `from __future__ import annotations` は、相互参照や実行時評価の遅延が必要な場合だけ使う。
 - public API には Google style の docstring を書く。

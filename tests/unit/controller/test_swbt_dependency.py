@@ -14,10 +14,10 @@ from swbt import (
 )
 
 
-def test_swbt_v05_direct_public_contract_is_available() -> None:
-    """Expose the v0.5 Direct public values required by the Project_Demi boundary."""
+def test_swbt_v06_direct_public_contract_is_available() -> None:
+    """Expose the v0.6 Direct public values required by the Project_Demi boundary."""
     installed_version = tuple(int(part) for part in version("swbt-python").split(".")[:3])
-    assert (0, 5, 1) <= installed_version < (0, 6, 0)
+    assert (0, 6, 0) <= installed_version < (0, 7, 0)
     constructor_parameters = inspect.signature(DirectProController).parameters
     profile_parameters = inspect.signature(DirectProController.create_profile).parameters
     assert "profile_path" in constructor_parameters
